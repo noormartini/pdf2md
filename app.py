@@ -1,66 +1,27 @@
-import fitz
-import requests
+from config import Config
 
+from extraction.text import extract_pages_from_pdf
+from llm.client import convert_pdf_text_to_markdown
+from .postprocess import postprocess_markdown
 
-def extract_pages_from_pdf(pdf_path: str, max_pages: int = 3) -> list[str]:
-    """Extract text page by page from the PDF."""
-    doc = fitz.open(pdf_path)
-    pages = []
+def run(config: Config):
+    pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
 
-    try:
-        for i, page in enumerate(doc):  # type: ignore[arg-type]
-            if i >= max_pages:
-                break
+    if not pages:
+        raise ValueError("No text could be extracted from the PDF.")
 
-            text = page.get_text("text")
-            if text and text.strip():
-                pages.append(text.strip())
-    finally:
-        doc.close()
+    cleaned_pages = []
 
-    return pages
+    for i, page_text in enumerate(pages, start=1):
+        print(f"Sending page {i} to LM Studio...")
+        cleaned = convert_pdf_text_to_markdown(config.base_url, config.model, page_text)
+        cleaned_pages.append(cleaned)
 
+    markdown = "\n\n".join(cleaned_pages)
+    markdown = postprocess_markdown(markdown)
 
-def clean_text_with_llm(base_url: str, model_name: str, text: str) -> str:
-    """Send extracted text to LM Studio and get cleaned Markdown back."""
-    payload = {
-        "model": model_name,
-        "messages": [
-            {
-                "role": "system",
-                "content": """\
-Convert the following PDF-extracted text into clean Markdown.
+    print("Saving Markdown output...")
+    with open(config.output, "w", encoding="utf-8") as f:
+        f.write(markdown)
 
-Rules:
-- Preserve the original meaning exactly.
-- Do not invent or add content.
-- Fix broken line breaks inside paragraphs.
-- Preserve real paragraph breaks.
-- Detect likely headings and format them as Markdown headings.
-- Use # for the document title if clearly visible.
-- Use ## and ### for section and subsection headings where appropriate.
-- If text looks like source code, wrap it in fenced code blocks.
-- If text looks like a list, format it as a Markdown list.
-- Keep formulas as plain text if unsure.
-- Return only the final Markdown.""",
-            },
-            {"role": "user", "content": f"TEXT:\n{text}"},
-        ],
-        "temperature": 0.2,
-        "max_tokens": 4096,
-    }
-
-    response = requests.post(f"{base_url}/chat/completions", json=payload, timeout=120)
-    response.raise_for_status()
-    data = response.json()
-    return data["choices"][0]["message"]["content"]
-
-
-def postprocess_markdown(md: str) -> str:
-    """Simple cleanup for line endings and excessive blank lines."""
-    md = md.replace("\r\n", "\n").replace("\r", "\n")
-
-    while "\n\n\n" in md:
-        md = md.replace("\n\n\n", "\n\n")
-
-    return md.strip() + "\n"
+    print(f"Done! Output saved as '{config.output}'.")
