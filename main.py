@@ -5,8 +5,8 @@ import argparse
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input",  default="test_pdf_source.pdf", help="Input PDF file",)
-    parser.add_argument("-o", "--output", default="test_pdf_output.md", help="Output Markdown file")     
-    parser.add_argument("-b", "--base-url", default="http://127.0.0.1:1234/api/v1", help="LM Studio base url",) 
+    parser.add_argument("-o", "--output", default="output/test_pdf_output.md", help="Output Markdown file")     
+    parser.add_argument("-b", "--base-url", default="http://127.0.0.1:1234/v1", help="LM Studio base url",) 
     parser.add_argument("-m", "--model", default="google/gemma-3-4b", help="Model name")
     parser.add_argument("-n", "--max-pages", default=3, help="Max pages to convert to markdown")                                                           
     args = parser.parse_args()

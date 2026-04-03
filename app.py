@@ -25,37 +25,38 @@ def clean_text_with_llm(base_url: str, model_name: str, text: str) -> str:
     """Send extracted text to LM Studio and get cleaned Markdown back."""
     payload = {
         "model": model_name,
-        "input": (
-            "Convert the following PDF-extracted text into clean Markdown.\n\n"
-            "Rules:\n"
-            "- Preserve the original meaning exactly.\n"
-            "- Do not invent or add content.\n"
-            "- Fix broken line breaks inside paragraphs.\n"
-            "- Preserve real paragraph breaks.\n"
-            "- Detect likely headings and format them as Markdown headings.\n"
-            "- Use # for the document title if clearly visible.\n"
-            "- Use ## and ### for section and subsection headings where appropriate.\n"
-            "- If text looks like source code, wrap it in fenced code blocks.\n"
-            "- If text looks like a list, format it as a Markdown list.\n"
-            "- Keep formulas as plain text if unsure.\n"
-            "- Return only the final Markdown.\n\n"
-            f"TEXT:\n{text}"
-        ),
+        "messages": [
+            {
+                "role": "system",
+                "content": """\
+Convert the following PDF-extracted text into clean Markdown.
+
+Rules:
+- Preserve the original meaning exactly.
+- Do not invent or add content.
+- Fix broken line breaks inside paragraphs.
+- Preserve real paragraph breaks.
+- Detect likely headings and format them as Markdown headings.
+- Use # for the document title if clearly visible.
+- Use ## and ### for section and subsection headings where appropriate.
+- If text looks like source code, wrap it in fenced code blocks.
+- If text looks like a list, format it as a Markdown list.
+- Keep formulas as plain text if unsure.
+- Return only the final Markdown."""
+            },
+            {
+                "role": "user",
+                "content": f"TEXT:\n{text}"
+            }
+        ],
+        "temperature": 0.2,
+        "max_tokens": 4096,
     }
 
-    response = requests.post(f"{base_url}/chat", json=payload, timeout=120)
+    response = requests.post(f"{base_url}/chat/completions", json=payload, timeout=120)
     response.raise_for_status()
-
     data = response.json()
-    print("LM Studio response:", data)
-
-    if "output" in data and isinstance(data["output"], list) and len(data["output"]) > 0:
-        first_output = data["output"][0]
-        if isinstance(first_output, dict) and "content" in first_output:
-            return first_output["content"]
-
-    raise ValueError(f"Unexpected LM Studio response: {data}")
-
+    return data["choices"][0]["message"]["content"]
 
 def postprocess_markdown(md: str) -> str:
     """Simple cleanup for line endings and excessive blank lines."""
