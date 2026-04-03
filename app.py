@@ -1,11 +1,6 @@
 import fitz
 import requests
 
-PDF_FILE = "file.pdf"
-OUTPUT_FILE = "output.md"
-LM_STUDIO_URL = "http://127.0.0.1:1234/api/v1/chat"
-MODEL_NAME = "mistralai/mistral-7b-instruct-v0.3"
-
 
 def extract_pages_from_pdf(pdf_path: str, max_pages: int = 3) -> list[str]:
     """Extract text page by page from the PDF."""
@@ -13,7 +8,7 @@ def extract_pages_from_pdf(pdf_path: str, max_pages: int = 3) -> list[str]:
     pages = []
 
     try:
-        for i, page in enumerate(doc):
+        for i, page in enumerate(doc): # type: ignore[arg-type]
             if i >= max_pages:
                 break
 
@@ -26,10 +21,10 @@ def extract_pages_from_pdf(pdf_path: str, max_pages: int = 3) -> list[str]:
     return pages
 
 
-def clean_text_with_llm(text: str) -> str:
+def clean_text_with_llm(base_url: str, model_name: str, text: str) -> str:
     """Send extracted text to LM Studio and get cleaned Markdown back."""
     payload = {
-        "model": MODEL_NAME,
+        "model": model_name,
         "input": (
             "Convert the following PDF-extracted text into clean Markdown.\n\n"
             "Rules:\n"
@@ -48,7 +43,7 @@ def clean_text_with_llm(text: str) -> str:
         ),
     }
 
-    response = requests.post(LM_STUDIO_URL, json=payload, timeout=120)
+    response = requests.post(f"{base_url}/chat", json=payload, timeout=120)
     response.raise_for_status()
 
     data = response.json()
@@ -70,34 +65,3 @@ def postprocess_markdown(md: str) -> str:
         md = md.replace("\n\n\n", "\n\n")
 
     return md.strip() + "\n"
-
-
-def main() -> None:
-    print("Extracting text from PDF...")
-    pages = extract_pages_from_pdf(PDF_FILE, max_pages=3)
-
-    if not pages:
-        raise ValueError("No text could be extracted from the PDF.")
-
-    cleaned_pages = []
-
-    for i, page_text in enumerate(pages, start=1):
-        print(f"Sending page {i} to LM Studio...")
-        cleaned = clean_text_with_llm(page_text)
-        cleaned_pages.append(cleaned)
-
-    markdown = "\n\n".join(cleaned_pages)
-    markdown = postprocess_markdown(markdown)
-
-    print("Saving Markdown output...")
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        f.write(markdown)
-
-    print(f"Done! Output saved as '{OUTPUT_FILE}'.")
-
-
-if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"Error: {e}")
