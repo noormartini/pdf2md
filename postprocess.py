@@ -1,4 +1,3 @@
-
 def postprocess_markdown(md: str) -> str:
     """Simple cleanup for line endings and excessive blank lines."""
     md = md.replace("\r\n", "\n").replace("\r", "\n")

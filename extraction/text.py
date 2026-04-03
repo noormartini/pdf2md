@@ -1,5 +1,6 @@
 import fitz
 
+
 def extract_pages_from_pdf(pdf_path: str, max_pages: int = 3) -> list[str]:
     """Extract text page by page from the PDF."""
     doc = fitz.open(pdf_path)

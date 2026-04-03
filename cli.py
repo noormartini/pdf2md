@@ -48,6 +48,6 @@ def parse_args():
         "--max-tokens",
         type=int,
         default=4096,
-        help="Max response length from LLM"
+        help="Max response length from LLM",
     )
     return parser.parse_args()

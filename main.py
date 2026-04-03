@@ -1,7 +1,7 @@
 from config import Config
 
-from .cli import parse_args
-from .app import run
+from cli import parse_args
+from app import run
 
 
 def main() -> None:
@@ -14,7 +14,7 @@ def main() -> None:
         max_pages=args.max_pages,
         strategy=args.strategy,
         temperature=args.temperature,
-        max_tokens=args.max_tokens
+        max_tokens=args.max_tokens,
     )
     run(config)
 
