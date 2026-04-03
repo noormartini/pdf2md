@@ -1,67 +1,38 @@
-import fitz
-import requests
+from config import Config
 
+from extraction.text import extract_pages_from_pdf
+from postprocess import postprocess_markdown
+from strategies.text_only import text_strategy
 
-def extract_pages_from_pdf(pdf_path: str, max_pages: int = 3) -> list[str]:
-    """Extract text page by page from the PDF."""
-    doc = fitz.open(pdf_path)
-    pages = []
+def run(config: Config):
+    pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
 
-    try:
-        for i, page in enumerate(doc): # type: ignore[arg-type]
-            if i >= max_pages:
-                break
+    if not pages:
+        raise ValueError("No text could be extracted from the PDF.")
 
-            text = page.get_text("text")
-            if text and text.strip():
-                pages.append(text.strip())
-    finally:
-        doc.close()
+    cleaned_pages = []
 
-    return pages
+    match (config.strategy):
+        case "text":
+            for i, page_text in enumerate(pages, start=1):
+                print(f"Sending page {i} to LM Studio...")
+                cleaned = text_strategy(
+                    base_url=config.base_url,
+                    model_name=config.model,
+                    text=page_text,
+                    temperature=config.temperature,
+                    max_tokens=config.max_tokens,
+                    prompt_variant="default"
+                )
+                cleaned_pages.append(cleaned)
+        case _:
+            raise ValueError(f"Unknown strategy: {config.strategy}") 
 
+    markdown = "\n\n".join(cleaned_pages)
+    markdown = postprocess_markdown(markdown)
 
-def clean_text_with_llm(base_url: str, model_name: str, text: str) -> str:
-    """Send extracted text to LM Studio and get cleaned Markdown back."""
-    payload = {
-        "model": model_name,
-        "input": (
-            "Convert the following PDF-extracted text into clean Markdown.\n\n"
-            "Rules:\n"
-            "- Preserve the original meaning exactly.\n"
-            "- Do not invent or add content.\n"
-            "- Fix broken line breaks inside paragraphs.\n"
-            "- Preserve real paragraph breaks.\n"
-            "- Detect likely headings and format them as Markdown headings.\n"
-            "- Use # for the document title if clearly visible.\n"
-            "- Use ## and ### for section and subsection headings where appropriate.\n"
-            "- If text looks like source code, wrap it in fenced code blocks.\n"
-            "- If text looks like a list, format it as a Markdown list.\n"
-            "- Keep formulas as plain text if unsure.\n"
-            "- Return only the final Markdown.\n\n"
-            f"TEXT:\n{text}"
-        ),
-    }
+    print("Saving Markdown output...")
+    with open(config.output, "w", encoding="utf-8") as f:
+        f.write(markdown)
 
-    response = requests.post(f"{base_url}/chat", json=payload, timeout=120)
-    response.raise_for_status()
-
-    data = response.json()
-    print("LM Studio response:", data)
-
-    if "output" in data and isinstance(data["output"], list) and len(data["output"]) > 0:
-        first_output = data["output"][0]
-        if isinstance(first_output, dict) and "content" in first_output:
-            return first_output["content"]
-
-    raise ValueError(f"Unexpected LM Studio response: {data}")
-
-
-def postprocess_markdown(md: str) -> str:
-    """Simple cleanup for line endings and excessive blank lines."""
-    md = md.replace("\r\n", "\n").replace("\r", "\n")
-
-    while "\n\n\n" in md:
-        md = md.replace("\n\n\n", "\n\n")
-
-    return md.strip() + "\n"
+    print(f"Done! Output saved as '{config.output}'.")

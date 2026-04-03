@@ -1,4 +1,4 @@
-# Multimodal conversion of PDF documents to Markdown for fast and accurate format conversion
+# Multimodal PDF-to-Markdown for fast and accurate format conversion
 
 ## Thesis Info
 
