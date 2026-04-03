@@ -8,7 +8,7 @@ def extract_pages_from_pdf(pdf_path: str, max_pages: int = 3) -> list[str]:
     pages = []
 
     try:
-        for i, page in enumerate(doc): # type: ignore[arg-type]
+        for i, page in enumerate(doc):  # type: ignore[arg-type]
             if i >= max_pages:
                 break
 
@@ -42,12 +42,9 @@ Rules:
 - If text looks like source code, wrap it in fenced code blocks.
 - If text looks like a list, format it as a Markdown list.
 - Keep formulas as plain text if unsure.
-- Return only the final Markdown."""
+- Return only the final Markdown.""",
             },
-            {
-                "role": "user",
-                "content": f"TEXT:\n{text}"
-            }
+            {"role": "user", "content": f"TEXT:\n{text}"},
         ],
         "temperature": 0.2,
         "max_tokens": 4096,
@@ -57,6 +54,7 @@ Rules:
     response.raise_for_status()
     data = response.json()
     return data["choices"][0]["message"]["content"]
+
 
 def postprocess_markdown(md: str) -> str:
     """Simple cleanup for line endings and excessive blank lines."""
