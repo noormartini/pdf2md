@@ -8,7 +8,7 @@ def main() -> None:
     parser.add_argument("-o", "--output", default="output/test_pdf_output.md", help="Output Markdown file")     
     parser.add_argument("-b", "--base-url", default="http://127.0.0.1:1234/v1", help="LM Studio base url",) 
     parser.add_argument("-m", "--model", default="google/gemma-3-4b", help="Model name")
-    parser.add_argument("-n", "--max-pages", default=3, help="Max pages to convert to markdown")                                                           
+    parser.add_argument("-n", "--max-pages", type=int, default=3, help="Max pages to convert to markdown")                                                           
     args = parser.parse_args()
 
     pages = extract_pages_from_pdf(args.input, max_pages=args.max_pages)
