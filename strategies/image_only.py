@@ -22,15 +22,13 @@ def image_strategy(
         prompt_variant: The prompt variant to use from PROMPTS
     """
     # Build content with images
-    content: list[dict[str, object]] = [{"type": "text", "text": PROMPTS[prompt_variant]["user"]}]
+    content: list[dict[str, object]] = []
     
     for img_base64 in images:
         content.append({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": "image/png",
-                "data": img_base64,
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/png;base64,{img_base64}",
             },
         })
     

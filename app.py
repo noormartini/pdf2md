@@ -8,17 +8,14 @@ from strategies.image_only import image_strategy
 from strategies.hybrid import hybrid_strategy
 
 def run(config: Config):
-    pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
-
-    if not pages:
-        raise ValueError("No text could be extracted from the PDF.")
-
-    cleaned_pages = []
-
     match (config.strategy):
         case "text":
-            for i, page_text in enumerate(pages, start=1):
-                print(f"Sending page {i} to LM Studio...")
+            pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
+            if not pages:
+                raise ValueError("No text could be extracted from the PDF.")
+            cleaned_pages = []
+            for i, page_text in enumerate(pages):
+                print(f"Sending page {i+1} to LM Studio...")
                 cleaned = text_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
@@ -32,8 +29,9 @@ def run(config: Config):
             images = extract_images_from_pdf(config.input, max_pages=config.max_pages)
             if not images:
                 raise ValueError("No images could be extracted from the PDF.")
-            for i, page_images in enumerate(images, start=1):
-                print(f"Sending page {i} to LM Studio...")
+            cleaned_pages = []
+            for i, page_images in enumerate(images):
+                print(f"Sending page {i+1} to LM Studio...")
                 cleaned = image_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
@@ -44,11 +42,15 @@ def run(config: Config):
                 )
                 cleaned_pages.append(cleaned)
         case "hybrid":
+            pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
             images = extract_images_from_pdf(config.input, max_pages=config.max_pages)
+            if not pages:
+                raise ValueError("No text could be extracted from the PDF.")
             if not images:
                 raise ValueError("No images could be extracted from the PDF.")
-            for i, (page_text, page_image) in enumerate(zip(pages, images), start=1):
-                print(f"Sending page {i} to LM Studio...")
+            cleaned_pages = []
+            for i, (page_text, page_image) in enumerate(zip(pages, images)):
+                print(f"Sending page {i+1} to LM Studio...")
                 cleaned = hybrid_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
