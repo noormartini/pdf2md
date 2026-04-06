@@ -1,0 +1,23 @@
+{
+  "name": "Sample Experiment",
+  "input_pdf": "test.pdf",
+  "reference_dir": "references",
+  "strategies": [
+    "text",
+    "image",
+    "hybrid"
+  ],
+  "models": [
+    "gemma-3-4b"
+  ],
+  "prompt_variants": [
+    "default"
+  ],
+  "temperatures": [
+    0.0,
+    0.2,
+    0.5
+  ],
+  "max_pages": 6,
+  "base_url": "http://localhost:1234/v1"
+}
