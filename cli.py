@@ -33,8 +33,8 @@ def parse_args():
         "-s",
         "--strategy",
         default="text",
-        choices=["text", "image", "hybrid"],
-        help="Conversion strategy",
+        choices=["text", "image", "hybrid", "adaptive"],
+        help="Conversion strategy: text, image, hybrid, or adaptive (per-page auto-detection)",
     )
     parser.add_argument(
         "-t",
