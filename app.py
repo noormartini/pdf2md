@@ -1,14 +1,21 @@
+import os
+
 import fitz
 
 from config import Config
 
 from extraction.text import extract_pages_from_pdf
-from extraction.image import extract_pages_from_pdf as extract_images_from_pdf
+from extraction.image import extract_pages_from_pdf as extract_images_from_pdf, extract_embedded_images
 from postprocess import postprocess_markdown
 from strategies.text_only import text_strategy
 from strategies.image_only import image_strategy
 from strategies.hybrid import hybrid_strategy
 from strategies.adaptive import analyze_page, adaptive_strategy, render_page_as_base64
+
+
+def _images_dir(output_path: str) -> str:
+    """Return the images/ directory next to the output Markdown file."""
+    return os.path.join(os.path.dirname(os.path.abspath(output_path)), "images")
 
 
 def run(config: Config):
@@ -28,6 +35,9 @@ def run(config: Config):
                     max_tokens=config.max_tokens,
                     prompt_variant="default",
                 )
+                img_refs = extract_embedded_images(config.input, i, _images_dir(config.output))
+                if img_refs:
+                    cleaned += "\n\n" + "\n\n".join(img_refs)
                 cleaned_pages.append(cleaned)
 
         case "image":
@@ -45,6 +55,9 @@ def run(config: Config):
                     max_tokens=config.max_tokens,
                     prompt_variant="default",
                 )
+                img_refs = extract_embedded_images(config.input, i, _images_dir(config.output))
+                if img_refs:
+                    cleaned += "\n\n" + "\n\n".join(img_refs)
                 cleaned_pages.append(cleaned)
 
         case "hybrid":
@@ -66,6 +79,9 @@ def run(config: Config):
                     max_tokens=config.max_tokens,
                     prompt_variant="default",
                 )
+                img_refs = extract_embedded_images(config.input, i, _images_dir(config.output))
+                if img_refs:
+                    cleaned += "\n\n" + "\n\n".join(img_refs)
                 cleaned_pages.append(cleaned)
 
         case "adaptive":
@@ -91,6 +107,9 @@ def run(config: Config):
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
                 )
+                img_refs = extract_embedded_images(config.input, i, _images_dir(config.output))
+                if img_refs:
+                    cleaned += "\n\n" + "\n\n".join(img_refs)
                 cleaned_pages.append(cleaned)
             doc.close()
 
