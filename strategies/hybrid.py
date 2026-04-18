@@ -1,5 +1,9 @@
+import time
+from typing import Callable
+
 from llm.prompts import PROMPTS
 from llm.client import call_llm
+from strategies.result import ConversionResult
 
 
 def hybrid_strategy(
@@ -10,23 +14,17 @@ def hybrid_strategy(
     temperature: float,
     max_tokens: int,
     prompt_variant: str = "default",
-) -> str:
-    """Converts PDF pages using both text and images into markdown using an LLM.
-    
-    Args:
-        base_url: The base URL of the LLM server
-        model_name: The name of the LLM model to use
-        text: The extracted text from the PDF page
-        images: List of base64-encoded image strings
-        temperature: Temperature parameter for the LLM
-        max_tokens: Maximum tokens for the LLM response
-        prompt_variant: The prompt variant to use from PROMPTS
+    llm_call: Callable = call_llm,
+) -> ConversionResult:
+    """Convert a PDF page to Markdown via a vision LLM using both text and image.
+
+    `llm_call` is injectable so tests can swap in a fake without touching
+    the network.
     """
-    # Build content with both text and images
     content: list[dict[str, object]] = [
         {"type": "text", "text": PROMPTS[prompt_variant]["user"].format(text=text)}
     ]
-    
+
     for img_base64 in images:
         content.append({
             "type": "image_url",
@@ -34,10 +32,18 @@ def hybrid_strategy(
                 "url": f"data:image/png;base64,{img_base64}",
             },
         })
-    
+
     messages = [
         {"role": "system", "content": PROMPTS[prompt_variant]["system"]},
         {"role": "user", "content": content},
     ]
 
-    return call_llm(base_url, model_name, messages, temperature, max_tokens)
+    start = time.perf_counter()
+    response, token_usage = llm_call(base_url, model_name, messages, temperature, max_tokens)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+
+    return ConversionResult(
+        markdown=response,
+        timing_ms=elapsed_ms,
+        token_usage=token_usage,
+    )

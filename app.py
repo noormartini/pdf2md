@@ -16,7 +16,7 @@ def run(config: Config):
             cleaned_pages = []
             for i, page_text in enumerate(pages):
                 print(f"Sending page {i+1} to LM Studio...")
-                cleaned = text_strategy(
+                result = text_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
                     text=page_text,
@@ -24,7 +24,7 @@ def run(config: Config):
                     max_tokens=config.max_tokens,
                     prompt_variant="default"
                 )
-                cleaned_pages.append(cleaned)
+                cleaned_pages.append(result.markdown)
         case "image":
             images = extract_images_from_pdf(config.input, max_pages=config.max_pages)
             if not images:
@@ -32,7 +32,7 @@ def run(config: Config):
             cleaned_pages = []
             for i, page_images in enumerate(images):
                 print(f"Sending page {i+1} to LM Studio...")
-                cleaned = image_strategy(
+                result = image_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
                     images=[page_images],
@@ -40,7 +40,7 @@ def run(config: Config):
                     max_tokens=config.max_tokens,
                     prompt_variant="default"
                 )
-                cleaned_pages.append(cleaned)
+                cleaned_pages.append(result.markdown)
         case "hybrid":
             pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
             images = extract_images_from_pdf(config.input, max_pages=config.max_pages)
@@ -51,7 +51,7 @@ def run(config: Config):
             cleaned_pages = []
             for i, (page_text, page_image) in enumerate(zip(pages, images)):
                 print(f"Sending page {i+1} to LM Studio...")
-                cleaned = hybrid_strategy(
+                result = hybrid_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
                     text=page_text,
@@ -60,7 +60,7 @@ def run(config: Config):
                     max_tokens=config.max_tokens,
                     prompt_variant="default"
                 )
-                cleaned_pages.append(cleaned)
+                cleaned_pages.append(result.markdown)
         case _:
             raise ValueError(f"Unknown strategy: {config.strategy}") 
 
