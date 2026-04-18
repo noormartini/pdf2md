@@ -158,23 +158,29 @@ def code_block_score(reference: str, candidate: str) -> float:
 
 
 def count_paragraphs(text: str) -> int:
-    """Count paragraphs in markdown text."""
-    # Split by double newlines and filter empty lines
+    """Count paragraphs in markdown text, excluding headings and code blocks.
+
+    Code blocks may be fully contained in one block (no blank line between
+    the fences) or span multiple blocks. We track the open/closed state by
+    counting fence markers rather than toggling once per block, so a
+    self-contained ``` … ``` does not leave the state stuck "inside code".
+    """
     blocks = [b.strip() for b in text.split("\n\n") if b.strip()]
-    # Exclude headings and code blocks from paragraph count
     paragraphs = 0
     in_code = False
 
     for block in blocks:
-        if block.startswith("```"):
-            in_code = not in_code
+        fence_count = block.count("```")
+        if fence_count:
+            # Odd → this block flips the in/out state; even → self-contained.
+            if fence_count % 2 == 1:
+                in_code = not in_code
             continue
         if in_code:
             continue
         if block.startswith("#"):
             continue
-        if block:
-            paragraphs += 1
+        paragraphs += 1
 
     return paragraphs
 
