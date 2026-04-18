@@ -60,22 +60,23 @@ def heading_structure_score(reference: str, candidate: str) -> float:
     """
     Compare heading structure between reference and candidate.
     Returns similarity score based on heading counts per level.
+
+    Only levels used by either side contribute to the score, so a page that
+    only has H1+H2 is not artificially inflated by perfect H3-H6 matches.
     """
     ref_counts = count_headings(reference)
     cand_counts = count_headings(candidate)
 
-    # Calculate per-level similarity
     similarities = []
     for level in ref_counts.keys():
         ref_val = ref_counts[level]
         cand_val = cand_counts[level]
 
         if ref_val == 0 and cand_val == 0:
-            similarities.append(1.0)
-        elif ref_val == 0 or cand_val == 0:
+            continue
+        if ref_val == 0 or cand_val == 0:
             similarities.append(0.0)
         else:
-            # Ratio of counts, capped at 1.0
             similarities.append(min(ref_val / cand_val, cand_val / ref_val))
 
     return sum(similarities) / len(similarities) if similarities else 1.0

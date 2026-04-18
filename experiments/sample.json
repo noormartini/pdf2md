@@ -1,6 +1,6 @@
 {
   "name": "Sample Experiment",
-  "input_pdf": "test.pdf",
+  "input_pdf": "test_pdf_source.pdf",
   "reference_dir": "references",
   "strategies": [
     "text",
@@ -18,6 +18,6 @@
     0.2,
     0.5
   ],
-  "max_pages": 6,
+  "max_pages": 1,
   "base_url": "http://localhost:1234/v1"
 }

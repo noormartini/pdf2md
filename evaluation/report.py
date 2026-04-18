@@ -96,6 +96,9 @@ def generate_summary_table(results: list[dict]) -> str:
         for k, v in r["metrics"].items():
             strategy_data[strategy]["metrics_sum"][k] += v
 
+    if not strategy_data:
+        return "*No successful conversions to summarise.*"
+
     # Build rows
     headers = ["Strategy", "Pages", "Avg Time (ms)"] + list(list(strategy_data.values())[0]["metrics_sum"].keys())
     rows = []
@@ -135,6 +138,9 @@ def generate_model_comparison(results: list[dict]) -> str:
         model_data[model]["total_time_ms"] += r["timing_ms"]
         for k, v in r["metrics"].items():
             model_data[model]["metrics_sum"][k] += v
+
+    if not model_data:
+        return "*No successful conversions to summarise.*"
 
     # Build rows
     headers = ["Model", "Pages", "Avg Time (ms)"] + list(list(model_data.values())[0]["metrics_sum"].keys())

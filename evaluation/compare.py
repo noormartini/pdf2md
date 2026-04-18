@@ -141,12 +141,20 @@ def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[Eva
     print(f"Temperatures: {config.temperatures}")
     print(f"{'='*60}\n")
 
+    # Resolve max_pages=None → total page count, so the downstream extractors
+    # (which require an int) get a concrete value.
+    if config.max_pages is None:
+        with fitz.open(config.input_pdf) as doc:
+            max_pages = len(doc)
+    else:
+        max_pages = config.max_pages
+
     # Extract text and images once
     print("Extracting text from PDF...")
-    pages = extract_pages_from_pdf(config.input_pdf, max_pages=config.max_pages)
+    pages = extract_pages_from_pdf(config.input_pdf, max_pages=max_pages)
 
     print("Extracting images from PDF...")
-    images = extract_images_from_pdf(config.input_pdf, max_pages=config.max_pages)
+    images = extract_images_from_pdf(config.input_pdf, max_pages=max_pages)
 
     num_pages = len(pages)
     print(f"Processing {num_pages} pages\n")
