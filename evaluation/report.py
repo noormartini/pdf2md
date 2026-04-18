@@ -1,6 +1,7 @@
 """Report generator for PDF-to-Markdown conversion experiments."""
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -328,6 +329,9 @@ def generate_full_report(results: list[dict], output_path: Optional[str] = None)
     report = "\n".join(lines)
 
     if output_path:
+        parent = os.path.dirname(output_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(report)
         print(f"Report saved to {output_path}")
@@ -340,8 +344,16 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="Generate report from evaluation results")
-    parser.add_argument("-i", "--input", required=True, help="Path to results JSON file")
-    parser.add_argument("-o", "--output", required=True, help="Path to save markdown report")
+    parser.add_argument(
+        "-i", "--input",
+        default="output/results.json",
+        help="Path to results JSON file (default: output/results.json)",
+    )
+    parser.add_argument(
+        "-o", "--output",
+        default="output/report.md",
+        help="Path to save markdown report (default: output/report.md)",
+    )
 
     args = parser.parse_args()
 

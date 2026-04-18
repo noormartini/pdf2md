@@ -1,6 +1,7 @@
 """Experiment runner for PDF-to-Markdown conversion comparisons."""
 
 import json
+import os
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Callable, Optional
@@ -242,8 +243,12 @@ def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[Eva
 
 
 def save_results(results: list[EvaluationResult], output_path: str) -> None:
-    """Save evaluation results to JSON file."""
+    """Save evaluation results to JSON file. Creates the parent dir if needed."""
     serializable = [asdict(r) for r in results]
+
+    parent = os.path.dirname(output_path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
 
     with open(output_path, "w") as f:
         json.dump(serializable, f, indent=2)
@@ -284,7 +289,11 @@ def main():
 
     parser = argparse.ArgumentParser(description="Run PDF-to-Markdown conversion experiments")
     parser.add_argument("-c", "--config", required=True, help="Path to experiment config JSON")
-    parser.add_argument("-o", "--output", required=True, help="Path to save results JSON")
+    parser.add_argument(
+        "-o", "--output",
+        default="output/results.json",
+        help="Path to save results JSON (default: output/results.json)",
+    )
     parser.add_argument("--max-tokens", type=int, default=4096, help="Max tokens for LLM")
 
     args = parser.parse_args()
