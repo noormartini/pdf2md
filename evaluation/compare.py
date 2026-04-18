@@ -1,15 +1,16 @@
 """Experiment runner for PDF-to-Markdown conversion comparisons."""
 
 import json
-import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
-from config import Config
+import fitz
+
 from strategies.text_only import text_strategy
 from strategies.image_only import image_strategy
 from strategies.hybrid import hybrid_strategy
+from strategies.result import ConversionResult
 from extraction.text import extract_pages_from_pdf
 from extraction.image import extract_pages_from_pdf as extract_images_from_pdf
 from evaluation.metrics import evaluate_conversion, EvaluationResult, aggregate_results
@@ -67,16 +68,16 @@ def run_strategy(
     base_url: str,
     model: str,
     page_text: str,
-    page_image: Optional[bytes],
+    page_image: Optional[str],
     temperature: float,
     max_tokens: int,
     prompt_variant: str,
-) -> tuple[Optional[str], float, Optional[int]]:
-    """
-    Run a conversion strategy and return (result, timing_ms, token_usage).
-    """
-    start_time = time.perf_counter()
+) -> tuple[Optional[ConversionResult], Optional[str]]:
+    """Run a conversion strategy and return (result, error).
 
+    On success, `result` carries `markdown`, `timing_ms`, and `token_usage`.
+    On failure, `result` is None and `error` holds the exception message.
+    """
     try:
         match strategy:
             case "text":
@@ -114,50 +115,47 @@ def run_strategy(
             case _:
                 raise ValueError(f"Unknown strategy: {strategy}")
 
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        return result, elapsed_ms, None  # Token usage not tracked yet
+        return result, None
 
     except Exception as e:
-        elapsed_ms = (time.perf_counter() - start_time) * 1000
-        return None, elapsed_ms, str(e)
+        return None, str(e)
 
 
-def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[EvaluationResult]:
+def prepare_pages(config: ExperimentConfig) -> tuple[list[str], list[str]]:
+    """Extract text and rendered page images for the configured PDF.
+
+    Resolves `max_pages=None` to the document's total page count so that
+    downstream extractors (which require an int) get a concrete value.
     """
-    Run a full experiment across all strategy/model/prompt/temperature combinations.
-
-    Returns a list of EvaluationResult objects.
-    """
-    results = []
-
-    print(f"\n{'='*60}")
-    print(f"Experiment: {config.name}")
-    print(f"{'='*60}")
-    print(f"Input PDF: {config.input_pdf}")
-    print(f"Reference dir: {config.reference_dir}")
-    print(f"Strategies: {config.strategies}")
-    print(f"Models: {config.models}")
-    print(f"Prompt variants: {config.prompt_variants}")
-    print(f"Temperatures: {config.temperatures}")
-    print(f"{'='*60}\n")
-
-    # Resolve max_pages=None → total page count, so the downstream extractors
-    # (which require an int) get a concrete value.
     if config.max_pages is None:
         with fitz.open(config.input_pdf) as doc:
             max_pages = len(doc)
     else:
         max_pages = config.max_pages
 
-    # Extract text and images once
     print("Extracting text from PDF...")
     pages = extract_pages_from_pdf(config.input_pdf, max_pages=max_pages)
 
     print("Extracting images from PDF...")
     images = extract_images_from_pdf(config.input_pdf, max_pages=max_pages)
 
+    return pages, images
+
+
+def run_combinations(
+    pages: list[str],
+    images: list[str],
+    config: ExperimentConfig,
+    max_tokens: int = 4096,
+    runner: Callable = run_strategy,
+) -> list[EvaluationResult]:
+    """Loop over every (strategy, model, prompt, temperature, page) combination.
+
+    `runner` is injectable so tests can swap in a fake without touching the
+    network. It must match `run_strategy`'s signature.
+    """
+    results: list[EvaluationResult] = []
     num_pages = len(pages)
-    print(f"Processing {num_pages} pages\n")
 
     total_combinations = (
         len(config.strategies)
@@ -180,18 +178,15 @@ def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[Eva
                               f"Page {page_num} | {strategy} | {model} | "
                               f"prompt={prompt_variant} | temp={temperature}")
 
-                        # Load reference
                         reference = load_reference(config.reference_dir, page_num)
                         if reference is None:
                             print(f"  ⚠ No reference found for page {page_num}, skipping")
                             continue
 
-                        # Get page content
                         page_text = pages[page_idx]
                         page_image = images[page_idx] if images else None
 
-                        # Run conversion
-                        result, timing_ms, error = run_strategy(
+                        result, error = runner(
                             strategy=strategy,
                             base_url=config.base_url,
                             model=model,
@@ -202,20 +197,24 @@ def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[Eva
                             prompt_variant=prompt_variant,
                         )
 
+                        timing_ms = result.timing_ms if result else 0.0
+                        token_usage = result.token_usage if result else None
+                        markdown = result.markdown if result else ""
+
                         if error:
                             print(f"  ✗ Error: {error}")
                         else:
                             print(f"  ✓ Completed in {timing_ms:.0f}ms")
 
-                        # Evaluate
                         eval_result = evaluate_conversion(
                             reference=reference,
-                            candidate=result or "",
+                            candidate=markdown,
                             page_number=page_num,
                             strategy=strategy,
                             model=model,
                             prompt_variant=prompt_variant,
                             timing_ms=timing_ms,
+                            token_usage=token_usage,
                             error=error,
                         )
                         results.append(eval_result)
@@ -223,13 +222,28 @@ def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[Eva
     return results
 
 
+def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[EvaluationResult]:
+    """Run a full experiment across all combinations defined in the config."""
+    print(f"\n{'='*60}")
+    print(f"Experiment: {config.name}")
+    print(f"{'='*60}")
+    print(f"Input PDF: {config.input_pdf}")
+    print(f"Reference dir: {config.reference_dir}")
+    print(f"Strategies: {config.strategies}")
+    print(f"Models: {config.models}")
+    print(f"Prompt variants: {config.prompt_variants}")
+    print(f"Temperatures: {config.temperatures}")
+    print(f"{'='*60}\n")
+
+    pages, images = prepare_pages(config)
+    print(f"Processing {len(pages)} pages\n")
+
+    return run_combinations(pages, images, config, max_tokens=max_tokens)
+
+
 def save_results(results: list[EvaluationResult], output_path: str) -> None:
     """Save evaluation results to JSON file."""
-    # Convert dataclasses to dicts for JSON serialization
-    serializable = []
-    for r in results:
-        d = asdict(r)
-        serializable.append(d)
+    serializable = [asdict(r) for r in results]
 
     with open(output_path, "w") as f:
         json.dump(serializable, f, indent=2)
@@ -242,14 +256,11 @@ def run_experiment_from_config(
     output_path: str,
     max_tokens: int = 4096,
 ) -> list[EvaluationResult]:
-    """
-    Load experiment config from JSON, run experiment, and save results.
-    """
+    """Load experiment config from JSON, run experiment, and save results."""
     config = load_experiment_config(config_path)
     results = run_experiment(config, max_tokens=max_tokens)
     save_results(results, output_path)
 
-    # Print summary
     summary = aggregate_results(results)
     print("\n" + "="*60)
     print("SUMMARY")
