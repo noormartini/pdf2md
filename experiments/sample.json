@@ -5,7 +5,8 @@
   "strategies": [
     "text",
     "image",
-    "hybrid"
+    "hybrid",
+    "adaptive"
   ],
   "models": [
     "gemma-3-4b"
