@@ -101,7 +101,7 @@ thesis-pdf-to-markdown/
 Run experiments comparing all strategies across models and pages:
 
 ```bash
-python -m evaluation.compare -c experiments/config.json -o output/results.json
+python -m evaluation.compare -c experiments/sample.json -o output/results.json
 python -m evaluation.report -i output/results.json -o output/report.md
 ```
 
