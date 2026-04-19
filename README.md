@@ -47,9 +47,23 @@ pip install -r requirements.txt
 
 ## Usage
 
+Make sure LM Studio is running with a model loaded before running any command.
+
 ```bash
-python main.py -i yourfile.pdf -o output.md -s adaptive -m google/gemma-3-4b
+# text strategy (default)
+python main.py -i test_pdf_source.pdf
+
+# image strategy (vision model required)
+python main.py -i test_pdf_source.pdf -s image
+
+# hybrid strategy (text + image, vision model required)
+python main.py -i test_pdf_source.pdf -s hybrid
+
+# adaptive strategy (auto-detects per page, recommended)
+python main.py -i test_pdf_source.pdf -s adaptive
 ```
+
+Output is saved to `output/test_pdf_output.md` by default.
 
 ### Options
 
