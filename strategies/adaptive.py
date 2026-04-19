@@ -14,8 +14,10 @@ from enum import Enum
 
 import fitz
 
-from strategies.text_only import text_strategy
-from strategies.image_only import image_strategy
+from typing import Callable
+
+from strategies.text_only import text_strategy as _text_strategy
+from strategies.image_only import image_strategy as _image_strategy
 from strategies.result import ConversionResult
 
 
@@ -125,6 +127,8 @@ def adaptive_strategy(
     page_type: PageType,
     temperature: float,
     max_tokens: int,
+    text_call: Callable = _text_strategy,
+    image_call: Callable = _image_strategy,
 ) -> ConversionResult:
     """
     Select and run the best extraction strategy for the given page type.
@@ -137,6 +141,8 @@ def adaptive_strategy(
         page_type:   Classified type from analyze_page().
         temperature: LLM temperature.
         max_tokens:  Maximum response tokens.
+        text_call:   Injectable text strategy (default: text_strategy).
+        image_call:  Injectable image strategy (default: image_strategy).
 
     Returns:
         ConversionResult for this page.
@@ -145,7 +151,7 @@ def adaptive_strategy(
         return ConversionResult(markdown="*[Empty page — skipped]*", timing_ms=0.0, token_usage=None)
 
     if page_type == PageType.TEXT:
-        return text_strategy(
+        return text_call(
             base_url=base_url,
             model_name=model_name,
             text=text,
@@ -155,7 +161,7 @@ def adaptive_strategy(
         )
 
     if page_type == PageType.FORMULA:
-        return image_strategy(
+        return image_call(
             base_url=base_url,
             model_name=model_name,
             images=[page_image],
@@ -165,7 +171,7 @@ def adaptive_strategy(
         )
 
     if page_type == PageType.IMAGE:
-        return image_strategy(
+        return image_call(
             base_url=base_url,
             model_name=model_name,
             images=[page_image],
@@ -175,7 +181,7 @@ def adaptive_strategy(
         )
 
     # MIXED — image with default prompt (best general coverage)
-    return image_strategy(
+    return image_call(
         base_url=base_url,
         model_name=model_name,
         images=[page_image],
