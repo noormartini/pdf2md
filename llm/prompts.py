@@ -1,4 +1,8 @@
 PROMPTS = {
+    # ------------------------------------------------------------------
+    # default — general-purpose prompt used by text, image, and hybrid
+    # strategies when no specific variant is specified.
+    # ------------------------------------------------------------------
     "default": {
         "system": """\
 You are a PDF-to-Markdown conversion specialist. Convert the following PDF-extracted text into clean, well-structured Markdown.
@@ -26,6 +30,10 @@ You are a PDF-to-Markdown conversion specialist. Convert the following PDF-extra
         "user": "{text}",
     },
 
+    # ------------------------------------------------------------------
+    # text — used by the adaptive strategy for TEXT-classified pages.
+    # Optimised for clean prose and structural fidelity.
+    # ------------------------------------------------------------------
     "text": {
         "system": """\
 You are a PDF-to-Markdown conversion specialist. You will receive raw text extracted from a PDF page. Convert it into clean, well-structured Markdown.
@@ -51,6 +59,10 @@ You are a PDF-to-Markdown conversion specialist. You will receive raw text extra
         "user": "{text}",
     },
 
+    # ------------------------------------------------------------------
+    # formula — used by the adaptive strategy for FORMULA-classified pages.
+    # Optimised for mathematical content rendered as images.
+    # ------------------------------------------------------------------
     "formula": {
         "system": """\
 You are a mathematical document converter. You will receive an image of a PDF page that contains mathematical formulas. Extract all content and convert it to structured Markdown with LaTeX math notation.
@@ -72,30 +84,10 @@ You are a mathematical document converter. You will receive an image of a PDF pa
         "user": "{text}",
     },
 
-    "code": {
-        "system": """\
-You are a source code document converter. You will receive raw text extracted from a PDF page that contains source code or program listings. Convert it into clean Markdown with properly fenced code blocks.
-
-## Rules
-
-**Code Blocks:**
-- Wrap all source code in fenced code blocks using triple backticks.
-- Detect the programming language (Python, Java, C, C++, JavaScript, etc.) and add it as the language tag: ```python
-- If the language cannot be determined, use ```text as a fallback.
-- Preserve indentation exactly — do not reformat or reindent code.
-
-**Multiple Snippets:**
-- If the page contains multiple separate code snippets, wrap each one in its own fenced block.
-- Preserve any surrounding explanatory text (captions, line number annotations) as regular Markdown prose.
-
-**Line Numbers:**
-- If the extracted text includes line numbers at the start of each line, remove them from inside the code block but keep them as context if they are referenced in the surrounding text.
-
-**Output:**
-- Return ONLY the Markdown — no preamble, no explanations.""",
-        "user": "{text}",
-    },
-
+    # ------------------------------------------------------------------
+    # diagram — used by the adaptive strategy for IMAGE-classified pages.
+    # Optimised for pages dominated by figures, charts, or diagrams.
+    # ------------------------------------------------------------------
     "diagram": {
         "system": """\
 You are a document analysis specialist. You will receive an image of a PDF page that is dominated by figures, charts, or diagrams. Extract all content and produce structured Markdown.

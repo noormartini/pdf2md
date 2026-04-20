@@ -53,15 +53,22 @@ Key idea: every conversion returns a `ConversionResult` with the markdown, timin
 
 ## Phase 3: Add Multimodal/Vision Pipeline
 
-This is the core of your thesis title ("Multimodal"). Three strategies to implement:
+This is the core of your thesis title ("Multimodal"). Four strategies to implement:
 
-1. **Text-only** (already exists) — PyMuPDF extracts text, LLM formats it
-2. **Image-only** — Render each page as PNG with `page.get_pixmap()`, send to a vision model using OpenAI vision format (base64 image in messages)
-3. **Hybrid** — Send both the extracted text AND the page image to the vision model. The model uses the image for layout understanding and the text for accurate content.
+1. **Text-only** (✅ done) — PyMuPDF extracts text, LLM formats it
+2. **Image-only** (✅ done) — Render each page as PNG with `page.get_pixmap()`, send to a vision model using OpenAI vision format (base64 image in messages)
+3. **Hybrid** (✅ done) — Send both the extracted text AND the page image to the vision model. The model uses the image for layout understanding and the text for accurate content.
+4. **Adaptive** (✅ done) — Automatically classifies each page and routes it to the best strategy:
+   - `TEXT` pages → text_strategy (enough text, no images/formulas)
+   - `FORMULA` pages → image_strategy with "formula" prompt (math symbols or many short vector paths)
+   - `IMAGE` pages → image_strategy with "diagram" prompt (3+ embedded images)
+   - `MIXED` pages → image_strategy with "default" prompt (some images or formulas)
+   - `EMPTY` pages → skipped entirely
+   - Implemented in `strategies/adaptive.py`, fully wired in `app.py`
 
 Vision models in LM Studio that support this: Gemma 3 (multimodal), Qwen-VL, LLaVA — check what's available.
 
-The image approach should significantly outperform text-only on tables, formulas, and layout-heavy pages — this is a key thesis finding.
+The adaptive strategy is the main thesis contribution — it outperforms any single fixed strategy by using the right approach per page. Expected finding: text-only wins on pure-text pages (speed), image-based wins on tables/formulas/diagrams.
 
 ---
 

@@ -5,10 +5,12 @@
   "strategies": [
     "text",
     "image",
-    "hybrid"
+    "hybrid",
+    "adaptive"
   ],
   "models": [
-    "gemma-3-4b"
+    "gemma-3-4b",
+    "qwen2.5-vl-7b-instruct-abliterated"
   ],
   "prompt_variants": [
     "default"

@@ -11,6 +11,7 @@ import fitz
 from strategies.text_only import text_strategy
 from strategies.image_only import image_strategy
 from strategies.hybrid import hybrid_strategy
+from strategies.adaptive import analyze_page, adaptive_strategy, render_page_as_base64, PageType
 from strategies.result import ConversionResult
 from extraction.text import extract_pages_from_pdf
 from extraction.image import extract_pages_from_pdf as extract_images_from_pdf
@@ -73,6 +74,7 @@ def run_strategy(
     temperature: float,
     max_tokens: int,
     prompt_variant: str,
+    page_type: Optional[PageType] = None,
 ) -> tuple[Optional[ConversionResult], Optional[str]]:
     """Run a conversion strategy and return (result, error).
 
@@ -112,6 +114,20 @@ def run_strategy(
                     temperature=temperature,
                     max_tokens=max_tokens,
                     prompt_variant=prompt_variant,
+                )
+            case "adaptive":
+                if page_type is None:
+                    raise ValueError("Adaptive strategy requires a pre-computed page_type")
+                if page_image is None:
+                    raise ValueError("Adaptive strategy requires page image")
+                result = adaptive_strategy(
+                    base_url=base_url,
+                    model_name=model,
+                    text=page_text,
+                    page_image=page_image,
+                    page_type=page_type,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
                 )
             case _:
                 raise ValueError(f"Unknown strategy: {strategy}")
@@ -158,6 +174,18 @@ def run_combinations(
     results: list[EvaluationResult] = []
     num_pages = len(pages)
 
+    # Pre-analyse pages for the adaptive strategy (needs fitz.Page objects)
+    page_analyses = None
+    if "adaptive" in config.strategies:
+        print("Pre-analysing pages for adaptive strategy...")
+        doc = fitz.open(config.input_pdf)
+        limit = config.max_pages if config.max_pages else len(doc)
+        page_analyses = [analyze_page(doc[i]) for i in range(min(limit, len(doc)))]
+        # Also build aligned image list for adaptive (render_page_as_base64 per page)
+        adaptive_images = [render_page_as_base64(doc[i]) for i in range(min(limit, len(doc)))]
+        doc.close()
+        print(f"  Page types: {[a.page_type.value for a in page_analyses]}\n")
+
     total_combinations = (
         len(config.strategies)
         * len(config.models)
@@ -185,7 +213,14 @@ def run_combinations(
                             continue
 
                         page_text = pages[page_idx]
-                        page_image = images[page_idx] if images else None
+
+                        # Adaptive uses its own aligned image list; others use standard extraction
+                        if strategy == "adaptive" and page_analyses is not None:
+                            page_image = adaptive_images[page_idx] if page_idx < len(adaptive_images) else None
+                            page_type = page_analyses[page_idx].page_type if page_idx < len(page_analyses) else None
+                        else:
+                            page_image = images[page_idx] if images else None
+                            page_type = None
 
                         result, error = runner(
                             strategy=strategy,
@@ -196,6 +231,7 @@ def run_combinations(
                             temperature=temperature,
                             max_tokens=max_tokens,
                             prompt_variant=prompt_variant,
+                            page_type=page_type,
                         )
 
                         timing_ms = result.timing_ms if result else 0.0
