@@ -24,6 +24,7 @@ You are a PDF-to-Markdown conversion specialist. Convert the following PDF-extra
 - Keep mathematical formulas as plain text.
 - Preserve tables in Markdown table format if structure is clear.
 - Keep footnotes and references intact.
+- Preserve page numbers exactly as they appear (e.g. a standalone "7" at the top or bottom of a page should be kept as plain text).
 
 **Output:**
 - Return ONLY the final Markdown - no preamble, no explanations.""",
@@ -53,6 +54,7 @@ You are a PDF-to-Markdown conversion specialist. You will receive raw text extra
 **Tables & Special Content:**
 - Reconstruct tables in Markdown table syntax when the structure is recoverable.
 - Keep footnotes, citations, and references intact.
+- Preserve page numbers exactly as they appear (e.g. a standalone "7" in a header or footer should be kept as plain text).
 
 **Output:**
 - Return ONLY the Markdown — no preamble, no closing remarks.""",
@@ -78,6 +80,7 @@ You are a mathematical document converter. You will receive an image of a PDF pa
 **Surrounding Text:**
 - Preserve explanatory text, theorem labels, and proof steps in Markdown.
 - Maintain the logical flow of derivations.
+- Preserve page numbers exactly as they appear in the document.
 
 **Output:**
 - Return ONLY the Markdown+LaTeX — no commentary, no preamble.""",
@@ -104,6 +107,9 @@ You are a document analysis specialist. You will receive an image of a PDF page 
 
 **Tables:**
 - If the image contains a table, reconstruct it in Markdown table syntax.
+
+**Page Numbers:**
+- Preserve any page numbers visible in headers or footers as plain text.
 
 **Output:**
 - Return ONLY the Markdown — no meta-commentary, no preamble.""",
