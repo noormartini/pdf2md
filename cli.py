@@ -21,7 +21,7 @@ def parse_args():
         default="http://127.0.0.1:1234/v1",
         help="LM Studio base url",
     )
-    parser.add_argument("-m", "--model", default="google/gemma-3-4b", help="Model name")
+    parser.add_argument("-m", "--model", default="qwen/qwen3.5-9b", help="Model name")
     parser.add_argument(
         "-n",
         "--max-pages",

@@ -35,7 +35,7 @@ The **adaptive** strategy is the main thesis contribution. It classifies each pa
 
 - Python 3.12+
 - [LM Studio](https://lmstudio.ai) running locally with a vision-capable model loaded
-- Recommended models: **Gemma 3** (multimodal), **Qwen 3.5 35B-A3B**
+- Recommended models: **Qwen 3.5 9B** (`qwen/qwen3.5-9b`)
 
 Install dependencies:
 
@@ -72,7 +72,7 @@ Output is saved to `output/test_pdf_output.md` by default.
 | `-i` / `--input` | `test_pdf_source.pdf` | Input PDF file |
 | `-o` / `--output` | `output/test_pdf_output.md` | Output Markdown file |
 | `-s` / `--strategy` | `text` | Strategy: `text`, `image`, `hybrid`, `adaptive` |
-| `-m` / `--model` | `google/gemma-3-4b` | Model name loaded in LM Studio |
+| `-m` / `--model` | `qwen/qwen3.5-9b` | Model name loaded in LM Studio |
 | `-b` / `--base-url` | `http://127.0.0.1:1234/v1` | LM Studio API base URL |
 | `-n` / `--max-pages` | `3` | Max number of pages to convert |
 | `-t` / `--temperature` | `0.2` | LLM temperature (0.0 = deterministic) |
