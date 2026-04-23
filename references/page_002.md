@@ -1,23 +1,7 @@
-## Introduction
+Halder, Stephan:
+Recursive Backwards Q-Learning am Beispiel eines Ping-Pong-Spiels / Stephan Halder. –
+Bachelor-Thesis, Mannheim: Technische Hochschule Mannheim, 2025. 55 Seiten.
 
-This is a sample text page to evaluate how well the conversion handles continuous prose and paragraph structures.
-
-### Background
-
-PDF documents often contain complex layouts that challenge text extraction tools. Line breaks may occur in the middle of sentences, and paragraph boundaries can be ambiguous.
-
-### Problem Statement
-
-The primary challenge in PDF-to-Markdown conversion is distinguishing between:
-
-1. Line breaks that are artifacts of PDF formatting
-2. Actual paragraph breaks that should be preserved
-3. List items that should be formatted as Markdown lists
-
-### Research Questions
-
-This thesis addresses the following questions:
-
-- How accurately can different strategies extract text content?
-- Which approach best handles complex layouts?
-- What is the impact of multimodal (vision-based) processing?
+Halder, Stephan:
+Recursive Backwards Q-Learning on the Example of a Ping-Pong Game / Stephan Halder. –
+Bachelor Thesis, Mannheim: University of Applied Sciences Mannheim, 2025. 55 pages.

@@ -1,16 +1,18 @@
-# Title of the Document
+# Recursive Backwards Q-Learning
+## am Beispiel eines Ping-Pong-Spiels
 
-**Author Name**
+Stephan Halder
 
-Department of Computer Science
-University Name
+Bachelor-Thesis
+zur Erlangung des akademischen Grades Bachelor of Science (B.Sc.)
+Studiengang Informatik
 
-April 2026
+Fakultät für Informatik
+Technische Hochschule Mannheim
 
----
+14.08.2025
 
-## Abstract
+Betreuer
 
-This document serves as a reference example for evaluating PDF-to-Markdown conversion quality. It contains various content types commonly found in academic documents.
-
-The conversion should preserve the document structure, formatting, and content accurately while producing clean, readable Markdown output.
+Prof. Dr. Jörn Fischer, Technische Hochschule Mannheim
+Prof. Dr. Thomas Ihme, Technische Hochschule Mannheim
