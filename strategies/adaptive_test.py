@@ -123,13 +123,17 @@ def test_adaptive_formula_page_routes_to_image_strategy_with_formula_prompt():
 
     adaptive_strategy(
         base_url="x", model_name="m",
-        pdf_path="x.pdf", page_num=0, page_image="img",
+        pdf_path="x.pdf", page_num=2, page_image="img",
         page_type=PageType.FORMULA,
         temperature=0.0, max_tokens=10,
+        figures_dir="out/figures", figure_offset=5,
         text_call=_fake_text,
         image_call=fake_image,
     )
     assert captured["prompt_variant"] == "formula"
+    assert captured["page_num"] == 2
+    assert captured["figures_dir"] == "out/figures"
+    assert captured["figure_offset"] == 5
 
 
 def test_adaptive_image_page_routes_to_image_strategy_with_diagram_prompt():

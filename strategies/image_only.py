@@ -1,8 +1,8 @@
+import base64
 import time
-from typing import Callable
+from pathlib import Path
+from typing import Callable, Optional
 
-from llm.prompts import PROMPTS
-from llm.client import call_llm
 from strategies.result import ConversionResult
 
 
@@ -12,35 +12,27 @@ def image_strategy(
     images: list[str],
     temperature: float,
     max_tokens: int,
+    page_num: int = 0,
+    figures_dir: str = "figures",
+    figure_offset: int = 1,
     prompt_variant: str = "default",
-    llm_call: Callable = call_llm,
+    llm_call: Optional[Callable] = None,
 ) -> ConversionResult:
-    """Convert page images to Markdown via a vision LLM (image-only input).
-
-    `llm_call` is injectable so tests can swap in a fake without touching
-    the network.
-    """
-    content: list[dict[str, object]] = []
-
-    for img_base64 in images:
-        content.append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:image/png;base64,{img_base64}",
-            },
-        })
-
-    messages = [
-        {"role": "system", "content": PROMPTS[prompt_variant]["system"]},
-        {"role": "user", "content": content},
-    ]
+    """Save page images to disk and return Markdown reference placeholders."""
+    Path(figures_dir).mkdir(parents=True, exist_ok=True)
 
     start = time.perf_counter()
-    response, token_usage = llm_call(base_url, model_name, messages, temperature, max_tokens)
-    elapsed_ms = (time.perf_counter() - start) * 1000
+    inline_refs: list[str] = []
+    ref_defs: list[str] = []
 
-    return ConversionResult(
-        markdown=response,
-        timing_ms=elapsed_ms,
-        token_usage=token_usage,
-    )
+    for i, img_base64 in enumerate(images):
+        n = figure_offset + i
+        key = f"fig-{page_num}-{i}"
+        filename = f"{key}.png"
+        (Path(figures_dir) / filename).write_bytes(base64.b64decode(img_base64))
+        inline_refs.append(f"![Figure {n}][{key}]")
+        ref_defs.append(f'[{key}]: figures/{filename} "Figure {n}"')
+
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    markdown = "\n\n".join(inline_refs)
+    return ConversionResult(markdown=markdown, timing_ms=elapsed_ms, token_usage=None, image_refs=ref_defs)
