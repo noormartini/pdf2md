@@ -14,8 +14,6 @@ from strategies.adaptive import analyze_page, adaptive_strategy, render_page_as_
 
 def run(config: Config):
     figures_dir = os.path.join(os.path.dirname(os.path.abspath(config.output)), "figures")
-    figure_counter = 1
-    all_image_refs: list[str] = []
     cleaned_pages: list[str] = []
 
     match (config.strategy):
@@ -43,20 +41,16 @@ def run(config: Config):
             if not images:
                 raise ValueError("No images could be extracted from the PDF.")
             for i, page_image in enumerate(images):
-                print(f"Processing page {i+1}/{len(images)}...")
+                print(f"Sending page {i+1}/{len(images)} to LM Studio...")
                 result = image_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
                     images=[page_image],
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
-                    page_num=i,
-                    figures_dir=figures_dir,
-                    figure_offset=figure_counter,
+                    prompt_variant="default",
                 )
                 cleaned_pages.append(result.markdown)
-                all_image_refs.extend(result.image_refs)
-                figure_counter += len(result.image_refs)
 
         case "hybrid":
             pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
@@ -100,11 +94,8 @@ def run(config: Config):
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
                     figures_dir=figures_dir,
-                    figure_offset=figure_counter,
                 )
                 cleaned_pages.append(result.markdown)
-                all_image_refs.extend(result.image_refs)
-                figure_counter += len(result.image_refs)
             doc.close()
 
         case _:
@@ -112,9 +103,6 @@ def run(config: Config):
 
     markdown = "\n\n".join(cleaned_pages)
     markdown = postprocess_markdown(markdown)
-
-    if all_image_refs:
-        markdown += "\n\n" + "\n".join(all_image_refs)
 
     print("Saving Markdown output...")
     with open(config.output, "w", encoding="utf-8") as f:

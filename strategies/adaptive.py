@@ -129,7 +129,6 @@ def adaptive_strategy(
     temperature: float,
     max_tokens: int,
     figures_dir: str = "figures",
-    figure_offset: int = 1,
     text_call: Callable = _text_strategy,
     image_call: Callable = _image_strategy,
 ) -> ConversionResult:
@@ -137,18 +136,17 @@ def adaptive_strategy(
     Select and run the best extraction strategy for the given page type.
 
     Args:
-        base_url:      LM Studio server URL.
-        model_name:    Model name loaded in LM Studio.
-        pdf_path:      Path to the source PDF file.
-        page_num:      0-based page index.
-        page_image:    Base64-encoded PNG of the rendered page.
-        page_type:     Classified type from analyze_page().
-        temperature:   LLM temperature.
-        max_tokens:    Maximum response tokens.
-        figures_dir:   Directory to save extracted images.
-        figure_offset: Global figure counter offset for this page.
-        text_call:     Injectable text strategy (default: text_strategy).
-        image_call:    Injectable image strategy (default: image_strategy).
+        base_url:    LM Studio server URL.
+        model_name:  Model name loaded in LM Studio.
+        pdf_path:    Path to the source PDF file.
+        page_num:    0-based page index.
+        page_image:  Base64-encoded PNG of the rendered page.
+        page_type:   Classified type from analyze_page().
+        temperature: LLM temperature.
+        max_tokens:  Maximum response tokens.
+        figures_dir: Directory to save inline images from text pages.
+        text_call:   Injectable text strategy (default: text_strategy).
+        image_call:  Injectable image strategy (default: image_strategy).
 
     Returns:
         ConversionResult for this page.
@@ -175,9 +173,6 @@ def adaptive_strategy(
             images=[page_image],
             temperature=temperature,
             max_tokens=max_tokens,
-            page_num=page_num,
-            figures_dir=figures_dir,
-            figure_offset=figure_offset,
             prompt_variant="formula",
         )
 
@@ -188,9 +183,6 @@ def adaptive_strategy(
             images=[page_image],
             temperature=temperature,
             max_tokens=max_tokens,
-            page_num=page_num,
-            figures_dir=figures_dir,
-            figure_offset=figure_offset,
             prompt_variant="diagram",
         )
 
@@ -201,8 +193,5 @@ def adaptive_strategy(
         images=[page_image],
         temperature=temperature,
         max_tokens=max_tokens,
-        page_num=page_num,
-        figures_dir=figures_dir,
-        figure_offset=figure_offset,
         prompt_variant="default",
     )

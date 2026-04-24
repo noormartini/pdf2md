@@ -1,6 +1,6 @@
 """Common return type for conversion strategies."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
@@ -10,4 +10,3 @@ class ConversionResult:
     markdown: str
     timing_ms: float
     token_usage: Optional[int]
-    image_refs: list[str] = field(default_factory=list)
