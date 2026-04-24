@@ -87,7 +87,7 @@ def _fake_image(**kwargs):
 def test_adaptive_empty_page_returns_skipped_without_llm_call():
     result = adaptive_strategy(
         base_url="x", model_name="m",
-        text="", page_image="img",
+        pdf_path="x.pdf", page_num=0, page_image="img",
         page_type=PageType.EMPTY,
         temperature=0.0, max_tokens=10,
     )
@@ -104,7 +104,7 @@ def test_adaptive_text_page_routes_to_text_strategy():
 
     result = adaptive_strategy(
         base_url="x", model_name="m",
-        text="some text", page_image="img",
+        pdf_path="x.pdf", page_num=0, page_image="img",
         page_type=PageType.TEXT,
         temperature=0.2, max_tokens=100,
         text_call=fake_text,
@@ -123,7 +123,7 @@ def test_adaptive_formula_page_routes_to_image_strategy_with_formula_prompt():
 
     adaptive_strategy(
         base_url="x", model_name="m",
-        text="", page_image="img",
+        pdf_path="x.pdf", page_num=0, page_image="img",
         page_type=PageType.FORMULA,
         temperature=0.0, max_tokens=10,
         text_call=_fake_text,
@@ -141,7 +141,7 @@ def test_adaptive_image_page_routes_to_image_strategy_with_diagram_prompt():
 
     adaptive_strategy(
         base_url="x", model_name="m",
-        text="", page_image="img",
+        pdf_path="x.pdf", page_num=0, page_image="img",
         page_type=PageType.IMAGE,
         temperature=0.0, max_tokens=10,
         text_call=_fake_text,
@@ -159,7 +159,7 @@ def test_adaptive_mixed_page_routes_to_image_strategy_with_default_prompt():
 
     adaptive_strategy(
         base_url="x", model_name="m",
-        text="some text", page_image="img",
+        pdf_path="x.pdf", page_num=0, page_image="img",
         page_type=PageType.MIXED,
         temperature=0.0, max_tokens=10,
         text_call=_fake_text,

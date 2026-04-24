@@ -122,7 +122,8 @@ def render_page_as_base64(page: fitz.Page, dpi: int = 150) -> str:
 def adaptive_strategy(
     base_url: str,
     model_name: str,
-    text: str,
+    pdf_path: str,
+    page_num: int,
     page_image: str,
     page_type: PageType,
     temperature: float,
@@ -136,7 +137,8 @@ def adaptive_strategy(
     Args:
         base_url:    LM Studio server URL.
         model_name:  Model name loaded in LM Studio.
-        text:        Raw text extracted from the page (may be empty).
+        pdf_path:    Path to the source PDF file.
+        page_num:    0-based page index.
         page_image:  Base64-encoded PNG of the rendered page.
         page_type:   Classified type from analyze_page().
         temperature: LLM temperature.
@@ -154,7 +156,8 @@ def adaptive_strategy(
         return text_call(
             base_url=base_url,
             model_name=model_name,
-            text=text,
+            pdf_path=pdf_path,
+            page_num=page_num,
             temperature=temperature,
             max_tokens=max_tokens,
             prompt_variant="text",

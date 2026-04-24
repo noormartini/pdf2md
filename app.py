@@ -14,19 +14,21 @@ from strategies.adaptive import analyze_page, adaptive_strategy, render_page_as_
 def run(config: Config):
     match (config.strategy):
         case "text":
-            pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
-            if not pages:
-                raise ValueError("No text could be extracted from the PDF.")
+            doc = fitz.open(config.input)
+            num_pages = min(len(doc), config.max_pages)
+            doc.close()
+            if num_pages == 0:
+                raise ValueError("No pages could be read from the PDF.")
             cleaned_pages = []
-            for i, page_text in enumerate(pages):
-                print(f"Sending page {i+1} to LM Studio...")
+            for i in range(num_pages):
+                print(f"Converting page {i+1}/{num_pages} to Markdown...")
                 result = text_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
-                    text=page_text,
+                    pdf_path=config.input,
+                    page_num=i,
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
-                    prompt_variant="default",
                 )
                 cleaned_pages.append(result.markdown)
 
@@ -80,12 +82,12 @@ def run(config: Config):
                     f"{analysis.page_type.value} "
                     f"(conf={analysis.confidence:.2f}) — sending to LM Studio..."
                 )
-                page_text = page.get_text("text").strip()
                 page_image = render_page_as_base64(page)
                 result = adaptive_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
-                    text=page_text,
+                    pdf_path=config.input,
+                    page_num=i,
                     page_image=page_image,
                     page_type=analysis.page_type,
                     temperature=config.temperature,
