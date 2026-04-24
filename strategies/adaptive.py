@@ -164,6 +164,7 @@ def adaptive_strategy(
             page_num=page_num,
             temperature=temperature,
             max_tokens=max_tokens,
+            figures_dir=figures_dir,
             prompt_variant="text",
         )
 

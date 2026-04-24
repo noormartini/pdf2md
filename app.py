@@ -34,6 +34,7 @@ def run(config: Config):
                     page_num=i,
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
+                    figures_dir=figures_dir,
                 )
                 cleaned_pages.append(result.markdown)
 
