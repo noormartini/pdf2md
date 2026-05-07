@@ -26,7 +26,7 @@ def parse_args():
         "-n",
         "--max-pages",
         type=int,
-        default=10,
+        default=20,
         help="Max pages to convert to markdown",
     )
     parser.add_argument(

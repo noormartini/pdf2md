@@ -77,6 +77,7 @@ def run_strategy(
     max_tokens: int,
     prompt_variant: str,
     page_type: Optional[PageType] = None,
+    figures_dir: str = "output/figures",
 ) -> tuple[Optional[ConversionResult], Optional[str]]:
     """Run a conversion strategy and return (result, error).
 
@@ -94,6 +95,7 @@ def run_strategy(
                     temperature=temperature,
                     max_tokens=max_tokens,
                     prompt_variant=prompt_variant,
+                    figures_dir=figures_dir,
                 )
             case "image":
                 if page_image is None:
@@ -132,6 +134,7 @@ def run_strategy(
                     page_type=page_type,
                     temperature=temperature,
                     max_tokens=max_tokens,
+                    figures_dir=figures_dir,
                 )
             case _:
                 raise ValueError(f"Unknown strategy: {strategy}")
