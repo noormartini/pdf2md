@@ -4,12 +4,12 @@ import fitz
 from config import Config
 
 from extraction.text import extract_pages_from_pdf
-from extraction.image import extract_pages_from_pdf as extract_images_from_pdf
+from extraction.image import extract_page_figures
 from postprocess import postprocess_markdown
 from strategies.text_only import text_strategy
 from strategies.image_only import image_strategy
 from strategies.hybrid import hybrid_strategy
-from strategies.adaptive import analyze_page, adaptive_strategy, render_page_as_base64
+from strategies.adaptive import analyze_page, adaptive_strategy, render_page_as_base64, PageType
 
 
 def run(config: Config):
@@ -37,11 +37,16 @@ def run(config: Config):
                 cleaned_pages.append(result.markdown)
 
         case "image":
-            images = extract_images_from_pdf(config.input, max_pages=config.max_pages)
-            if not images:
-                raise ValueError("No images could be extracted from the PDF.")
-            for i, page_image in enumerate(images):
-                print(f"Sending page {i+1}/{len(images)} to LM Studio...")
+            doc = fitz.open(config.input)
+            num_pages = min(len(doc), config.max_pages)
+            if num_pages == 0:
+                doc.close()
+                raise ValueError("No pages could be read from the PDF.")
+            for i in range(num_pages):
+                page = doc[i]
+                page_image = render_page_as_base64(page)
+                figure_refs = extract_page_figures(page, doc, i, figures_dir)
+                print(f"Sending page {i+1}/{num_pages} to LM Studio...")
                 result = image_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
@@ -49,18 +54,23 @@ def run(config: Config):
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
                     prompt_variant="default",
+                    figure_refs=figure_refs or None,
                 )
                 cleaned_pages.append(result.markdown)
+            doc.close()
 
         case "hybrid":
             pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
-            images = extract_images_from_pdf(config.input, max_pages=config.max_pages)
             if not pages:
                 raise ValueError("No text could be extracted from the PDF.")
-            if not images:
-                raise ValueError("No images could be extracted from the PDF.")
-            for i, (page_text, page_image) in enumerate(zip(pages, images)):
-                print(f"Sending page {i+1} to LM Studio...")
+            doc = fitz.open(config.input)
+            num_pages = min(len(doc), config.max_pages)
+            for i in range(num_pages):
+                page = doc[i]
+                page_image = render_page_as_base64(page)
+                figure_refs = extract_page_figures(page, doc, i, figures_dir)
+                page_text = pages[i] if i < len(pages) else ""
+                print(f"Sending page {i+1}/{num_pages} to LM Studio...")
                 result = hybrid_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
@@ -69,8 +79,10 @@ def run(config: Config):
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
                     prompt_variant="default",
+                    figure_refs=figure_refs or None,
                 )
                 cleaned_pages.append(result.markdown)
+            doc.close()
 
         case "adaptive":
             doc = fitz.open(config.input)
@@ -84,6 +96,13 @@ def run(config: Config):
                     f"(conf={analysis.confidence:.2f})..."
                 )
                 page_image = render_page_as_base64(page)
+                # Extract embedded figures for vision-processed pages so the
+                # LLM can reference them as individual Markdown image links.
+                figure_refs = (
+                    extract_page_figures(page, doc, i, figures_dir)
+                    if analysis.page_type != PageType.TEXT
+                    else None
+                )
                 result = adaptive_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
@@ -94,6 +113,7 @@ def run(config: Config):
                     temperature=config.temperature,
                     max_tokens=config.max_tokens,
                     figures_dir=figures_dir,
+                    figure_refs=figure_refs,
                 )
                 cleaned_pages.append(result.markdown)
             doc.close()

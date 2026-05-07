@@ -180,6 +180,7 @@ def test_save_results_writes_serializable_json(tmp_path: Path):
         strategy="text",
         model="m",
         prompt_variant="default",
+        temperature=0.0,
         metrics={"text_similarity": 0.5},
         timing_ms=10.0,
         token_usage=42,

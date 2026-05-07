@@ -14,16 +14,28 @@ def hybrid_strategy(
     temperature: float,
     max_tokens: int,
     prompt_variant: str = "default",
+    figure_refs: list[str] | None = None,
     llm_call: Callable = call_llm,
 ) -> ConversionResult:
     """Convert a PDF page to Markdown via a vision LLM using both text and image.
 
     `llm_call` is injectable so tests can swap in a fake without touching
     the network.
+    `figure_refs`: optional list of already-saved figure paths; when present,
+    they are appended as a text block so the LLM can include the links.
     """
     content: list[dict[str, object]] = [
         {"type": "text", "text": PROMPTS[prompt_variant]["user"].format(text=text)}
     ]
+
+    if figure_refs:
+        ref_list = "\n".join(
+            f"- ![Figure {i + 1}]({ref})" for i, ref in enumerate(figure_refs)
+        )
+        content.append({
+            "type": "text",
+            "text": "Extracted figures for this page:\n" + ref_list,
+        })
 
     for img_base64 in images:
         content.append({

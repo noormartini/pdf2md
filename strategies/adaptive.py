@@ -129,6 +129,7 @@ def adaptive_strategy(
     temperature: float,
     max_tokens: int,
     figures_dir: str = "figures",
+    figure_refs: list[str] | None = None,
     text_call: Callable = _text_strategy,
     image_call: Callable = _image_strategy,
 ) -> ConversionResult:
@@ -136,17 +137,19 @@ def adaptive_strategy(
     Select and run the best extraction strategy for the given page type.
 
     Args:
-        base_url:    LM Studio server URL.
-        model_name:  Model name loaded in LM Studio.
-        pdf_path:    Path to the source PDF file.
-        page_num:    0-based page index.
-        page_image:  Base64-encoded PNG of the rendered page.
-        page_type:   Classified type from analyze_page().
-        temperature: LLM temperature.
-        max_tokens:  Maximum response tokens.
-        figures_dir: Directory to save inline images from text pages.
-        text_call:   Injectable text strategy (default: text_strategy).
-        image_call:  Injectable image strategy (default: image_strategy).
+        base_url:     LM Studio server URL.
+        model_name:   Model name loaded in LM Studio.
+        pdf_path:     Path to the source PDF file.
+        page_num:     0-based page index.
+        page_image:   Base64-encoded PNG of the rendered page.
+        page_type:    Classified type from analyze_page().
+        temperature:  LLM temperature.
+        max_tokens:   Maximum response tokens.
+        figures_dir:  Directory to save inline images from text pages.
+        figure_refs:  Pre-extracted figure paths to include as Markdown links
+                      in the LLM output for non-text pages.
+        text_call:    Injectable text strategy (default: text_strategy).
+        image_call:   Injectable image strategy (default: image_strategy).
 
     Returns:
         ConversionResult for this page.
@@ -174,6 +177,7 @@ def adaptive_strategy(
             temperature=temperature,
             max_tokens=max_tokens,
             prompt_variant="formula",
+            figure_refs=figure_refs,
         )
 
     if page_type == PageType.IMAGE:
@@ -184,6 +188,7 @@ def adaptive_strategy(
             temperature=temperature,
             max_tokens=max_tokens,
             prompt_variant="diagram",
+            figure_refs=figure_refs,
         )
 
     # MIXED — image with default prompt (best general coverage)
@@ -194,4 +199,5 @@ def adaptive_strategy(
         temperature=temperature,
         max_tokens=max_tokens,
         prompt_variant="default",
+        figure_refs=figure_refs,
     )

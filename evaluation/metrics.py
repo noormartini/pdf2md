@@ -22,6 +22,7 @@ class EvaluationResult:
     strategy: str
     model: str
     prompt_variant: str
+    temperature: float
     metrics: dict[str, float]
     timing_ms: float
     token_usage: Optional[int] = None
@@ -228,6 +229,7 @@ def evaluate_conversion(
     strategy: str,
     model: str,
     prompt_variant: str,
+    temperature: float,
     timing_ms: float,
     token_usage: Optional[int] = None,
     error: Optional[str] = None,
@@ -243,6 +245,7 @@ def evaluate_conversion(
             strategy=strategy,
             model=model,
             prompt_variant=prompt_variant,
+            temperature=temperature,
             metrics={
                 "text_similarity": 0.0,
                 "heading_structure": 0.0,
@@ -272,6 +275,7 @@ def evaluate_conversion(
         strategy=strategy,
         model=model,
         prompt_variant=prompt_variant,
+        temperature=temperature,
         metrics=metrics,
         timing_ms=timing_ms,
         token_usage=token_usage,

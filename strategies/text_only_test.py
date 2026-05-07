@@ -37,7 +37,10 @@ def test_text_strategy_passes_correct_page_to_pymupdf4llm():
             pdf_path="my.pdf", page_num=3,
             temperature=0.0, max_tokens=10,
         )
-    mock.assert_called_once_with("my.pdf", pages=[3], page_chunks=True)
+    mock.assert_called_once_with(
+        "my.pdf", pages=[3], page_chunks=True,
+        write_images=True, image_path="figures", image_size_limit=0,
+    )
 
 
 def test_text_strategy_returns_empty_string_when_no_chunks():

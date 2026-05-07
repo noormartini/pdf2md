@@ -1,6 +1,42 @@
-import fitz
 import base64
-from io import BytesIO
+import os
+
+import fitz
+
+
+def extract_page_figures(
+    page: fitz.Page,
+    doc: fitz.Document,
+    page_num: int,
+    figures_dir: str,
+) -> list[str]:
+    """Extract embedded images from a PDF page and save them as files.
+
+    Returns relative paths (`figures/<filename>`) suitable for Markdown image links.
+    Images are saved under `figures_dir`; the returned paths assume the Markdown
+    file lives in the parent directory of `figures_dir`.
+    """
+    os.makedirs(figures_dir, exist_ok=True)
+    refs: list[str] = []
+
+    for fig_idx, img_info in enumerate(page.get_images(full=True), start=1):
+        xref = img_info[0]
+        try:
+            img_dict = doc.extract_image(xref)
+        except Exception:
+            continue
+
+        ext = img_dict.get("ext", "png")
+        img_bytes = img_dict["image"]
+        filename = f"page_{page_num + 1:03d}_fig_{fig_idx:03d}.{ext}"
+        filepath = os.path.join(figures_dir, filename)
+
+        with open(filepath, "wb") as f:
+            f.write(img_bytes)
+
+        refs.append(f"figures/{filename}")
+
+    return refs
 
 
 def extract_pages_from_pdf(pdf_path: str, max_pages: int = 3) -> list[str]:
