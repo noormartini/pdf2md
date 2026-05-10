@@ -5,7 +5,6 @@ from config import Config
 
 from extraction.text import extract_pages_from_pdf
 from extraction.image import extract_page_figures
-from extraction.toc import extract_toc
 from extraction.language import detect_language, language_name
 from postprocess import postprocess_markdown
 from strategies.text_only import text_strategy
@@ -29,9 +28,6 @@ def run(config: Config):
         sample_text = _doc[0].get_text("text") if len(_doc) > 0 else ""
     language = detect_language(sample_text)
     print(f"Detected language: {language_name(language)} ({language})")
-
-    # Extract TOC (empty string if the PDF has none)
-    toc_markdown = extract_toc(config.input)
 
     match (config.strategy):
         case "text":
@@ -146,10 +142,6 @@ def run(config: Config):
 
     markdown = "\n\n---\n\n".join(cleaned_pages)
     markdown = postprocess_markdown(markdown)
-
-    # Prepend TOC if the PDF has one
-    if toc_markdown:
-        markdown = toc_markdown + "\n\n---\n\n" + markdown
 
     print("Saving Markdown output...")
     os.makedirs(os.path.dirname(os.path.abspath(config.output)), exist_ok=True)
