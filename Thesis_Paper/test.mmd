@@ -1,0 +1,28 @@
+flowchart TD
+    PDF[PDF File] --> CLI[CLI / Config]
+    CLI --> LOOP[For each page]
+
+    LOOP --> EXT[Extract text\nPyMuPDF]
+    LOOP --> RENDER[Render page\nto PNG base64]
+
+    EXT --> CLASSIFY[analyze_page\nclassify content]
+    RENDER --> CLASSIFY
+
+    CLASSIFY --> T{PageType?}
+
+    T -->|EMPTY| SKIP[Skip — blank page]
+    T -->|TEXT| TS[text_strategy\nprompt: text]
+    T -->|FORMULA| IS1[image_strategy\nprompt: formula]
+    T -->|IMAGE| IS2[image_strategy\nprompt: diagram]
+    T -->|MIXED| IS3[image_strategy\nprompt: default]
+
+    TS --> LLM[LM Studio\nLocal LLM]
+    IS1 --> LLM
+    IS2 --> LLM
+    IS3 --> LLM
+
+    LLM --> RES[ConversionResult\nmarkdown + timing + tokens]
+    SKIP --> RES
+
+    RES --> POST[Postprocess\ncombine pages]
+    POST --> OUT[Markdown output file]
