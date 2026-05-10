@@ -130,6 +130,7 @@ def adaptive_strategy(
     max_tokens: int,
     figures_dir: str = "figures",
     figure_refs: list[str] | None = None,
+    language: str = "en",
     text_call: Callable = _text_strategy,
     image_call: Callable = _image_strategy,
 ) -> ConversionResult:
@@ -178,6 +179,7 @@ def adaptive_strategy(
             max_tokens=max_tokens,
             prompt_variant="formula",
             figure_refs=figure_refs,
+            language=language,
         )
 
     if page_type == PageType.IMAGE:
@@ -189,6 +191,7 @@ def adaptive_strategy(
             max_tokens=max_tokens,
             prompt_variant="diagram",
             figure_refs=figure_refs,
+            language=language,
         )
 
     # MIXED — image with default prompt (best general coverage)
@@ -200,4 +203,5 @@ def adaptive_strategy(
         max_tokens=max_tokens,
         prompt_variant="default",
         figure_refs=figure_refs,
+        language=language,
     )

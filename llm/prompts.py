@@ -1,3 +1,24 @@
+_LANGUAGE_NAMES: dict[str, str] = {
+    "de": "German",
+    "fr": "French",
+    "es": "Spanish",
+    "it": "Italian",
+    "nl": "Dutch",
+}
+
+
+def with_language_hint(system_prompt: str, language: str) -> str:
+    """Append a language-preservation note to a system prompt for non-English docs."""
+    if language.startswith("en"):
+        return system_prompt
+    lang_name = _LANGUAGE_NAMES.get(language, language.upper())
+    note = (
+        f"\n\n**Language:** This document is written in {lang_name}. "
+        "Preserve all text in the original language — do not translate."
+    )
+    return system_prompt + note
+
+
 PROMPTS = {
     # ------------------------------------------------------------------
     # default — general-purpose prompt used by text, image, and hybrid

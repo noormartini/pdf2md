@@ -1,5 +1,7 @@
 import argparse
 
+from config import DEFAULT_BASE_URL, DEFAULT_MODEL
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -18,10 +20,10 @@ def parse_args():
     parser.add_argument(
         "-b",
         "--base-url",
-        default="http://127.0.0.1:1234/v1",
+        default=DEFAULT_BASE_URL,
         help="LM Studio base url",
     )
-    parser.add_argument("-m", "--model", default="qwen/qwen3.5-9b", help="Model name")
+    parser.add_argument("-m", "--model", default=DEFAULT_MODEL, help="Model name")
     parser.add_argument(
         "-n",
         "--max-pages",

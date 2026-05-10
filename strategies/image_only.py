@@ -1,7 +1,7 @@
 import time
 from typing import Callable
 
-from llm.prompts import PROMPTS
+from llm.prompts import PROMPTS, with_language_hint
 from llm.client import call_llm
 from strategies.result import ConversionResult
 
@@ -14,6 +14,7 @@ def image_strategy(
     max_tokens: int,
     prompt_variant: str = "default",
     figure_refs: list[str] | None = None,
+    language: str = "en",
     llm_call: Callable = call_llm,
 ) -> ConversionResult:
     """Convert page images to Markdown via a vision LLM (image-only input).
@@ -23,6 +24,8 @@ def image_strategy(
     `figure_refs`: optional list of already-saved figure paths (e.g.
     ``["figures/page_001_fig_001.png"]``); when present, a text block is
     prepended instructing the LLM to include those links in its output.
+    `language`: ISO 639-1 code of the document language; non-English docs
+    get a language-preservation note appended to the system prompt.
     """
     content: list[dict[str, object]] = []
 
@@ -48,7 +51,7 @@ def image_strategy(
         })
 
     messages = [
-        {"role": "system", "content": PROMPTS[prompt_variant]["system"]},
+        {"role": "system", "content": with_language_hint(PROMPTS[prompt_variant]["system"], language)},
         {"role": "user", "content": content},
     ]
 
