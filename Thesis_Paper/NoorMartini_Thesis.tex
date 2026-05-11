@@ -60,7 +60,11 @@ A tool optimized for text-heavy academic papers will apply the same logic to a
 page containing only a scanned diagram or a dense mathematical formula. This
 one-size-fits-all assumption breaks down on real-world documents, which
 routinely mix plain text, tables, images, source code, and equations within the
-same file --- and sometimes within the same page. No existing open-source tool
+same file --- and sometimes within the same page. Ingemarsson and Persson
+\cite{ingemarsson2024} empirically confirm this: in a controlled comparison of
+parsing tools across document types, rule-based tools scored above 86\% on
+plain-text PDFs but 0\% on image-only documents, while no single method
+achieved top performance across all content types. No existing open-source tool
 selects its extraction strategy adaptively based on what each page actually
 contains.
 
@@ -579,25 +583,135 @@ document formats, and integration with newer multimodal LLM architectures.
     \end{itemize}
 \end{itemize}
 
+Ingemarsson and Persson \cite{ingemarsson2024} provide empirical confirmation
+of this content-type dependency in a controlled experiment spanning multiple
+parsing tools and document categories. Rule-based tools such as PyPDF and
+PyMuPDF achieved accuracy above 86\% on plain-text documents but scored 0\%
+on image-only PDFs, since they possess no mechanism to process visual content.
+Performance on mixed-content documents dropped to 82\%, compared to 87\% for
+plain-text files. These results demonstrate that each additional content type
+introduces a distinct failure mode for fixed-strategy parsers, reinforcing the
+case for content-aware, per-page strategy selection.
+
 \subsection{Markdown Format}
-\begin{itemize}
-    \item Introduction to Markdown syntax
-    \item Markdown as a Structured Representation
-\end{itemize}
+
+Markdown is a lightweight markup language created by John Gruber in 2004,
+designed to be readable in plain-text form while converting cleanly to HTML
+and other structured formats \cite{cone2019}. Its syntax uses familiar ASCII
+characters to denote document structure: hash symbols (\texttt{\#}) for
+headings, hyphens or asterisks for unordered lists, backtick characters for
+inline code, and triple backticks for fenced code blocks. This minimalist
+design means that Markdown source files remain human-readable without a
+renderer, unlike binary or XML-based formats such as PDF or DOCX.
+
+As a structured representation, Markdown preserves semantic hierarchy ---
+headings, nested lists, emphasis, and tables --- making documents interpretable
+by both human readers and automated systems. Community extensions to the base
+specification, such as GitHub Flavored Markdown (GFM), add support for tables,
+task lists, and mathematical notation via \LaTeX-style delimiters, further
+broadening its applicability for technical and scientific documents
+\cite{cassel2025}. In practice, this means that the output of a PDF-to-Markdown
+conversion pipeline can be directly consumed by documentation platforms, static
+site generators, and AI pipelines without additional transformation.
+
+Markdown's plain-text nature makes it natively compatible with version control
+systems such as Git, where every change is tracked and attributed at the
+character level --- a property that PDF and Word formats cannot match. For
+AI-driven workflows, structured Markdown is a preferred input format for large
+language model (LLM) pipelines and retrieval-augmented generation (RAG)
+systems: preserving semantic hierarchy in the converted document improves
+retrieval precision and context quality when documents are ingested into
+knowledge bases \cite{khan2024}. These properties collectively make Markdown
+the most suitable target representation for the conversion system developed
+in this thesis.
 
 \subsection{Large Language Models}
-\begin{itemize}
-    \item Basic concepts and architecture
-    \item Vision capabilities of modern LLMs
-    \item Prompt Engineering for Structured Output
-\end{itemize}
+
+Large language models (LLMs) are neural networks trained on large-scale text
+corpora to predict and generate human-like text. The transformer architecture
+underpins virtually all modern LLMs, with self-attention as its key mechanism:
+each token in a sequence can attend to every other token regardless of distance,
+enabling the model to understand and generate contextually rich responses across
+long passages of text. Training on diverse corpora spanning books, articles, and
+code gives these models broad general knowledge and the ability to perform a wide
+range of language tasks, including translation, summarization, question answering,
+and code generation.
+
+A practical constraint governing LLM behavior is the \textit{context window}:
+the maximum number of tokens the model can process in a single inference step.
+Larger context windows allow the model to consider longer documents and maintain
+coherence across extended exchanges, but require proportionally more memory and
+compute \cite{ingemarsson2024}. For document conversion tasks, the context window
+determines how much of a page --- or how many pages --- can be submitted in a
+single prompt.
+
+Modern LLMs vary substantially in capability and cost. Proprietary models such as
+GPT-4o integrate text, audio, and visual inputs into a single end-to-end neural
+network, enabling them to process rendered page images alongside extracted text
+\cite{ingemarsson2024}. Open-source alternatives such as Meta's LLaMA 3 and
+Mistral's Mixtral achieve competitive performance at significantly lower inference
+cost, making them well-suited for local deployment via runtimes such as LM Studio.
+A comparative study by Ingemarsson and Persson \cite{ingemarsson2024} evaluating
+these model families on PDF parsing tasks found that GPT-4-Turbo and GPT-4o
+achieved the highest document understanding scores (77--78\%), while open-source
+models clustered near 70\% --- a meaningful accuracy gap that must be weighed
+against the cost and privacy advantages of running models locally.
+
+Vision-capable LLMs are of particular relevance to document conversion. By
+accepting rendered page images as input, they can identify visual structure ---
+reading order, column boundaries, figure captions, mathematical notation ---
+that is inaccessible to text-layer extraction. Prompt engineering further
+shapes this capability: instructions specifying the desired output format,
+the language of the document, and the content type of the page steer the model
+toward structured, consistent output. This visual grounding and prompt-driven
+control form the foundation of the image-based and hybrid extraction strategies
+evaluated in this thesis.
 
 \subsection{Multimodal Processing Strategies}
-\begin{itemize}
-    \item Text-only extraction
-    \item Image-based extraction (visual parsing)
-    \item Hybrid approaches combining both modalities
-\end{itemize}
+
+PDF parsing approaches can be grouped into three broad strategies based on how
+they interpret document content: rule-based text extraction, deep
+learning-based recognition, and multimodal processing \cite{ingemarsson2024}.
+
+\textbf{Rule-based (text-only) extraction} operates directly on the PDF's
+embedded text layer, retrieving character sequences and their coordinates
+without any visual processing. Libraries such as PyMuPDF and pdfplumber fall
+into this category. These tools are fast, deterministic, and reliable on
+native PDFs with simple layouts, but they cannot process scanned or
+image-based pages and discard all visual structure during extraction
+\cite{adhikari2024}. Ingemarsson and Persson \cite{ingemarsson2024} quantify
+this limitation empirically: rule-based tools achieve 0\% accuracy on
+image-only documents, a hard ceiling that cannot be overcome through
+configuration or tuning alone.
+
+\textbf{Deep learning-based extraction} applies trained neural network models
+to recognize text, layout regions, and graphical elements from page images.
+OCR engines such as Tesseract are a foundational example; more recent tools
+apply deep learning models for higher-accuracy recognition across a broader
+range of content types. These approaches can handle scanned documents that
+rule-based tools cannot, and they outperform multimodal tools on documents
+dominated by complex images \cite{ingemarsson2024}. However, applying them
+to native PDFs that already contain extractable text introduces unnecessary
+noise and discards existing formatting metadata \cite{adhikari2024}.
+
+\textbf{Multimodal extraction} combines text-layer signals with visual
+understanding, using models that process both the raw text content and a
+rendered image of the page simultaneously. Systems of this type extract all
+content modalities --- text, images, and tables --- process each
+appropriately, and align them according to the document's logical structure,
+preserving the semantic relationship between figures and their captions, and
+between equations and surrounding text \cite{ingemarsson2024}. Ingemarsson
+and Persson \cite{ingemarsson2024} find that multimodal tools achieve the best
+overall performance across diverse document types, reaching 90\% accuracy with
+GPT-4o, making them the preferred choice when page content is unknown or mixed.
+
+These three strategies present a fundamental trade-off: rule-based methods are
+fast and reliable for text but blind to images; deep learning methods handle
+visual content better but may over-process native PDFs; multimodal methods
+offer the best coverage but at higher computational cost. Crucially, no single
+strategy is universally optimal --- the appropriate choice depends on the
+content type of each individual page. This finding directly motivates the
+adaptive, per-page strategy developed in this thesis.
 
 
 % ================================================================
@@ -884,6 +998,11 @@ Potential and limitations of LLMs in capturing structured semantics: A case stud
 In \textit{Proceedings of the 20th International Conference on Advanced Intelligent Computing
 Technology and Applications (ICIC 2024)}, LNAI vol.\ 14867, pp.\ 50--61. Springer.
 \url{https://doi.org/10.1007/978-981-97-5663-6_5}
+
+\bibitem{ingemarsson2024}
+Ingemarsson, P., \& Persson, D. (2024).
+PDF Parsing, Unveiling the Most Efficient Method.
+Engineering Degree Project, Linnaeus University.
 
 \end{thebibliography}
 
