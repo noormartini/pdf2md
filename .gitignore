@@ -5,6 +5,7 @@ PRESENTATION.md
 .DS_Store
 
 # LaTeX build artifacts
+Thesis_Paper/NoorMartini_Thesis.pdf
 Thesis_Paper/*.aux
 Thesis_Paper/*.fdb_latexmk
 Thesis_Paper/*.fls
