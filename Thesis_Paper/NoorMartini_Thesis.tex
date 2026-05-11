@@ -398,21 +398,36 @@ against the experimental results in Chapter~6.
 % ----------------------------------------------------------------
 
 This thesis focuses on PDF documents as the exclusive input format. The
-developed system is evaluated on English-language documents across four
-representative categories: academic papers, administrative forms, presentation
+developed system is primarily evaluated on German and English academic
+documents, with the experimental benchmark covering four representative
+document categories: academic papers, administrative forms, presentation
 slides, and scanned archival documents. While the system architecture is
 designed to be compatible with any LLM backend supporting a vision API, all
-experiments are conducted locally using LM Studio to ensure reproducibility
-without dependence on external cloud services.
+experiments are conducted locally using LM Studio to ensure full
+reproducibility without dependence on external cloud services.
+
+The system performs automatic language detection using the \texttt{langdetect}
+library and adjusts LLM prompts accordingly, appending a language-preservation
+instruction for non-English documents to prevent the model from translating
+content. However, no language-specific training or fine-tuning is applied, and
+the evaluation metrics are language-agnostic. The primary experimental results
+and qualitative analysis are based on the German-language test document.
+
+The page classification module identifies five content types (TEXT, IMAGE,
+FORMULA, MIXED, and EMPTY) based on structural signals extracted by
+PyMuPDF: embedded image count, vector path density, presence of mathematical
+Unicode symbols, and total character count. Font-size-based heading detection
+is applied to text pages using a character-weighted font-size tally to identify
+the body text size and promote larger spans to Markdown heading levels H1--H3.
 
 The following aspects are explicitly out of scope:
 
 \begin{itemize}
   \item Real-time or streaming document processing.
-  \item Support for languages other than English.
   \item Conversion of formats other than PDF (e.g., DOCX, HTML, PPTX).
-  \item Fine-tuning of LLM models for the conversion task.
-  \item Enterprise-scale deployment or cloud integration.
+  \item Fine-tuning or task-specific training of LLM models.
+  \item Enterprise-scale deployment or cloud infrastructure integration.
+  \item Support for right-to-left scripts or ideographic writing systems.
 \end{itemize}
 
 The evaluation focuses on Markdown as a single target format. Conversion to
@@ -427,32 +442,47 @@ This thesis makes the following contributions to the field of document
 processing and multimodal AI systems:
 
 \begin{enumerate}
-  \item \textbf{Content-aware adaptive conversion system.} A multimodal system
-        that classifies each PDF page by content type — plain text, image, table,
-        hyperlink, page number, source code, or mathematical formula — and
-        applies the most appropriate extraction strategy per page, powered by
-        LM Studio as a local LLM backend.
+  \item \textbf{Per-page content classifier.} A lightweight page classification
+        module that assigns each PDF page to one of five content types
+        (TEXT, IMAGE, FORMULA, MIXED, or EMPTY) using structural signals
+        extracted by PyMuPDF: embedded image count, vector path density,
+        mathematical symbol detection, and character count. The classifier
+        operates without any LLM call, keeping classification fast and
+        deterministic.
 
-  \item \textbf{Systematic comparison framework.} A structured experimental
-        framework for comparing the adaptive system against three fixed
-        strategies (text-only, image-only, hybrid) across four document
-        categories, yielding actionable guidance on strategy selection based on
-        document characteristics.
+  \item \textbf{Font-size-based heading detection.} A heading detection
+        mechanism that uses a character-weighted font-size tally to identify
+        the dominant body text size on each page and promotes spans exceeding
+        this baseline by thresholds of 15\%, 40\%, and 80\% to Markdown heading
+        levels H3, H2, and H1 respectively. This replaces flat text extraction
+        with structure-preserving Markdown output for text-classified pages.
 
-  \item \textbf{Evaluation methodology for structured output.} A proposed
-        evaluation methodology that extends beyond BLEU/ROUGE metrics to assess
-        structural accuracy (heading hierarchy, list fidelity, table
-        reconstruction) and semantic completeness.
+  \item \textbf{Per-page figure extraction with Markdown linking.} An image
+        extraction pipeline that retrieves embedded figures from vision-processed
+        pages using PyMuPDF's \texttt{extract\_image} API, saves them as
+        individual files (e.g.\ \texttt{figures/page\_001\_fig\_001.png}), and
+        instructs the vision LLM to reference these paths as Markdown image
+        links in its output, preserving the visual content of non-text pages.
 
-  \item \textbf{Empirical findings.} Empirical results demonstrating the
-        trade-offs between accuracy, computational cost, and strategy choice
-        across document categories, contributing to the growing body of work
-        on LLM-based document understanding.
+  \item \textbf{Seven-metric evaluation framework.} A structured evaluation
+        methodology that assesses Markdown output quality across seven
+        complementary metrics: text similarity (difflib SequenceMatcher ratio),
+        heading structure score, list structure score, table structure score,
+        code block score, paragraph structure score, and word overlap (Jaccard
+        similarity). This multi-dimensional approach captures aspects of
+        structural fidelity that standard n-gram metrics such as BLEU and ROUGE
+        cannot measure.
 
-  \item \textbf{Reproducible implementation.} A fully documented, reproducible
-        implementation using open-source tools (PyMuPDF, LM Studio) with all
-        prompt templates, evaluation scripts, and sample documents provided in
-        the appendices.
+  \item \textbf{Systematic experiment runner.} A configurable experiment
+        framework that evaluates all combinations of strategy, model,
+        prompt variant, temperature, and page across a benchmark of reference
+        documents, records per-page scores and token usage, and generates
+        summary reports for strategy and model comparison.
+
+  \item \textbf{Reproducible open-source implementation.} A fully documented
+        implementation using open-source tools (PyMuPDF, pymupdf4llm, LM Studio)
+        that runs entirely locally, with all prompt templates, evaluation scripts,
+        experiment configurations, and test suites included.
 \end{enumerate}
 
 % ----------------------------------------------------------------
@@ -461,42 +491,45 @@ processing and multimodal AI systems:
 
 The remainder of this thesis is organized as follows:
 
-\textbf{Chapter 2 — Background and Fundamentals} provides the theoretical
-foundation for this work, covering the PDF internal structure and parsing
-challenges, Markdown syntax and its use as a structured representation, the
-architecture and vision capabilities of modern LLMs, and a taxonomy of
-multimodal processing strategies.
+\textbf{Chapter 2 (Background and Fundamentals)} provides the theoretical
+foundation for this work. It covers the PDF internal structure and its
+parsing challenges, Markdown syntax and its role as a structured target
+representation, the architecture and vision capabilities of modern large
+language models, and a taxonomy of multimodal extraction strategies.
 
-\textbf{Chapter 3 — Related Work} surveys existing tools and research in three
-areas: traditional PDF processing tools (PyMuPDF, pdfplumber), modern
-conversion systems (Marker, LlamaParse, Nougat, MinerU), and LLM-based document
-understanding approaches. It identifies the limitations of current solutions
-that this thesis addresses.
+\textbf{Chapter 3 (Related Work)} surveys existing tools and research across
+three areas: traditional PDF processing tools (PyMuPDF, pdfplumber, Tesseract),
+modern conversion systems (Marker, LlamaParse, Nougat, MinerU), and LLM-based
+document understanding. It identifies the limitations that motivate the
+adaptive approach developed in this thesis.
 
-\textbf{Chapter 4 — Methodology} describes the research design, dataset
-construction, ground truth creation process, and evaluation metrics. It
-introduces the comparative study framework and defines the experimental
-conditions under which the adaptive system and the three fixed strategies are
-evaluated.
+\textbf{Chapter 4 (Methodology)} describes the research design and
+comparative study framework, the document dataset and ground truth construction
+process, and the seven-metric evaluation methodology used to assess Markdown
+output quality. It defines the experimental conditions under which all four
+strategies are compared.
 
-\textbf{Chapter 5 — System Design and Implementation} presents the architecture
-of the developed system, including the per-page content classification module,
-PDF processing pipeline, LM Studio integration, prompt design per content type,
-and post-processing pipeline. It documents the technology stack and
-implementation decisions.
+\textbf{Chapter 5 (System Design and Implementation)} presents the full
+architecture of the developed system: the per-page content classifier, the
+font-size-based heading detection mechanism, the figure extraction and Markdown
+linking pipeline, the four conversion strategies and their LM Studio
+integration, the content-type-specific prompt designs, and the post-processing
+pipeline. Implementation decisions and the technology stack are documented here.
 
-\textbf{Chapter 6 — Results and Evaluation} reports the experimental outcomes,
-including quantitative accuracy results by strategy and document type,
-qualitative case studies of success and failure modes, and a strategy comparison
-summary with recommended use cases.
+\textbf{Chapter 6 (Results and Evaluation)} reports the experimental
+outcomes, including per-metric scores by strategy, model, temperature, and
+document type; qualitative case studies of success and failure modes; and a
+strategy comparison summary with recommended use cases for each approach.
 
-\textbf{Chapter 7 — Discussion} interprets the results in light of the research
-questions, addresses threats to validity, and situates the findings within the
-broader related work.
+\textbf{Chapter 7 (Discussion)} interprets the results in light of the five
+research questions and four hypotheses, addresses threats to internal and
+external validity, and situates the findings within the broader landscape of
+document understanding research.
 
-\textbf{Chapter 8 — Conclusion} summarizes the findings, discusses limitations,
-and outlines directions for future work including support for additional
-document types, multilingual processing, and integration with newer LLM models.
+\textbf{Chapter 8 (Conclusion)} summarizes the contributions and key
+findings, acknowledges the limitations of the study, and outlines directions
+for future work including multilingual evaluation, support for additional
+document formats, and integration with newer multimodal LLM architectures.
 
 
 % ================================================================
