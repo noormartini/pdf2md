@@ -569,6 +569,12 @@ document formats, and integration with newer multimodal LLM architectures.
               existing formatting metadata \cite{adhikari2024}
         \item Multi-column layouts, footnotes, and mixed-language documents
               violate the assumption that positional order equals reading order \cite{gao2011}
+        \item \textbf{Mathematical notation:} PDF stores formulas as sequences
+              of individual characters positioned at specific coordinates ---
+              superscripts, subscripts, and multi-line expressions are
+              geometrically positioned but carry no semantic markup, so
+              extractors conflate them with body text and garble the expression
+              \cite{blecher2023}
     \end{itemize}
     \item Visual/Image-based Extraction Challenges
     \begin{itemize}
@@ -580,6 +586,13 @@ document formats, and integration with newer multimodal LLM architectures.
         \item Code blocks: identifiable through monospaced font detection and
               consistent horizontal spacing, but easily fragmented by standard
               text extractors \cite{adhikari2024}
+        \item \textbf{Scanned vs.\ digital-native detection:} determining
+              whether a PDF page requires OCR is itself a non-trivial
+              preprocessing decision, typically approximated by comparing the
+              ratio of embedded text area to image area; further, some
+              digital-native PDFs contain visually correct but internally
+              garbled text encodings that require an OCR fallback despite not
+              being scanned \cite{wang2024}
     \end{itemize}
 \end{itemize}
 
@@ -621,9 +634,13 @@ AI-driven workflows, structured Markdown is a preferred input format for large
 language model (LLM) pipelines and retrieval-augmented generation (RAG)
 systems: preserving semantic hierarchy in the converted document improves
 retrieval precision and context quality when documents are ingested into
-knowledge bases \cite{khan2024}. These properties collectively make Markdown
-the most suitable target representation for the conversion system developed
-in this thesis.
+knowledge bases \cite{khan2024}. Khan et al.\ \cite{khan2024} demonstrate this
+concretely: the quality of upstream text extraction directly caps downstream
+retrieval precision, because poorly structured or fragmented text produces
+low-quality chunk embeddings that fail to retrieve the correct context even
+when the relevant content is present in the document. These properties
+collectively make Markdown the most suitable target representation for the
+conversion system developed in this thesis.
 
 \subsection{Large Language Models}
 
@@ -667,11 +684,33 @@ toward structured, consistent output. This visual grounding and prompt-driven
 control form the foundation of the image-based and hybrid extraction strategies
 evaluated in this thesis.
 
+A dedicated class of models has emerged for visually rich document
+understanding (VRD-CU), which treats documents as multimodal objects with
+jointly meaningful text, spatial layout, and visual features. The LayoutLM
+model family \cite{ding2025} exemplifies this approach: these models are
+pretrained to simultaneously learn text content, two-dimensional positional
+embeddings encoding word locations on the page, and visual features extracted
+from page images. This joint pretraining enables the model to associate a
+heading not only by its words but by its position, font size, and surrounding
+whitespace --- signals that a purely text-based language model cannot access.
+The field has evolved through three generations: early feature-based models
+(2018--2020), BERT-style pretrained document models (2020--2022), and
+LLM-instruction-tuned frameworks (2022--present) \cite{ding2025}, reflecting
+both the maturation of document understanding as a research discipline and the
+increasing multimodal capability of the underlying architectures.
+
 \subsection{Multimodal Processing Strategies}
 
 PDF parsing approaches can be grouped into three broad strategies based on how
 they interpret document content: rule-based text extraction, deep
 learning-based recognition, and multimodal processing \cite{ingemarsson2024}.
+More granularly, a complete document parsing system must address five
+interdependent subtasks: layout analysis, text recognition, table structure
+recognition, mathematical expression recognition, and chart understanding
+\cite{parsing2024}. No single existing approach handles all five
+simultaneously, and the relative difficulty of each subtask varies by document
+type --- a key reason why fixed-strategy tools underperform on diverse
+real-world documents.
 
 \textbf{Rule-based (text-only) extraction} operates directly on the PDF's
 embedded text layer, retrieving character sequences and their coordinates
@@ -692,7 +731,11 @@ range of content types. These approaches can handle scanned documents that
 rule-based tools cannot, and they outperform multimodal tools on documents
 dominated by complex images \cite{ingemarsson2024}. However, applying them
 to native PDFs that already contain extractable text introduces unnecessary
-noise and discards existing formatting metadata \cite{adhikari2024}.
+noise and discards existing formatting metadata \cite{adhikari2024}. A further
+structural weakness of multi-stage pipelines is error propagation: a
+misclassification in the layout analysis step cascades through all subsequent
+stages --- OCR, table detection, formula recognition --- producing compounding
+errors that are difficult to trace back to their root cause \cite{cassel2025}.
 
 \textbf{Multimodal extraction} combines text-layer signals with visual
 understanding, using models that process both the raw text content and a
@@ -710,7 +753,13 @@ fast and reliable for text but blind to images; deep learning methods handle
 visual content better but may over-process native PDFs; multimodal methods
 offer the best coverage but at higher computational cost. Crucially, no single
 strategy is universally optimal --- the appropriate choice depends on the
-content type of each individual page. This finding directly motivates the
+content type of each individual page. Recent benchmarks reinforce this
+conclusion: ParseBench \cite{parsebench2026} evaluates 14 parsers across five
+capability dimensions (tables, charts, content faithfulness, semantic
+formatting, and visual grounding) and finds that no current system achieves
+consistently strong performance across all five --- the highest-scoring system
+reaches only 84.9\% overall while still failing on chart understanding and
+visual grounding. This persistent gap across methods directly motivates the
 adaptive, per-page strategy developed in this thesis.
 
 
@@ -1003,6 +1052,12 @@ Technology and Applications (ICIC 2024)}, LNAI vol.\ 14867, pp.\ 50--61. Springe
 Ingemarsson, P., \& Persson, D. (2024).
 PDF Parsing, Unveiling the Most Efficient Method.
 Engineering Degree Project, Linnaeus University.
+
+\bibitem{ding2025}
+Ding, Y., Han, S.C., Lee, J., \& Hovy, E. (2025).
+Deep learning based visually rich document content understanding: A survey.
+\textit{arXiv preprint arXiv:2408.01287}.
+\url{https://arxiv.org/abs/2408.01287}
 
 \end{thebibliography}
 
