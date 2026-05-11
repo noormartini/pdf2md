@@ -530,71 +530,62 @@ document formats, and integration with newer multimodal LLM architectures.
 % ================================================================
 
 \subsection{PDF Format and Parsing Challenges}
-\begin{itemize}
-    \item PDF Internal Structure
-    \begin{itemize}
-        \item \textbf{PostScript heritage:} PDF evolved from PostScript, a page
-              description language designed for rendering, not for storing structured
-              information --- this origin explains why PDF encodes content as drawing
-              instructions rather than semantic elements \cite{whitington2012}
-        \item PDFs as ``drawing instructions'': text stored as glyphs at $(x, y)$
-              coordinates with no native concept of paragraph, heading, or list ---
-              all semantic structure must be reverse-engineered from geometric
-              proximity, font size, and alignment cues \cite{parsing2024}
-        \item \textbf{PDF coordinate system:} the page origin is at the bottom-left
-              corner with $Y$ increasing upward, opposite to screen coordinates ---
-              positional sorting requires coordinate transformation and still fails
-              on multi-column layouts \cite{whitington2012}
-        \item \textbf{Tagged vs.\ untagged PDFs:} ISO 32000-1 version 1.4
-              introduced ``tagged PDF,'' adding a logical structure tree that maps
-              rendering commands to semantic roles such as headings and paragraphs
-              and specifies reading order \cite{darvishy2018}; the vast majority of
-              PDFs are untagged, meaning structure must be inferred purely from
-              geometry, and even when tags exist, correct reading order still
-              requires manual verification \cite{darvishy2018}
-        \item Distinction between \textbf{native PDFs} (contain actual text objects
-              with bounding boxes, amenable to structural parsing) and
-              \textbf{scanned PDFs} (image-only pages requiring OCR and visual
-              region detection before any text can be extracted) \cite{parsing2024}
-    \end{itemize}
-    \item Text Extraction Challenges (embedded fonts, encoding, layouts)
-    \begin{itemize}
-        \item \textbf{Font encoding complexity:} PDF can embed fonts with custom
-              encoding vectors, meaning character codes in the file do not directly
-              map to Unicode --- a root cause of garbled or incomplete text
-              extraction, especially in older documents \cite{whitington2012}
-        \item Flattened text extraction: loses paragraph boundaries, list
-              structure, and semantic grouping \cite{adhikari2024}
-        \item Over-applying OCR to native PDFs: introduces noise and discards
-              existing formatting metadata \cite{adhikari2024}
-        \item Multi-column layouts, footnotes, and mixed-language documents
-              violate the assumption that positional order equals reading order \cite{gao2011}
-        \item \textbf{Mathematical notation:} PDF stores formulas as sequences
-              of individual characters positioned at specific coordinates ---
-              superscripts, subscripts, and multi-line expressions are
-              geometrically positioned but carry no semantic markup, so
-              extractors conflate them with body text and garble the expression
-              \cite{blecher2023}
-    \end{itemize}
-    \item Visual/Image-based Extraction Challenges
-    \begin{itemize}
-        \item Images extracted without positional context lose their semantic
-              relationship to surrounding text \cite{parsing2024}
-        \item Tables: PDF encodes no explicit row/column structure; complex
-              layouts may require HTML fallback since Markdown lacks
-              \texttt{rowspan}/\texttt{colspan} support \cite{parsing2024}
-        \item Code blocks: identifiable through monospaced font detection and
-              consistent horizontal spacing, but easily fragmented by standard
-              text extractors \cite{adhikari2024}
-        \item \textbf{Scanned vs.\ digital-native detection:} determining
-              whether a PDF page requires OCR is itself a non-trivial
-              preprocessing decision, typically approximated by comparing the
-              ratio of embedded text area to image area; further, some
-              digital-native PDFs contain visually correct but internally
-              garbled text encodings that require an OCR fallback despite not
-              being scanned \cite{wang2024}
-    \end{itemize}
-\end{itemize}
+
+PDF evolved from PostScript, a page description language designed for
+rendering, not for storing structured information \cite{whitington2012}. This
+origin has a lasting consequence: PDF encodes content as drawing instructions
+rather than semantic elements. Text is stored as individual glyphs positioned
+at $(x, y)$ coordinates on the page, with no native concept of paragraph,
+heading, or list. The page origin sits at the bottom-left corner with $Y$
+increasing upward --- opposite to screen coordinates --- meaning that
+positional sorting requires coordinate transformation before reading order can
+even be approximated, and that approximation still fails on multi-column
+layouts \cite{whitington2012}. All semantic structure visible to a human reader
+must therefore be reverse-engineered from geometric proximity, font size, and
+alignment cues \cite{parsing2024}.
+
+The ISO 32000-1 standard introduced ``tagged PDF'' in version 1.4, adding a
+logical structure tree that maps rendering commands to semantic roles such as
+headings and paragraphs and explicitly specifies reading order
+\cite{darvishy2018}. However, the vast majority of PDFs produced in practice
+are untagged, meaning structure must be inferred purely from geometry. Even
+when tags are present, correct reading order still requires manual verification
+\cite{darvishy2018}. A further fundamental distinction separates
+\textit{native PDFs} --- which contain actual text objects with bounding boxes
+amenable to structural parsing --- from \textit{scanned PDFs}, where pages
+exist only as images and require Optical Character Recognition (OCR) and
+visual region detection before any text can be extracted \cite{parsing2024}.
+Determining which category a given page belongs to is itself a non-trivial
+preprocessing step, typically approximated by comparing the ratio of embedded
+text area to image area. Complicating matters further, some digital-native PDFs
+contain visually correct but internally garbled text encodings, requiring an
+OCR fallback despite not being scanned \cite{wang2024}.
+
+Text extraction from native PDFs carries its own set of challenges. PDF can
+embed fonts with custom encoding vectors, meaning character codes in the file
+do not directly map to Unicode --- a root cause of garbled or incomplete
+extraction, particularly in older documents \cite{whitington2012}. Even when
+characters are recovered correctly, naive sequential extraction loses paragraph
+boundaries, list structure, and semantic grouping \cite{adhikari2024}.
+Multi-column layouts, footnotes, and mixed-language documents compound this
+problem by violating the assumption that positional order corresponds to
+reading order \cite{gao2011}. Mathematical notation presents a particularly
+acute challenge: PDF stores formulas as sequences of individual characters
+positioned at specific coordinates, so superscripts, subscripts, and
+multi-line expressions carry no semantic markup and are routinely conflated
+with body text by extractors \cite{blecher2023}.
+
+Visual and structural content introduces a third category of challenges.
+Images embedded in a PDF carry no positional context linking them to
+surrounding text, so their semantic relationship to a caption or paragraph is
+lost during extraction \cite{parsing2024}. Tables present a similar problem:
+the PDF format encodes no explicit row or column structure, and complex merged
+cells may require conversion to HTML rather than Markdown, since Markdown
+lacks native support for \texttt{rowspan} and \texttt{colspan}
+\cite{parsing2024}. Code blocks, while identifiable through monospaced font
+detection and consistent horizontal spacing, are easily fragmented by standard
+text extractors that do not preserve whitespace-sensitive formatting
+\cite{adhikari2024}.
 
 Ingemarsson and Persson \cite{ingemarsson2024} provide empirical confirmation
 of this content-type dependency in a controlled experiment spanning multiple
