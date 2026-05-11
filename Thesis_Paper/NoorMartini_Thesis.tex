@@ -85,28 +85,18 @@ the work is situated.
 
 \subsubsection*{Difficulty of Extracting Structured Content from PDFs}
 
-The PDF specification, originally developed by Adobe Systems in the early 1990s
-\cite{whitington2012}, was designed as a faithful electronic representation of
-printed pages. Its internal structure stores content as a flat sequence of
-graphical operations: glyphs rendered at specific coordinates with particular
-fonts and sizes \cite{whitington2012}, functioning more like instructions on how
-to visually produce a page than a structured representation of content
-\cite{darvishy2018}. Unlike HTML or XML, PDF has no native
-concept of a paragraph, heading, list item, or table cell \cite{whitington2012}.
-As Subramani et al.\ \cite{subramani2020} observe, automated document
-understanding must bridge the gap between documents \textit{made for humans} and
-systems that can parse machine-readable structure, a challenge that requires
-combining both computer vision (CV) and natural language processing (NLP)
-architectures into a unified solution.
-
-Extracting the logical reading order alone is non-trivial: multi-column layouts,
-footnotes, side-bars, and mixed-language documents all violate the assumption
-that positional order corresponds to reading order \cite{gao2011}. The
-problem compounds when documents contain embedded images, complex tables spanning
-multiple pages, mathematical formulas encoded as bitmaps, or watermarks overlaid
-on text \cite{gao2011}. These structural complexities mean that a simple
-text dump from a PDF extractor produces output that is fragmented, mis-ordered,
-or semantically meaningless without further processing \cite{parsing2024}.
+PDF was designed to faithfully reproduce the visual appearance of a printed
+page, not to encode its meaning. As a result, the format provides no native
+representation of semantic elements such as paragraphs, headings, list items,
+or table cells \cite{whitington2012}. Any structure visible to a human reader
+must be reverse-engineered by software from low-level positional and typographic
+signals, a process that is inherently fragile and error-prone
+\cite{parsing2024}. Real-world documents compound this difficulty by mixing
+plain text, embedded images, mathematical formulas, multi-column layouts, and
+complex tables within the same file, meaning that a single extraction strategy
+applied uniformly across all pages will inevitably fail on some content types.
+The technical details of the PDF format and the specific challenges each content
+type poses are covered in Chapter~2.
 
 \subsubsection*{Limited OCR Accuracy for Complex Layouts}
 
