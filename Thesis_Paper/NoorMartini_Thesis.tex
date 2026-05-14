@@ -537,10 +537,10 @@ origin has a lasting consequence: PDF encodes content as drawing instructions
 rather than semantic elements. Text is stored as individual glyphs positioned
 at $(x, y)$ coordinates on the page, with no native concept of paragraph,
 heading, or list. The page origin sits at the bottom-left corner with $Y$
-increasing upward --- opposite to screen coordinates --- meaning that
-positional sorting requires coordinate transformation before reading order can
-even be approximated, and that approximation still fails on multi-column
-layouts \cite{whitington2012}. All semantic structure visible to a human reader
+increasing upward (opposite to screen coordinates), meaning that positional
+sorting requires coordinate transformation before reading order can even be
+approximated, and that approximation still fails on multi-column layouts
+\cite{whitington2012}. All semantic structure visible to a human reader
 must therefore be reverse-engineered from geometric proximity, font size, and
 alignment cues \cite{parsing2024}.
 
@@ -551,8 +551,8 @@ headings and paragraphs and explicitly specifies reading order
 are untagged, meaning structure must be inferred purely from geometry. Even
 when tags are present, correct reading order still requires manual verification
 \cite{darvishy2018}. A further fundamental distinction separates
-\textit{native PDFs} --- which contain actual text objects with bounding boxes
-amenable to structural parsing --- from \textit{scanned PDFs}, where pages
+\textit{native PDFs} (which contain actual text objects with bounding boxes
+amenable to structural parsing) from \textit{scanned PDFs}, where pages
 exist only as images and require Optical Character Recognition (OCR) and
 visual region detection before any text can be extracted \cite{parsing2024}.
 Determining which category a given page belongs to is itself a non-trivial
@@ -563,7 +563,7 @@ OCR fallback despite not being scanned \cite{wang2024}.
 
 Text extraction from native PDFs carries its own set of challenges. PDF can
 embed fonts with custom encoding vectors, meaning character codes in the file
-do not directly map to Unicode --- a root cause of garbled or incomplete
+do not directly map to Unicode, which is a root cause of garbled or incomplete
 extraction, particularly in older documents \cite{whitington2012}. Even when
 characters are recovered correctly, naive sequential extraction loses paragraph
 boundaries, list structure, and semantic grouping \cite{adhikari2024}.
@@ -608,9 +608,9 @@ inline code, and triple backticks for fenced code blocks. This minimalist
 design means that Markdown source files remain human-readable without a
 renderer, unlike binary or XML-based formats such as PDF or DOCX.
 
-As a structured representation, Markdown preserves semantic hierarchy ---
-headings, nested lists, emphasis, and tables --- making documents interpretable
-by both human readers and automated systems. Community extensions to the base
+As a structured representation, Markdown preserves semantic hierarchy (headings, nested lists, emphasis, and
+tables), making documents interpretable by both human readers and automated
+systems. Community extensions to the base
 specification, such as GitHub Flavored Markdown (GFM), add support for tables,
 task lists, and mathematical notation via \LaTeX-style delimiters, further
 broadening its applicability for technical and scientific documents
@@ -620,7 +620,7 @@ site generators, and AI pipelines without additional transformation.
 
 Markdown's plain-text nature makes it natively compatible with version control
 systems such as Git, where every change is tracked and attributed at the
-character level --- a property that PDF and Word formats cannot match. For
+character level, a property that PDF and Word formats cannot match. For
 AI-driven workflows, structured Markdown is a preferred input format for large
 language model (LLM) pipelines and retrieval-augmented generation (RAG)
 systems: preserving semantic hierarchy in the converted document improves
@@ -650,7 +650,7 @@ the maximum number of tokens the model can process in a single inference step.
 Larger context windows allow the model to consider longer documents and maintain
 coherence across extended exchanges, but require proportionally more memory and
 compute \cite{ingemarsson2024}. For document conversion tasks, the context window
-determines how much of a page --- or how many pages --- can be submitted in a
+determines how much of a page (or how many pages) can be submitted in a
 single prompt.
 
 Modern LLMs vary substantially in capability and cost. Proprietary models such as
@@ -662,13 +662,13 @@ cost, making them well-suited for local deployment via runtimes such as LM Studi
 A comparative study by Ingemarsson and Persson \cite{ingemarsson2024} evaluating
 these model families on PDF parsing tasks found that GPT-4-Turbo and GPT-4o
 achieved the highest document understanding scores (77--78\%), while open-source
-models clustered near 70\% --- a meaningful accuracy gap that must be weighed
+models clustered near 70\%, a meaningful accuracy gap that must be weighed
 against the cost and privacy advantages of running models locally.
 
 Vision-capable LLMs are of particular relevance to document conversion. By
-accepting rendered page images as input, they can identify visual structure ---
-reading order, column boundaries, figure captions, mathematical notation ---
-that is inaccessible to text-layer extraction. Prompt engineering further
+accepting rendered page images as input, they can identify visual structure such as reading order, column boundaries,
+figure captions, and mathematical notation, which is inaccessible to
+text-layer extraction. Prompt engineering further
 shapes this capability: instructions specifying the desired output format,
 the language of the document, and the content type of the page steer the model
 toward structured, consistent output. This visual grounding and prompt-driven
@@ -683,7 +683,7 @@ pretrained to simultaneously learn text content, two-dimensional positional
 embeddings encoding word locations on the page, and visual features extracted
 from page images. This joint pretraining enables the model to associate a
 heading not only by its words but by its position, font size, and surrounding
-whitespace --- signals that a purely text-based language model cannot access.
+whitespace, signals that a purely text-based language model cannot access.
 The field has evolved through three generations: early feature-based models
 (2018--2020), BERT-style pretrained document models (2020--2022), and
 LLM-instruction-tuned frameworks (2022--present) \cite{ding2025}, reflecting
@@ -699,9 +699,9 @@ More granularly, a complete document parsing system must address five
 interdependent subtasks: layout analysis, text recognition, table structure
 recognition, mathematical expression recognition, and chart understanding
 \cite{parsing2024}. No single existing approach handles all five
-simultaneously, and the relative difficulty of each subtask varies by document
-type --- a key reason why fixed-strategy tools underperform on diverse
-real-world documents.
+simultaneously, and the relative difficulty of each subtask varies by document type, which is
+a key reason why fixed-strategy tools underperform on diverse real-world
+documents.
 
 \textbf{Rule-based (text-only) extraction} operates directly on the PDF's
 embedded text layer, retrieving character sequences and their coordinates
@@ -725,14 +725,14 @@ to native PDFs that already contain extractable text introduces unnecessary
 noise and discards existing formatting metadata \cite{adhikari2024}. A further
 structural weakness of multi-stage pipelines is error propagation: a
 misclassification in the layout analysis step cascades through all subsequent
-stages --- OCR, table detection, formula recognition --- producing compounding
+stages (OCR, table detection, formula recognition), producing compounding
 errors that are difficult to trace back to their root cause \cite{cassel2025}.
 
 \textbf{Multimodal extraction} combines text-layer signals with visual
 understanding, using models that process both the raw text content and a
-rendered image of the page simultaneously. Systems of this type extract all
-content modalities --- text, images, and tables --- process each
-appropriately, and align them according to the document's logical structure,
+rendered image of the page simultaneously. Systems of this type extract all content modalities (text, images, and
+tables), process each appropriately, and align them according to the
+document's logical structure,
 preserving the semantic relationship between figures and their captions, and
 between equations and surrounding text \cite{ingemarsson2024}. Ingemarsson
 and Persson \cite{ingemarsson2024} find that multimodal tools achieve the best
@@ -743,7 +743,7 @@ These three strategies present a fundamental trade-off: rule-based methods are
 fast and reliable for text but blind to images; deep learning methods handle
 visual content better but may over-process native PDFs; multimodal methods
 offer the best coverage but at higher computational cost. Crucially, no single
-strategy is universally optimal --- the appropriate choice depends on the
+strategy is universally optimal; the appropriate choice depends on the
 content type of each individual page. Recent benchmarks reinforce this
 conclusion: ParseBench \cite{parsebench2026} evaluates 14 parsers across five
 capability dimensions (tables, charts, content faithfulness, semantic
