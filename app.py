@@ -1,7 +1,10 @@
 import os
+from functools import partial
+
 import fitz
 
 from config import Config
+from llm.client import call_llm
 
 from extraction.text import extract_pages_from_pdf
 from extraction.image import extract_page_figures
@@ -22,6 +25,7 @@ def _page_label(doc: fitz.Document, index: int) -> str:
 def run(config: Config):
     figures_dir = os.path.join(os.path.dirname(os.path.abspath(config.output)), "figures")
     cleaned_pages: list[str] = []
+    llm_call = partial(call_llm, timeout=config.llm_timeout)
 
     # Detect document language from the first page's text
     with fitz.open(config.input) as _doc:
@@ -72,6 +76,7 @@ def run(config: Config):
                     prompt_variant="default",
                     figure_refs=figure_refs or None,
                     language=language,
+                    llm_call=llm_call,
                 )
                 cleaned_pages.append(f"<!-- Page {label} -->\n\n{result.markdown}")
             doc.close()
@@ -99,6 +104,7 @@ def run(config: Config):
                     prompt_variant="default",
                     figure_refs=figure_refs or None,
                     language=language,
+                    llm_call=llm_call,
                 )
                 cleaned_pages.append(f"<!-- Page {label} -->\n\n{result.markdown}")
             doc.close()
@@ -133,6 +139,7 @@ def run(config: Config):
                     figures_dir=figures_dir,
                     figure_refs=figure_refs,
                     language=language,
+                    image_call=partial(image_strategy, llm_call=llm_call),
                 )
                 cleaned_pages.append(f"<!-- Page {label} -->\n\n{result.markdown}")
             doc.close()

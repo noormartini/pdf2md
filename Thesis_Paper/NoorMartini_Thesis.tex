@@ -132,10 +132,7 @@ PDF-to-Markdown conversion, Blecher et al.\ \cite{blecher2023} note that the PDF
 format causes ``a loss of semantic information, particularly for mathematical
 expressions,'' a point reinforced by Darvishy~\cite{darvishy2018}, who observes
 that no existing tool provides mechanisms to interpret or describe mathematical
-formulas and scientific graphs. This underscores that the limitation is not
-purely a pixel-level recognition problem but an inherently structural one ---
-and directly motivates the content-aware, per-page strategy developed in this
-thesis.
+formulas and scientific graphs. This underscores that the fundamental challenge is structural, not merely perceptual: what a page contains determines which extraction approach can succeed.
 
 \subsubsection*{Need for Conversion to Markdown for Accessibility and Version Control}
 
@@ -148,31 +145,7 @@ for machine-readability due to its simple syntax and structured format, noting
 that community extensions further support tables and advanced mathematical
 notation, making it a well-suited target for document conversion pipelines.
 
-Three properties make Markdown especially valuable as a target representation:
-
-\begin{enumerate}
-  \item \textbf{Version control compatibility.} Because Markdown is plain text,
-        every change is tracked, attributed, and auditable in version control
-        systems such as Git, treating a document as a fully versioned project.
-
-  \item \textbf{Machine-readability and structured format.} Markdown's simple
-        syntax and structured format preserve context and enhance comprehensibility
-        for both humans and automated systems, with community extensions further
-        supporting tables and advanced mathematical notation \cite{cassel2025}.
-
-  \item \textbf{Portability and long-term accessibility.} Markdown files can be
-        opened with virtually any text editor on any operating system, with no
-        dependency on proprietary software. Even if a specific application stops
-        working, the content remains fully readable --- an important consideration
-        for documents that need to be preserved indefinitely \cite{cone2019}.
-
-  \item \textbf{LLM and RAG pipeline integration.} The growth of large language
-        models (LLMs) and retrieval-augmented generation (RAG) architectures has
-        created strong demand for structured plain-text document representations.
-        Structured Markdown preserves semantic hierarchy --- headings, lists,
-        tables --- that improves retrieval precision and context quality when
-        documents are ingested into AI pipelines \cite{khan2024}.
-\end{enumerate}
+These properties --- version control compatibility, machine-readability, long-term portability, and compatibility with LLM and RAG pipelines --- make Markdown the most suitable target representation for the conversion system developed in this thesis. Chapter~2 discusses each in detail.
 
 % ----------------------------------------------------------------
 \subsection{Motivation}
@@ -191,20 +164,7 @@ documents and the dynamic, queryable knowledge bases that modern workflows deman
 
 \subsubsection*{Advantages of Markdown as a Structured Representation}
 
-Markdown offers a unique balance between human readability and machine
-processability. Unlike proprietary formats such as Word or PDF, Markdown does
-not rely on closed specifications and can be used to create websites, documents,
-books, presentations, and technical documentation, and converted between these
-formats using tools such as Pandoc. Its widespread adoption
-across platforms such as GitHub and Reddit means Markdown files can be opened
-with virtually any application on any operating system, and remain readable even
-if the software used to create them is no longer available. This flexibility allows
-document content to be \textit{written once and adapted for various platforms
-without reformatting} \cite{cone2019}.
-
-Table \ref{tab:format_comparison} summarizes the key properties of PDF, Word,
-and Markdown as document formats, highlighting why Markdown is the preferred
-target representation for automated document processing pipelines.
+Among common document formats, Markdown offers the best balance between human readability and machine processability for automated processing pipelines. Table~\ref{tab:format_comparison} illustrates why, across eight key properties.
 
 \begin{table}[h!]
 \centering
@@ -227,40 +187,6 @@ Long-term archival stability & High & Moderate & \textbf{High} \\
 \end{tabularx}
 \end{table}
 
-\subsubsection*{Potential of LLMs in Understanding Context and Structure}
-
-The emergence of large language models with vision capabilities has opened new
-possibilities for document understanding that transcend traditional OCR-based
-approaches. Blecher et al.\ \cite{blecher2023} introduced Nougat (Neural Optical
-Understanding for Academic Documents), a Visual Transformer model that converts
-images of PDF pages directly into a structured markup language. Their key insight
-is that an end-to-end model trained on paired PDF-markup data can infer semantic
-structure (headings, equations, tables, and citations) without requiring an
-explicit layout analysis step. This demonstrated the viability of replacing
-multi-stage OCR pipelines with a single multimodal model.
-
-Building on this direction, Wang et al.\ \cite{wang2024} developed MinerU, an
-open-source dual-engine system combining Vision-Language Models (VLMs) and OCR
-to convert PDFs and other document types into structured Markdown and JSON,
-supporting 109 languages and automatic detection of scanned versus
-digitally-born PDFs. More recent work by Cassel et al.\ \cite{cassel2025}
-demonstrates that end-to-end decoder transformer models outperform pipeline-based
-methods on accuracy metrics while offering greater flexibility on diverse document
-types.
-
-Complementing these document-level findings, Cheng et al.\ \cite{cheng2024}
-demonstrate that LLMs can capture structured semantic representations via
-prompting alone, without task-specific fine-tuning, though limitations emerge
-when handling complex argument structures. This supports the theoretical
-basis for using a vision LLM to recover structured Markdown from rendered
-page images, while also setting bounded expectations for content types such
-as dense mathematical formulas.
-
-These developments motivate the central premise of this thesis: that a
-\textit{hybrid} extraction strategy combining text-layer extraction with
-image-based LLM understanding can achieve accuracy and structural fidelity
-that neither modality achieves alone.
-
 \subsubsection*{Comparison of Extraction Strategies}
 
 Table \ref{tab:strategy_comparison} provides a preliminary comparison of the
@@ -275,13 +201,13 @@ related literature \cite{adhikari2024, parsing2024}.
 \renewcommand{\arraystretch}{1.4}
 \begin{tabularx}{\textwidth}{lXXXX}
 \toprule
-\textbf{Criterion} & \textbf{Text-only} & \textbf{Image-only} & \textbf{Hybrid} & \textbf{Adaptive} \\
+\textbf{Criterion} & \textbf{Text-only} & \textbf{Image\nobreakdash-only} & \textbf{Hybrid} & \textbf{Adaptive} \\
 \midrule
 Works on scanned PDFs        & No      & Yes               & Yes          & Yes      \\
 Preserves reading order      & Partial & Yes (model-dep.)  & Yes          & Yes      \\
 Handles complex tables       & Poor    & Moderate          & Good         & Good     \\
 Handles mathematical formulas & Poor   & Good              & Good         & Good     \\
-Computational cost           & Low     & High              & Medium-High  & Low-Medium \\
+Computational cost           & Low     & High              & \mbox{Medium-High}  & \mbox{Low-Medium} \\
 Structural fidelity          & Low     & Moderate          & High         & High     \\
 Dependency on LLM            & None    & Full              & Partial      & Selective \\
 \bottomrule
@@ -315,19 +241,9 @@ text-only, image-only, and hybrid strategies with respect to accuracy,
 structural fidelity, and computational efficiency.}
 \end{quote}
 
-The system achieves this by analysing each PDF page individually and
-classifying it by content type before conversion. Pages identified as
-plain text are converted immediately using PyMuPDF without any LLM
-involvement, keeping processing fast and deterministic. Pages that
-contain visual or structured content --- images, diagrams, mathematical
-formulas, tables, source code, headings embedded in layouts, or
-hyperlinks --- are rendered as images and sent to LM Studio, where a
-locally-hosted vision-capable LLM performs the conversion using a
-prompt tailored to the detected content type. This routing decision is
-made per page, so a single document can combine both pathways depending
-on what each page contains.
+In practice, the system classifies each PDF page by content type and routes plain-text pages to PyMuPDF while visually complex pages are sent to a locally-hosted vision LLM via LM Studio. A single document can therefore follow both pathways, depending on what each page contains.
 
-This objective is operationalized through the following research questions:
+This gives rise to five research questions:
 
 \begin{description}
   \item[RQ1.] \textit{Adaptivity:} Does a content-aware system that selects an
@@ -359,7 +275,7 @@ These questions are guided by the following hypotheses, which are evaluated
 against the experimental results in Chapter~6.
 
 \begin{description}
-  \item[H1 — Adaptive superiority.] The adaptive system will achieve higher
+  \item[H1 — Adaptive superiority.] We expect the adaptive system to achieve higher
         overall structural fidelity and content accuracy than any single fixed
         strategy, because different page types have fundamentally different
         extraction requirements that no one strategy handles equally well.
@@ -372,13 +288,13 @@ against the experimental results in Chapter~6.
         visual rendering and LLM inference, which introduces noise compared to
         direct text extraction.
 
-  \item[H3 — Computational efficiency of the adaptive approach.] Despite
-        classifying each page before conversion, the adaptive system will have a
-        lower average computational cost than the image-only or hybrid
-        strategies, because plain-text pages are handled by PyMuPDF locally
-        without any LLM call, and non-text pages are processed with prompts
-        tailored to their content type rather than a single general-purpose
-        prompt, reducing wasted inference on irrelevant instructions.
+  \item[H3 — Computational efficiency of the adaptive approach.] We argue that,
+        despite classifying each page before conversion, the adaptive system will
+        have a lower average computational cost than the image-only or hybrid
+        strategies: plain-text pages are handled by PyMuPDF locally without any
+        LLM call, and non-text pages are processed with prompts tailored to their
+        content type rather than a single general-purpose prompt, reducing wasted
+        inference on irrelevant instructions.
 
   \item[H4 — Hybrid as upper bound for mixed content.] For documents with a
         balanced mix of text and visual content, the hybrid strategy will serve
@@ -405,13 +321,6 @@ instruction for non-English documents to prevent the model from translating
 content. However, no language-specific training or fine-tuning is applied, and
 the evaluation metrics are language-agnostic. The primary experimental results
 and qualitative analysis are based on the German-language test document.
-
-The page classification module identifies five content types (TEXT, IMAGE,
-FORMULA, MIXED, and EMPTY) based on structural signals extracted by
-PyMuPDF: embedded image count, vector path density, presence of mathematical
-Unicode symbols, and total character count. Font-size-based heading detection
-is applied to text pages using a character-weighted font-size tally to identify
-the body text size and promote larger spans to Markdown heading levels H1--H3.
 
 The following aspects are explicitly out of scope:
 
@@ -493,36 +402,33 @@ language models, and a taxonomy of multimodal extraction strategies.
 \textbf{Chapter 3 (Related Work)} surveys existing tools and research across
 three areas: traditional PDF processing tools (PyMuPDF, pdfplumber, Tesseract),
 modern conversion systems (Marker, LlamaParse, Nougat, MinerU), and LLM-based
-document understanding. It identifies the limitations that motivate the
-adaptive approach developed in this thesis.
+document understanding, identifying the gaps this work addresses.
 
-\textbf{Chapter 4 (Methodology)} describes the research design and
-comparative study framework, the document dataset and ground truth construction
-process, and the seven-metric evaluation methodology used to assess Markdown
-output quality. It defines the experimental conditions under which all four
-strategies are compared.
+\textbf{Chapter 4 (Methodology)} establishes the research design: the
+comparative study framework, document dataset and ground truth construction
+process, and the seven-metric evaluation methodology. It defines the
+experimental conditions under which all four strategies are compared.
 
-\textbf{Chapter 5 (System Design and Implementation)} presents the full
-architecture of the developed system: the per-page content classifier, the
-font-size-based heading detection mechanism, the figure extraction and Markdown
-linking pipeline, the four conversion strategies and their LM Studio
-integration, the content-type-specific prompt designs, and the post-processing
-pipeline. Implementation decisions and the technology stack are documented here.
+\textbf{Chapter 5 (System Design and Implementation)} documents the full
+architecture of the developed system, including the per-page content
+classifier, heading detection mechanism, figure extraction pipeline, the four
+conversion strategies and their LM Studio integration, and the post-processing
+pipeline.
 
-\textbf{Chapter 6 (Results and Evaluation)} reports the experimental
-outcomes, including per-metric scores by strategy, model, temperature, and
-document type; qualitative case studies of success and failure modes; and a
-strategy comparison summary with recommended use cases for each approach.
+\textbf{Chapter 6 (Results and Evaluation)} reports per-metric scores by
+strategy, model, temperature, and document type; qualitative case studies of
+success and failure modes; and a strategy comparison summary with recommended
+use cases for each approach.
 
-\textbf{Chapter 7 (Discussion)} interprets the results in light of the five
-research questions and four hypotheses, addresses threats to internal and
-external validity, and situates the findings within the broader landscape of
-document understanding research.
+\textbf{Chapter 7 (Discussion)} interprets these findings against the five
+research questions and four hypotheses, addresses threats to validity, and
+situates the work within the broader landscape of document understanding
+research.
 
-\textbf{Chapter 8 (Conclusion)} summarizes the contributions and key
-findings, acknowledges the limitations of the study, and outlines directions
-for future work including multilingual evaluation, support for additional
-document formats, and integration with newer multimodal LLM architectures.
+\textbf{Chapter 8 (Conclusion)} closes with a summary of contributions,
+acknowledgement of limitations, and directions for future work --- including
+multilingual evaluation, additional document formats, and integration with
+newer multimodal LLM architectures.
 
 
 % ================================================================
@@ -540,9 +446,7 @@ heading, or list. The page origin sits at the bottom-left corner with $Y$
 increasing upward (opposite to screen coordinates), meaning that positional
 sorting requires coordinate transformation before reading order can even be
 approximated, and that approximation still fails on multi-column layouts
-\cite{whitington2012}. All semantic structure visible to a human reader
-must therefore be reverse-engineered from geometric proximity, font size, and
-alignment cues \cite{parsing2024}.
+\cite{whitington2012}. In practice, any structure a reader perceives has to be reconstructed from geometric cues alone --- an approximation that is inherently fragile \cite{parsing2024}.
 
 The ISO 32000-1 standard introduced ``tagged PDF'' in version 1.4, adding a
 logical structure tree that maps rendering commands to semantic roles such as
@@ -586,16 +490,6 @@ lacks native support for \texttt{rowspan} and \texttt{colspan}
 detection and consistent horizontal spacing, are easily fragmented by standard
 text extractors that do not preserve whitespace-sensitive formatting
 \cite{adhikari2024}.
-
-Ingemarsson and Persson \cite{ingemarsson2024} provide empirical confirmation
-of this content-type dependency in a controlled experiment spanning multiple
-parsing tools and document categories. Rule-based tools such as PyPDF and
-PyMuPDF achieved accuracy above 86\% on plain-text documents but scored 0\%
-on image-only PDFs, since they possess no mechanism to process visual content.
-Performance on mixed-content documents dropped to 82\%, compared to 87\% for
-plain-text files. These results demonstrate that each additional content type
-introduces a distinct failure mode for fixed-strategy parsers, reinforcing the
-case for content-aware, per-page strategy selection.
 
 \subsection{Markdown Format}
 
@@ -750,8 +644,7 @@ capability dimensions (tables, charts, content faithfulness, semantic
 formatting, and visual grounding) and finds that no current system achieves
 consistently strong performance across all five --- the highest-scoring system
 reaches only 84.9\% overall while still failing on chart understanding and
-visual grounding. This persistent gap across methods directly motivates the
-adaptive, per-page strategy developed in this thesis.
+visual grounding.
 
 
 % ================================================================
@@ -777,10 +670,33 @@ adaptive, per-page strategy developed in this thesis.
 \end{itemize}
 
 \subsection{LLM-based Document Understanding}
-\begin{itemize}
-    \item Vision-Language Models in Document Processing
-    \item Multimodal Approaches for Layout Analysis
-\end{itemize}
+
+The emergence of large language models with vision capabilities has opened new
+possibilities for document understanding that transcend traditional OCR-based
+approaches. Blecher et al.\ \cite{blecher2023} introduced Nougat (Neural Optical
+Understanding for Academic Documents), a Visual Transformer model that converts
+images of PDF pages directly into a structured markup language. Their key insight
+is that an end-to-end model trained on paired PDF-markup data can infer semantic
+structure (headings, equations, tables, and citations) without requiring an
+explicit layout analysis step. This demonstrated the viability of replacing
+multi-stage OCR pipelines with a single multimodal model.
+
+Building on this direction, Wang et al.\ \cite{wang2024} developed MinerU, an
+open-source dual-engine system combining Vision-Language Models (VLMs) and OCR
+to convert PDFs and other document types into structured Markdown and JSON,
+supporting 109 languages and automatic detection of scanned versus
+digitally-born PDFs. More recent work by Cassel et al.\ \cite{cassel2025}
+demonstrates that end-to-end decoder transformer models outperform pipeline-based
+methods on accuracy metrics while offering greater flexibility on diverse document
+types.
+
+Complementing these document-level findings, Cheng et al.\ \cite{cheng2024}
+demonstrate that LLMs can capture structured semantic representations via
+prompting alone, without task-specific fine-tuning, though limitations emerge
+when handling complex argument structures. This supports the theoretical
+basis for using a vision LLM to recover structured Markdown from rendered
+page images, while also setting bounded expectations for content types such
+as dense mathematical formulas.
 
 \subsection{Evaluation Methods for Document Conversion}
 
@@ -828,6 +744,15 @@ adaptive, per-page strategy developed in this thesis.
     \item Integration with LLM backend (LM Studio)
     \item Data flow diagram
 \end{itemize}
+
+\subsection{Page Content Classifier}
+
+The page classification module identifies five content types (TEXT, IMAGE,
+FORMULA, MIXED, and EMPTY) based on structural signals extracted by
+PyMuPDF: embedded image count, vector path density, presence of mathematical
+Unicode symbols, and total character count. Font-size-based heading detection
+is applied to text pages using a character-weighted font-size tally to identify
+the body text size and promote larger spans to Markdown heading levels H1--H3.
 
 \subsection{PDF Processing Module}
 \begin{itemize}
