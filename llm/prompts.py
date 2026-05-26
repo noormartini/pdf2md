@@ -42,7 +42,8 @@ You are a PDF-to-Markdown conversion specialist. Convert the following PDF-extra
 - Wrap source code in fenced code blocks with language identifier if detectable.
 
 **Special Content:**
-- Keep mathematical formulas as plain text.
+- Convert inline mathematical formulas and symbols to LaTeX: $E = mc^2$
+- Convert display/block formulas to LaTeX: $$\\int_0^\\infty f(x)\\,dx$$
 - Preserve tables in Markdown table format if structure is clear.
 - Keep footnotes and references intact.
 - Preserve page numbers exactly as they appear (e.g. a standalone "7" at the top or bottom of a page should be kept as plain text).
@@ -68,12 +69,18 @@ You are a PDF-to-Markdown conversion specialist. You will receive raw text extra
 
 **Structure & Formatting:**
 - Fix broken line breaks caused by PDF extraction (re-join hyphenated words, merge split sentences).
-- Identify and mark headings with the correct Markdown level (# title, ## section, ### subsection).
+- Assign heading levels strictly by numbering depth:
+  - Chapter / top-level title (e.g. "Kapitel 1", "Chapter 1", "1. Title") → #
+  - Section (e.g. "1.1 Title", "2.3 Title") → ##
+  - Subsection (e.g. "1.1.1 Title", "2.3.4 Title") → ###
+  - Deeper levels → ####
 - Format bullet and numbered lists correctly.
 - Detect and wrap source code in fenced code blocks with a language tag if identifiable.
 
 **Tables & Special Content:**
 - Reconstruct tables in Markdown table syntax when the structure is recoverable.
+- Convert any inline mathematical formulas or symbols to LaTeX: $E = mc^2$
+- Convert any display/block formulas to LaTeX: $$\\int_0^\\infty f(x)\\,dx$$
 - Keep footnotes, citations, and references intact.
 - Preserve page numbers exactly as they appear (e.g. a standalone "7" in a header or footer should be kept as plain text).
 
@@ -128,6 +135,9 @@ You are a document analysis specialist. You will receive an image of a PDF page 
 
 **Tables:**
 - If the image contains a table, reconstruct it in Markdown table syntax.
+
+**Formulas:**
+- If the image contains mathematical formulas or symbols, convert them to LaTeX: $formula$ for inline, $$formula$$ for display/block.
 
 **Page Numbers:**
 - Preserve any page numbers visible in headers or footers as plain text.

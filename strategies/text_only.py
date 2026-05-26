@@ -1,8 +1,10 @@
+import os
 import time
 from typing import Callable, Optional
 
 import pymupdf4llm
 
+from llm.prompts import PROMPTS, with_language_hint
 from strategies.result import ConversionResult
 
 
@@ -15,11 +17,16 @@ def text_strategy(
     max_tokens: int,
     figures_dir: str = "figures",
     prompt_variant: str = "default",
+    language: str = "en",
     llm_call: Optional[Callable] = None,
 ) -> ConversionResult:
-    """Convert a PDF page directly to Markdown using pymupdf4llm (no LLM call).
+    """Convert a PDF page to Markdown using pymupdf4llm, then optionally clean
+    up the output with an LLM (required for LaTeX math conversion).
 
-    Inline images on text pages are saved to figures_dir instead of being omitted.
+    When `llm_call` is provided the raw pymupdf4llm output is passed through
+    the LLM using `prompt_variant` so that any mathematical symbols or formulas
+    are converted to LaTeX notation.  Without `llm_call` the raw Markdown is
+    returned as-is (fast path, no math conversion).
     """
     start = time.perf_counter()
     chunks = pymupdf4llm.to_markdown(
@@ -30,14 +37,23 @@ def text_strategy(
         image_path=figures_dir,
         image_size_limit=0,
     )
-    markdown = chunks[0]["text"] if chunks else ""
-    # pymupdf4llm uses a cwd-relative path in markdown image references;
-    # replace it with "figures/" so links are relative to the output file
-    import os as _os
-    cwd_rel = _os.path.relpath(figures_dir).replace("\\", "/") + "/"
-    markdown = markdown.replace(f"({cwd_rel}", "(figures/")
-    # also handle absolute paths (e.g. when tmp dir is used)
-    abs_prefix = _os.path.abspath(figures_dir).replace("\\", "/") + "/"
-    markdown = markdown.replace(f"({abs_prefix}", "(figures/")
+    raw_markdown = chunks[0]["text"] if chunks else ""
+
+    # Fix image paths to be relative to the output file, not cwd.
+    cwd_rel = os.path.relpath(figures_dir).replace("\\", "/") + "/"
+    raw_markdown = raw_markdown.replace(f"({cwd_rel}", "(figures/")
+    abs_prefix = os.path.abspath(figures_dir).replace("\\", "/") + "/"
+    raw_markdown = raw_markdown.replace(f"({abs_prefix}", "(figures/")
+
+    if llm_call is None:
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        return ConversionResult(markdown=raw_markdown, timing_ms=elapsed_ms, token_usage=None)
+
+    prompt = PROMPTS.get(prompt_variant, PROMPTS["text"])
+    messages = [
+        {"role": "system", "content": with_language_hint(prompt["system"], language)},
+        {"role": "user", "content": raw_markdown},
+    ]
+    response, token_usage = llm_call(base_url, model_name, messages, temperature, max_tokens)
     elapsed_ms = (time.perf_counter() - start) * 1000
-    return ConversionResult(markdown=markdown, timing_ms=elapsed_ms, token_usage=None)
+    return ConversionResult(markdown=response, timing_ms=elapsed_ms, token_usage=token_usage)

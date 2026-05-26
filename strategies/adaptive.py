@@ -159,6 +159,7 @@ def adaptive_strategy(
         return ConversionResult(markdown="*[Empty page — skipped]*", timing_ms=0.0, token_usage=None)
 
     if page_type == PageType.TEXT:
+        from llm.client import call_llm
         return text_call(
             base_url=base_url,
             model_name=model_name,
@@ -168,6 +169,8 @@ def adaptive_strategy(
             max_tokens=max_tokens,
             figures_dir=figures_dir,
             prompt_variant="text",
+            language=language,
+            llm_call=call_llm,
         )
 
     if page_type == PageType.FORMULA:

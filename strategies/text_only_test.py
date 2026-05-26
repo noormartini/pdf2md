@@ -54,12 +54,13 @@ def test_text_strategy_returns_empty_string_when_no_chunks():
     assert result.token_usage is None
 
 
-def test_llm_call_argument_is_ignored():
-    called = []
+def test_llm_call_is_used_when_provided():
+    """When llm_call is provided, the raw pymupdf4llm output is passed through
+    the LLM so that math symbols are converted to LaTeX."""
+    fake_token_usage = {"prompt_tokens": 10, "completion_tokens": 20}
 
     def fake_llm(*args, **kwargs):
-        called.append(True)
-        return "should not appear", 99
+        return "# Hello\n\n$E = mc^2$", fake_token_usage
 
     with patch("strategies.text_only.pymupdf4llm.to_markdown", return_value=_FAKE_CHUNKS):
         result = text_strategy(
@@ -68,5 +69,17 @@ def test_llm_call_argument_is_ignored():
             temperature=0.0, max_tokens=10,
             llm_call=fake_llm,
         )
-    assert not called
+    assert result.markdown == "# Hello\n\n$E = mc^2$"
+    assert result.token_usage == fake_token_usage
+
+
+def test_no_llm_call_returns_raw_pymupdf4llm_output():
+    """Without llm_call, the raw pymupdf4llm output is returned directly."""
+    with patch("strategies.text_only.pymupdf4llm.to_markdown", return_value=_FAKE_CHUNKS):
+        result = text_strategy(
+            base_url="x", model_name="m",
+            pdf_path="doc.pdf", page_num=0,
+            temperature=0.0, max_tokens=10,
+        )
+    assert result.markdown == "# Hello\n\nSome paragraph."
     assert result.token_usage is None

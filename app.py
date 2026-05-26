@@ -9,7 +9,7 @@ from llm.client import call_llm
 from extraction.text import extract_pages_from_pdf
 from extraction.image import extract_page_figures
 from extraction.language import detect_language, language_name
-from postprocess import postprocess_markdown
+from postprocess import clean_page, postprocess_markdown
 from strategies.text_only import text_strategy
 from strategies.image_only import image_strategy
 from strategies.hybrid import hybrid_strategy
@@ -52,7 +52,7 @@ def run(config: Config):
                     max_tokens=config.max_tokens,
                     figures_dir=figures_dir,
                 )
-                cleaned_pages.append(f"<!-- Page {label} -->\n\n{result.markdown}")
+                cleaned_pages.append(f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}")
             doc.close()
 
         case "image":
@@ -78,7 +78,7 @@ def run(config: Config):
                     language=language,
                     llm_call=llm_call,
                 )
-                cleaned_pages.append(f"<!-- Page {label} -->\n\n{result.markdown}")
+                cleaned_pages.append(f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}")
             doc.close()
 
         case "hybrid":
@@ -106,7 +106,7 @@ def run(config: Config):
                     language=language,
                     llm_call=llm_call,
                 )
-                cleaned_pages.append(f"<!-- Page {label} -->\n\n{result.markdown}")
+                cleaned_pages.append(f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}")
             doc.close()
 
         case "adaptive":
@@ -141,7 +141,7 @@ def run(config: Config):
                     language=language,
                     image_call=partial(image_strategy, llm_call=llm_call),
                 )
-                cleaned_pages.append(f"<!-- Page {label} -->\n\n{result.markdown}")
+                cleaned_pages.append(f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}")
             doc.close()
 
         case _:
