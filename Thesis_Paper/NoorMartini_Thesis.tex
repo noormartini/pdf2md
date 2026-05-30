@@ -684,45 +684,90 @@ documents this thesis works with. This is what motivates the move toward
 learning-based and multimodal systems covered in the sections that follow.
 
 \subsection{Modern Document Conversion Tools}
-\begin{itemize}
-    \item Llama Parse, Marker, and Similar Tools
-    \item Block-based conversion tools (e.g., pdftomarkdown.pro): treat pages as
-          layout blocks with bounding boxes, sort by position, merge spans into
-          paragraphs, and route scanned pages to OCR automatically \cite{parsing2024}
-    \item Limitations of Current Solutions: Darvishy \cite{darvishy2018} notes
-          that no existing tool provides mechanisms to interpret and describe
-          mathematical formulas or scientific graphs in PDFs --- a gap that
-          directly motivates the image-based strategy in the proposed system
-\end{itemize}
+
+Modern conversion tools go beyond simple text extraction. Rather than reading the
+raw text layer, they first analyse the visual structure of each page. This approach
+is sometimes called pipeline-based document parsing: the page is decomposed into
+layout blocks, each classified as text, table, figure, or heading, and the blocks
+are then processed in reading order \cite{parsing2024}. Scanned pages are detected
+automatically and routed to an OCR module, while digitally-born pages go through a
+text extraction path. Zhang et al.\ \cite{parsing2024} provide a systematic
+taxonomy of these methods, grouping them into modular pipeline systems and unified
+Vision-Language Model (VLM) approaches, and note that robust handling of complex
+layouts remains an open challenge for both.
+
+Commercial tools such as LlamaParse, Marker, and Mistral OCR follow this general
+architecture but add API layers and post-processing for downstream use cases.
+Zhang et al.\ \cite{parsebench2026} evaluated 14 such parsers in ParseBench, a
+benchmark of approximately 2{,}000 human-verified enterprise document pages
+covering five capability dimensions: table structure, chart data extraction,
+content faithfulness, semantic formatting, and visual grounding. No single parser
+performed consistently well across all five dimensions. LlamaParse Agentic achieved
+the highest overall score at 84.9\%, but substantial gaps remained in chart
+extraction and visual grounding. These results highlight how difficult it is to
+build one general-purpose tool for structurally diverse documents.
+
+A more recent direction aims to unify these capabilities in a single end-to-end
+model. Wei et al.\ \cite{gotocr2024} proposed GOT-OCR 2.0, which they describe
+as a step towards ``OCR-2.0.'' The model treats all optical signals---plain text,
+mathematical formulas, tables, charts, sheet music, and geometric shapes---as a
+single recognition target. With 580 million parameters, a high-compression encoder,
+and a long-context decoder, it handles both scene images and document pages in
+whole-page and sliced input modes. Output formats include Markdown, tikz, and
+SMILES notation, and the model supports region-level recognition guided by
+coordinates. This removes the need for a separate OCR stage and handles content
+types that dedicated OCR tools typically cannot.
+
+For long, multimodal academic documents, Xie et al.\ \cite{wukong2024} introduced
+PDF-WuKong, a multimodal large language model for question-answering over long
+PDFs. The system uses a sparse sampler that operates on both text and image
+representations, selecting only the paragraphs and diagrams most relevant to a
+given query. Evaluated on the PaperPDF dataset of 1.1 million QA pairs from
+English and Chinese academic papers, PDF-WuKong outperformed proprietary products
+by an average of 8.6\% on F1. This shows that efficient joint modelling of text
+and images is achievable for long documents, though the system targets retrieval
+and question-answering rather than full document conversion.
+
+Despite these advances, key limitations remain. Adhikari and Agarwal
+\cite{adhikari2024} found that even modern deep-learning tools struggle with
+scientific and patent documents containing dense formulas and non-standard layouts.
+Darvishy \cite{darvishy2018} notes that no existing tool provides mechanisms to
+interpret and describe mathematical formulas or scientific graphs in PDFs. This gap
+is one of the central motivations for the image-based extraction strategy in this
+thesis, where rendered page images are passed to a multimodal LLM that can reason
+about text and visual content together.
 
 \subsection{LLM-based Document Understanding}
 
-The emergence of large language models with vision capabilities has opened new
-possibilities for document understanding that transcend traditional OCR-based
-approaches. Blecher et al.\ \cite{blecher2023} introduced Nougat (Neural Optical
+Large language models with vision capabilities have changed how researchers
+approach document understanding. Rather than building multi-stage pipelines with
+separate layout detection, OCR, and parsing steps, these models read page images
+directly and produce structured output in a single pass.
+
+Blecher et al.\ \cite{blecher2023} introduced Nougat (Neural Optical
 Understanding for Academic Documents), a Visual Transformer model that converts
-images of PDF pages directly into a structured markup language. Their key insight
-is that an end-to-end model trained on paired PDF-markup data can infer semantic
-structure (headings, equations, tables, and citations) without requiring an
-explicit layout analysis step. This demonstrated the viability of replacing
-multi-stage OCR pipelines with a single multimodal model.
+images of PDF pages into a structured markup language. Nougat is trained on
+paired PDF-markup data and can infer semantic structure---headings, equations,
+tables, and citations---without a separate layout analysis step. This showed
+that replacing multi-stage OCR pipelines with a single multimodal model was
+both practical and effective, particularly for academic documents.
 
-Building on this direction, Wang et al.\ \cite{wang2024} developed MinerU, an
-open-source dual-engine system combining Vision-Language Models (VLMs) and OCR
-to convert PDFs and other document types into structured Markdown and JSON,
-supporting 109 languages and automatic detection of scanned versus
-digitally-born PDFs. More recent work by Cassel et al.\ \cite{cassel2025}
-demonstrates that end-to-end decoder transformer models outperform pipeline-based
-methods on accuracy metrics while offering greater flexibility on diverse document
-types.
+Wang et al.\ \cite{wang2024} built on this idea with MinerU, an open-source
+dual-engine system that combines Vision-Language Models and OCR to convert PDFs
+and other document types into structured Markdown and JSON. MinerU supports 109
+languages and detects automatically whether a page is scanned or digitally born,
+routing each page to the appropriate engine. Cassel et al.\ \cite{cassel2025}
+take this further, showing that end-to-end decoder transformer models outperform
+pipeline-based methods on accuracy metrics and handle diverse document types more
+flexibly.
 
-Complementing these document-level findings, Cheng et al.\ \cite{cheng2024}
-demonstrate that LLMs can capture structured semantic representations via
-prompting alone, without task-specific fine-tuning, though limitations emerge
-when handling complex argument structures. This supports the theoretical
-basis for using a vision LLM to recover structured Markdown from rendered
-page images, while also setting bounded expectations for content types such
-as dense mathematical formulas.
+Cheng et al.\ \cite{cheng2024} show that LLMs can capture structured semantic
+representations via prompting alone, without task-specific fine-tuning, though
+limitations appear when handling complex argument structures. For document
+conversion, this means a vision LLM prompted with a page image can recover
+structured Markdown without any training on conversion data. But the same work
+also sets realistic expectations: content types such as dense mathematical
+formulas still push beyond what prompting-based approaches reliably handle.
 
 \subsection{Evaluation Methods for Document Conversion}
 
@@ -1049,6 +1094,20 @@ Ding, Y., Han, S.C., Lee, J., \& Hovy, E. (2025).
 Deep learning based visually rich document content understanding: A survey.
 \textit{arXiv preprint arXiv:2408.01287}.
 \url{https://arxiv.org/abs/2408.01287}
+
+\bibitem{gotocr2024}
+Wei, H., Liu, C., Chen, J., Wang, J., Kong, L., Xu, Y., Ge, Z., Zhao, L.,
+Sun, J., Peng, Y., Han, C., \& Zhang, X. (2024).
+General OCR Theory: Towards OCR-2.0 via a unified end-to-end model.
+\textit{arXiv preprint arXiv:2409.01704}.
+\url{https://arxiv.org/abs/2409.01704}
+
+\bibitem{wukong2024}
+Xie, X., Yan, H., Yin, L., Liu, Y., Ding, J., Liao, M., Liu, Y., Chen, W., \& Bai, X. (2024).
+PDF-WuKong: A large multimodal model for efficient long PDF reading with
+end-to-end sparse sampling.
+\textit{International Journal of Computer Vision} (accepted 2026).
+\url{https://arxiv.org/abs/2410.05970}
 
 \end{thebibliography}
 
