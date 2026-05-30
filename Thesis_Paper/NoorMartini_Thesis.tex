@@ -707,14 +707,13 @@ the highest overall score at 84.9\%, but substantial gaps remained in chart
 extraction and visual grounding. These results highlight how difficult it is to
 build one general-purpose tool for structurally diverse documents.
 
-A more recent direction aims to unify these capabilities in a single end-to-end
-model. Wei et al.\ \cite{gotocr2024} proposed GOT-OCR 2.0, which they describe
-as a step towards ``OCR-2.0.'' The model treats all optical signals---plain text,
-mathematical formulas, tables, charts, sheet music, and geometric shapes---as a
-single recognition target. With 580 million parameters, a high-compression encoder,
-and a long-context decoder, it handles both scene images and document pages in
-whole-page and sliced input modes. Output formats include Markdown, tikz, and
-SMILES notation, and the model supports region-level recognition guided by
+Wei et al.\ \cite{gotocr2024} proposed GOT-OCR 2.0, which they describe as a
+step towards ``OCR-2.0.'' The model treats all optical signals as a single
+recognition target: plain text, mathematical formulas, tables, charts, sheet
+music, and geometric shapes. With 580 million parameters, a high-compression
+encoder, and a long-context decoder, it handles both scene images and document
+pages in whole-page and sliced input modes. Output formats include Markdown, tikz,
+and SMILES notation, and the model supports region-level recognition guided by
 coordinates. This removes the need for a separate OCR stage and handles content
 types that dedicated OCR tools typically cannot.
 
@@ -728,9 +727,9 @@ by an average of 8.6\% on F1. This shows that efficient joint modelling of text
 and images is achievable for long documents, though the system targets retrieval
 and question-answering rather than full document conversion.
 
-Despite these advances, key limitations remain. Adhikari and Agarwal
-\cite{adhikari2024} found that even modern deep-learning tools struggle with
-scientific and patent documents containing dense formulas and non-standard layouts.
+Even so, key limitations remain. Adhikari and Agarwal \cite{adhikari2024} found
+that even modern deep-learning tools struggle with scientific and patent documents
+containing dense formulas and non-standard layouts.
 Darvishy \cite{darvishy2018} notes that no existing tool provides mechanisms to
 interpret and describe mathematical formulas or scientific graphs in PDFs. This gap
 is one of the central motivations for the image-based extraction strategy in this
@@ -763,11 +762,10 @@ flexibly.
 
 Ding et al.\ \cite{ding2025} survey deep learning approaches for Visually Rich
 Document Content Understanding (VRD-CU), covering documents that combine text,
-layout, and visual elements. Models that integrate all three modalities through
-pretraining consistently outperform text-only approaches, and the most recent
-LLM-based architectures---trained with instruction tuning and prompt-driven
-inference---achieve cross-modal reasoning that earlier models could not. At the
-same time, the survey identifies persistent gaps: fine-grained word-level
+layout, and visual elements. Models that integrate all three modalities through pretraining consistently
+outperform text-only approaches. The most recent LLM-based architectures, trained
+with instruction tuning, achieve cross-modal reasoning that earlier models could
+not. But the survey also identifies persistent gaps: fine-grained word-level
 representations miss higher-level semantic structure, and multi-page documents
 with mixed visual and textual content remain an open challenge. For this thesis,
 this means a vision LLM can handle pages where text extraction alone fails, but
@@ -788,17 +786,17 @@ all the content is correct.
 For table evaluation, TEDS (Tree Edit Distance based Similarity) is a widely used
 alternative. It compares the tree structure of a predicted table against a
 reference and gives partial credit when individual cells are correct even if the
-overall structure differs \cite{parsing2024}. Zhang et al.\ \cite{parsing2024}
-survey the range of metrics across document parsing sub-tasks and find that no
-single metric covers all content types: layout analysis uses mean Average
-Precision (mAP), text extraction uses character- or token-level edit metrics, and
-table evaluation uses TEDS or similar structural measures.
+overall structure differs \cite{parsing2024}. Zhang et al.\ \cite{parsing2024} survey the range of metrics across document
+parsing sub-tasks and find that no single metric covers all content types. Layout
+analysis uses mean Average Precision (mAP), text extraction uses character- or
+token-level edit metrics, and table evaluation uses TEDS or similar structural
+measures.
 
-A more fundamental concern is that text similarity scores can be high even when
-the parsed output is not usable. Zhang et al.\ \cite{parsebench2026} make this
-point directly: a parser may produce text that looks close to the reference under
-BLEU or edit distance but has a misaligned table header or a dropped superscript
-that would cause a downstream process to fail. Their ParseBench framework
+The deeper problem is that text similarity scores can be high even when the
+parsed output is not usable. A parser may produce text that looks close to the
+reference under BLEU or edit distance but has a misaligned table header or a
+dropped superscript that would cause a downstream process to fail. Zhang et al.\
+\cite{parsebench2026} make this case clearly. Their ParseBench framework
 evaluates parsers across five separate dimensions---table structure, chart data
 extraction, content faithfulness, semantic formatting, and visual grounding---each
 with its own scoring method. Across 14 parsers, no system performed well on all
