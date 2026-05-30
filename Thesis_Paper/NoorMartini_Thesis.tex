@@ -761,13 +761,17 @@ take this further, showing that end-to-end decoder transformer models outperform
 pipeline-based methods on accuracy metrics and handle diverse document types more
 flexibly.
 
-Cheng et al.\ \cite{cheng2024} show that LLMs can capture structured semantic
-representations via prompting alone, without task-specific fine-tuning, though
-limitations appear when handling complex argument structures. For document
-conversion, this means a vision LLM prompted with a page image can recover
-structured Markdown without any training on conversion data. But the same work
-also sets realistic expectations: content types such as dense mathematical
-formulas still push beyond what prompting-based approaches reliably handle.
+Ding et al.\ \cite{ding2025} survey deep learning approaches for Visually Rich
+Document Content Understanding (VRD-CU), covering documents that combine text,
+layout, and visual elements. Models that integrate all three modalities through
+pretraining consistently outperform text-only approaches, and the most recent
+LLM-based architectures---trained with instruction tuning and prompt-driven
+inference---achieve cross-modal reasoning that earlier models could not. At the
+same time, the survey identifies persistent gaps: fine-grained word-level
+representations miss higher-level semantic structure, and multi-page documents
+with mixed visual and textual content remain an open challenge. For this thesis,
+this means a vision LLM can handle pages where text extraction alone fails, but
+no current model covers all content types reliably.
 
 \subsection{Evaluation Methods for Document Conversion}
 
