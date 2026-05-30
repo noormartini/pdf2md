@@ -775,6 +775,43 @@ no current model covers all content types reliably.
 
 \subsection{Evaluation Methods for Document Conversion}
 
+Evaluating document conversion is harder than evaluating plain text extraction.
+The output combines headings, paragraphs, tables, formulas, and figures, and each
+element type can fail in different ways. Early studies used string-similarity
+metrics: edit distance (Levenshtein similarity) and BLEU score compare the
+extracted text against a reference string, token by token or character by
+character \cite{adhikari2024}. These metrics are easy to compute and well
+understood in NLP, but they treat the full output as a flat sequence. A table
+with one column shifted will receive a low Levenshtein score even though nearly
+all the content is correct.
+
+For table evaluation, TEDS (Tree Edit Distance based Similarity) is a widely used
+alternative. It compares the tree structure of a predicted table against a
+reference and gives partial credit when individual cells are correct even if the
+overall structure differs \cite{parsing2024}. Zhang et al.\ \cite{parsing2024}
+survey the range of metrics across document parsing sub-tasks and find that no
+single metric covers all content types: layout analysis uses mean Average
+Precision (mAP), text extraction uses character- or token-level edit metrics, and
+table evaluation uses TEDS or similar structural measures.
+
+A more fundamental concern is that text similarity scores can be high even when
+the parsed output is not usable. Zhang et al.\ \cite{parsebench2026} make this
+point directly: a parser may produce text that looks close to the reference under
+BLEU or edit distance but has a misaligned table header or a dropped superscript
+that would cause a downstream process to fail. Their ParseBench framework
+evaluates parsers across five separate dimensions---table structure, chart data
+extraction, content faithfulness, semantic formatting, and visual grounding---each
+with its own scoring method. Across 14 parsers, no system performed well on all
+five dimensions, showing that aggregate text-similarity scores hide capability
+gaps that dimension-specific evaluation reveals.
+
+For conversion to Markdown specifically, N-gram metrics such as BLEU and ROUGE
+carry an additional limitation: they do not account for Markdown syntax. A heading
+written with a \texttt{\#} prefix and the same text written as bold have
+near-identical character content but very different semantic meaning in the
+rendered document. The evaluation approach used in Chapter 4 accounts for this by
+measuring structural, content, and formatting dimensions separately rather than
+collapsing everything into a single score.
 
 % ================================================================
 \section{Methodology}
