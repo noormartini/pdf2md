@@ -92,16 +92,25 @@ low-level positional and typographic signals, which is fragile and often
 wrong \cite{parsing2024}. A single PDF can mix plain text, embedded images,
 mathematical formulas, multi-column layouts, and complex tables, sometimes
 on the same page. No single extraction strategy handles all of these
-correctly. The specific challenges each content type creates are covered in
-Chapter~2.
+correctly. Adhikari and Agarwal \cite{adhikari2024} tested ten parsing tools
+across six document categories and found that even the top performers ---
+PyMuPDF and pypdfium --- failed on scientific and patent documents.
+The specific challenges each content type creates are covered in Chapter~2.
 
 \subsubsection{Limited OCR Accuracy for Complex Layouts}
 
 OCR is the standard approach for scanned PDFs, where text exists only as
 pixels. But OCR accuracy drops significantly on complex layouts. Subramani
-et al.\ \cite{subramani2020} show that layout analysis must happen before
-OCR: the tool first needs to identify regions (text blocks, figures, tables,
-equations) before recognizing characters within them. Tools like
+et al.\ \cite{subramani2020} describe OCR as a two-stage process: text
+detection, which locates where text appears on the page, and text
+transcription, which recognises characters within each detected region.
+Layout analysis must happen before both stages --- the tool first needs to
+identify content regions (text blocks, figures, tables, equations) before
+any recognition can begin. Wei et al.\ \cite{gotocr2024} explain the
+mechanical reason: traditional OCR engines can only process small image
+slices, not full pages, which forces the entire pipeline into a
+detect-first, recognise-second pattern where any error in region detection
+propagates directly into the recognition step. Tools like
 Tesseract~\cite{smith2007} skip this step and treat the whole page as a
 single flat image, which makes it hard to assign the right semantic role to
 each detected region. Zhu et al.\ \cite{zhu2022} measured the effect
@@ -129,7 +138,7 @@ The demand for Markdown as a target format comes from several practical
 directions at once: software development, scientific publishing, and
 AI-driven workflows. Markdown is a lightweight markup language created by
 John Gruber in 2004. It is readable in plain text form and converts cleanly
-to HTML and other formats \cite{cone2019}. Cassel et al.\ \cite{cassel2025}
+to HTML and other formats \cite{cone2019}. Duan \cite{cassel2025}
 describe it as well-suited for machine processing due to its simple syntax,
 and note that extensions like GitHub Flavored Markdown add support for tables
 and LaTeX-style math notation, which covers most of what academic documents
@@ -750,12 +759,16 @@ paired PDF-markup data and can infer semantic structure---headings, equations,
 tables, and citations---without a separate layout analysis step. This showed
 that replacing multi-stage OCR pipelines with a single multimodal model was
 both practical and effective, particularly for academic documents.
+Adhikari and Agarwal \cite{adhikari2024} confirmed this in a direct comparison:
+for scientific documents, tools that output structured formats such as Markdown
+or \LaTeX{} outperformed all rule-based parsers, with Nougat specifically
+demonstrating superior performance on these categories.
 
 Wang et al.\ \cite{wang2024} built on this idea with MinerU, an open-source
 dual-engine system that combines Vision-Language Models and OCR to convert PDFs
 and other document types into structured Markdown and JSON. MinerU supports 109
 languages and detects automatically whether a page is scanned or digitally born,
-routing each page to the appropriate engine. Cassel et al.\ \cite{cassel2025}
+routing each page to the appropriate engine. Duan \cite{cassel2025}
 take this further, showing that end-to-end decoder transformer models outperform
 pipeline-based methods on accuracy metrics and handle diverse document types more
 flexibly.
@@ -778,8 +791,12 @@ The output combines headings, paragraphs, tables, formulas, and figures, and eac
 element type can fail in different ways. Early studies used string-similarity
 metrics: edit distance (Levenshtein similarity) and BLEU score compare the
 extracted text against a reference string, token by token or character by
-character \cite{adhikari2024}. These metrics are easy to compute and well
-understood in NLP, but they treat the full output as a flat sequence. A table
+character \cite{adhikari2024}. Adhikari and Agarwal \cite{adhikari2024} added
+local alignment as a third metric alongside these two. Local alignment allows
+gaps between matched segments, so it detects word-order errors --- merged
+columns, reversed reading order --- that BLEU misses because BLEU counts
+matching n-grams regardless of position. These metrics are easy to compute and
+well understood in NLP, but they still treat the full output as a flat sequence. A table
 with one column shifted will receive a low Levenshtein score even though nearly
 all the content is correct.
 
@@ -1067,7 +1084,7 @@ Nougat: Neural Optical Understanding for Academic Documents.
 \url{https://arxiv.org/abs/2308.13418}
 
 \bibitem{cassel2025}
-Cassel, T., et al. (2025).
+Duan, C. (2025).
 Accelerating end-to-end PDF to Markdown conversion through assisted generation.
 \textit{arXiv preprint arXiv:2512.18122}.
 \url{https://arxiv.org/abs/2512.18122}

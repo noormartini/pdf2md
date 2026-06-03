@@ -50,17 +50,22 @@ pip install -r requirements.txt
 Make sure LM Studio is running with a model loaded before running any command.
 
 ```bash
-# text strategy (default)
-python main.py -i test_pdf_source.pdf
+# text strategy (default, uses test_pdf_source.pdf)
+python3 main.py
+
+# specify a different PDF
+python3 main.py -i pdf_source/test_pdf_source.pdf
+python3 main.py -i "pdf_source/Bachelor_Thesis_Informatik_Koehler_Sven.pdf"
+python3 main.py -i "pdf_source/A_human_in_the_loop_system_for_research_paper_generation_using_local_large_language_models.pdf"
 
 # image strategy (vision model required)
-python main.py -i test_pdf_source.pdf -s image
+python3 main.py -i pdf_source/test_pdf_source.pdf -s image
 
 # hybrid strategy (text + image, vision model required)
-python main.py -i test_pdf_source.pdf -s hybrid
+python3 main.py -i pdf_source/test_pdf_source.pdf -s hybrid
 
 # adaptive strategy (auto-detects per page, recommended)
-python main.py -i test_pdf_source.pdf -s adaptive
+python3 main.py -i pdf_source/test_pdf_source.pdf -s adaptive
 ```
 
 Output is saved to `output/test_pdf_output.md` by default.
@@ -69,7 +74,7 @@ Output is saved to `output/test_pdf_output.md` by default.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `-i` / `--input` | `test_pdf_source.pdf` | Input PDF file |
+| `-i` / `--input` | `pdf_source/test_pdf_source.pdf` | Input PDF file |
 | `-o` / `--output` | `output/test_pdf_output.md` | Output Markdown file |
 | `-s` / `--strategy` | `text` | Strategy: `text`, `image`, `hybrid`, `adaptive` |
 | `-m` / `--model` | `qwen/qwen3.5-9b` | Model name loaded in LM Studio |
@@ -83,7 +88,8 @@ Output is saved to `output/test_pdf_output.md` by default.
 ## Project Structure
 
 ```
-thesis-pdf-to-markdown/
+PDF2MD/
+├── pdf_source/              # Input PDFs for testing
 ├── main.py                  # Entry point
 ├── app.py                   # Main pipeline logic
 ├── cli.py                   # Argument parsing

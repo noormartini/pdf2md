@@ -8,7 +8,7 @@ def parse_args():
     parser.add_argument(
         "-i",
         "--input",
-        default="test_pdf_source.pdf",
+        default="pdf_source/test_pdf_source.pdf",
         help="Input PDF file",
     )
     parser.add_argument(

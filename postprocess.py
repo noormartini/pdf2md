@@ -4,6 +4,17 @@ import re
 # Groups: (hashes, optional bold markers, heading text content)
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(\*{0,2})(.+?)(\*{0,2})\s*$")
 
+# Matches the figure-ref instruction block that leaks from the LLM prompt into
+# its output — e.g. "The following figures have been extracted from this page
+# and saved as files. Include them as Markdown image links..."
+# We strip the preamble sentence + the duplicated image list; the figures
+# themselves appear correctly later in the same output.
+_FIGURE_INSTRUCTION_RE = re.compile(
+    r"The following figures have been extracted\b[^\n]+\n"
+    r"(?:- !\[[^\]]*\]\([^\)]+\)\n*)+",
+    re.MULTILINE,
+)
+
 # Patterns for detecting heading depth from section numbers.
 _SUBSECTION_RE = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\s+\S")  # e.g. "1.1.1 Title"
 _SECTION_RE    = re.compile(r"^\d{1,3}\.\d{1,3}\s+\S")           # e.g. "1.1 Title"
@@ -53,6 +64,9 @@ def clean_page(md: str) -> str:
     page-break separators added afterwards are not affected.
     """
     md = md.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Strip figure-ref instruction text that some models copy verbatim from the prompt.
+    md = _FIGURE_INSTRUCTION_RE.sub("", md)
 
     # LLMs sometimes wrap their entire response in ```markdown ... ```.
     md = re.sub(r"```markdown\n(.*?)```", lambda m: m.group(1), md, flags=re.DOTALL)
