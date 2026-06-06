@@ -131,6 +131,7 @@ def adaptive_strategy(
     figures_dir: str = "figures",
     figure_refs: list[str] | None = None,
     language: str = "en",
+    pre_extracted_markdown: str | None = None,
     text_call: Callable = _text_strategy,
     image_call: Callable = _image_strategy,
 ) -> ConversionResult:
@@ -149,6 +150,10 @@ def adaptive_strategy(
         figures_dir:  Directory to save inline images from text pages.
         figure_refs:  Pre-extracted figure paths to include as Markdown links
                       in the LLM output for non-text pages.
+        pre_extracted_markdown: Optional pre-extracted pymupdf4llm output for
+                      this page (used only when page_type == TEXT).  Lets
+                      callers bulk-extract once instead of paying the all-pages
+                      font-histogram pass on every per-page call.
         text_call:    Injectable text strategy (default: text_strategy).
         image_call:   Injectable image strategy (default: image_strategy).
 
@@ -159,7 +164,9 @@ def adaptive_strategy(
         return ConversionResult(markdown="*[Empty page — skipped]*", timing_ms=0.0, token_usage=None)
 
     if page_type == PageType.TEXT:
-        from llm.client import call_llm
+        # TEXT pages have no images and no formulas (per analyze_page), so
+        # pymupdf4llm's output is the answer — skip the LLM entirely to save
+        # the 3–10 s round-trip per page.
         return text_call(
             base_url=base_url,
             model_name=model_name,
@@ -170,7 +177,8 @@ def adaptive_strategy(
             figures_dir=figures_dir,
             prompt_variant="text",
             language=language,
-            llm_call=call_llm,
+            llm_call=None,
+            pre_extracted_markdown=pre_extracted_markdown,
         )
 
     if page_type == PageType.FORMULA:

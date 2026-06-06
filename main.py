@@ -15,6 +15,7 @@ def main() -> None:
         strategy=args.strategy,
         temperature=args.temperature,
         max_tokens=args.max_tokens,
+        concurrency=args.concurrency,
     )
     run(config)
 

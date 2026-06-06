@@ -83,3 +83,39 @@ def test_no_llm_call_returns_raw_pymupdf4llm_output():
         )
     assert result.markdown == "# Hello\n\nSome paragraph."
     assert result.token_usage is None
+
+
+def test_pre_extracted_markdown_skips_pymupdf4llm_call():
+    """When pre_extracted_markdown is provided, no per-page pymupdf4llm
+    call should fire — callers can bulk-extract once and feed chunks in."""
+    with patch("strategies.text_only.pymupdf4llm.to_markdown") as mock:
+        result = text_strategy(
+            base_url="x", model_name="m",
+            pdf_path="doc.pdf", page_num=0,
+            temperature=0.0, max_tokens=10,
+            pre_extracted_markdown="# Pre-extracted\n\nbody",
+        )
+    mock.assert_not_called()
+    assert result.markdown == "# Pre-extracted\n\nbody"
+    assert result.token_usage is None
+
+
+def test_pre_extracted_markdown_still_runs_llm_when_provided():
+    """pre_extracted_markdown bypasses extraction but is still passed
+    through the LLM when llm_call is given (e.g. for math cleanup)."""
+    captured_user_content = {}
+
+    def fake_llm(base_url, model_name, messages, temperature, max_tokens):
+        captured_user_content["text"] = messages[-1]["content"]
+        return "# Cleaned\n\n$x = 1$", None
+
+    with patch("strategies.text_only.pymupdf4llm.to_markdown") as mock:
+        text_strategy(
+            base_url="x", model_name="m",
+            pdf_path="doc.pdf", page_num=0,
+            temperature=0.0, max_tokens=10,
+            pre_extracted_markdown="# Raw\n\nx = 1",
+            llm_call=fake_llm,
+        )
+    mock.assert_not_called()
+    assert "# Raw" in captured_user_content["text"]

@@ -111,7 +111,30 @@ def test_adaptive_text_page_routes_to_text_strategy():
         image_call=_fake_image,
     )
     assert captured["prompt_variant"] == "text"
+    # TEXT pages skip the LLM — pymupdf4llm output is returned as-is.
+    assert captured["llm_call"] is None
     assert result.markdown == "# Out"
+
+
+def test_adaptive_text_page_forwards_pre_extracted_markdown():
+    """Bulk-extracted markdown from app.py should reach text_strategy
+    so the per-page pymupdf4llm call can be skipped."""
+    captured = {}
+
+    def fake_text(**kwargs):
+        captured.update(kwargs)
+        return _fake_result
+
+    adaptive_strategy(
+        base_url="x", model_name="m",
+        pdf_path="x.pdf", page_num=2, page_image="img",
+        page_type=PageType.TEXT,
+        temperature=0.0, max_tokens=10,
+        pre_extracted_markdown="# Page 3 markdown",
+        text_call=fake_text,
+        image_call=_fake_image,
+    )
+    assert captured["pre_extracted_markdown"] == "# Page 3 markdown"
 
 
 def test_adaptive_formula_page_routes_to_image_strategy_with_formula_prompt():
