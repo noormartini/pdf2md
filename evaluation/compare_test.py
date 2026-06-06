@@ -23,7 +23,7 @@ from strategies.result import ConversionResult
 def _cfg(reference_dir: str, **overrides) -> ExperimentConfig:
     base = dict(
         name="test",
-        input_pdf="unused",
+        input_pdfs=["unused"],
         reference_dir=reference_dir,
         strategies=["text"],
         models=["m1"],
@@ -65,13 +65,20 @@ def test_load_reference_missing_returns_none(tmp_path: Path):
 
 def test_load_experiment_config_applies_defaults(tmp_path: Path):
     p = tmp_path / "exp.json"
-    p.write_text(json.dumps({"input_pdf": "x.pdf", "reference_dir": "refs"}), encoding="utf-8")
+    p.write_text(json.dumps({"input_pdfs": ["x.pdf", "y.pdf"], "reference_dir": "refs"}), encoding="utf-8")
     cfg = load_experiment_config(str(p))
-    assert cfg.input_pdf == "x.pdf"
+    assert cfg.input_pdfs == ["x.pdf", "y.pdf"]
     assert cfg.strategies == ["text"]
     assert cfg.prompt_variants == ["default"]
     assert cfg.temperatures == [0.0]
     assert cfg.max_pages is None
+
+
+def test_load_experiment_config_backward_compat_single_pdf(tmp_path: Path):
+    p = tmp_path / "exp.json"
+    p.write_text(json.dumps({"input_pdf": "x.pdf", "reference_dir": "refs"}), encoding="utf-8")
+    cfg = load_experiment_config(str(p))
+    assert cfg.input_pdfs == ["x.pdf"]
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +110,7 @@ def test_run_combinations_invokes_runner_for_every_combination(tmp_path: Path):
         pages=["page text 1", "page text 2"],
         images=["img1", "img2"],
         config=cfg,
+        pdf_path="unused",
         runner=_make_fake_runner(record),
     )
     # 2 strategies × 2 models × 1 prompt × 2 temps × 2 pages = 16
@@ -117,7 +125,7 @@ def test_run_combinations_records_token_usage_and_timing(tmp_path: Path):
     def fake(**kwargs):
         return ConversionResult(markdown="ok", timing_ms=42.0, token_usage=99), None
 
-    results = run_combinations(["t"], ["i"], cfg, runner=fake)
+    results = run_combinations(["t"], ["i"], cfg, pdf_path="unused", runner=fake)
     assert results[0].token_usage == 99
     assert results[0].timing_ms == 42.0
 
@@ -126,7 +134,7 @@ def test_run_combinations_skips_pages_with_no_reference(tmp_path: Path):
     _write_refs(tmp_path, 1)  # only page 1 has a reference
     cfg = _cfg(str(tmp_path), max_pages=2)
     record: list = []
-    results = run_combinations(["t1", "t2"], ["i1", "i2"], cfg, runner=_make_fake_runner(record))
+    results = run_combinations(["t1", "t2"], ["i1", "i2"], cfg, pdf_path="unused", runner=_make_fake_runner(record))
     # Page 2 reference missing → skipped before runner is called
     assert len(record) == 1
     assert len(results) == 1
@@ -140,7 +148,7 @@ def test_run_combinations_records_runner_errors(tmp_path: Path):
     def failing(**kwargs):
         return None, "HTTP 500"
 
-    results = run_combinations(["t"], ["i"], cfg, runner=failing)
+    results = run_combinations(["t"], ["i"], cfg, pdf_path="unused", runner=failing)
     assert results[0].error == "HTTP 500"
     # Errored runs zero out metrics
     assert all(v == 0.0 for v in results[0].metrics.values())
@@ -158,7 +166,7 @@ def test_run_combinations_passes_correct_args_to_runner(tmp_path: Path):
         max_pages=1,
     )
     record: list = []
-    run_combinations(["my page text"], ["my image"], cfg, runner=_make_fake_runner(record))
+    run_combinations(["my page text"], ["my image"], cfg, pdf_path="unused", runner=_make_fake_runner(record))
     call = record[0]
     assert call["strategy"] == "hybrid"
     assert call["model"] == "mymodel"
@@ -180,6 +188,7 @@ def test_save_results_writes_serializable_json(tmp_path: Path):
         strategy="text",
         model="m",
         prompt_variant="default",
+        temperature=0.0,
         metrics={"text_similarity": 0.5},
         timing_ms=10.0,
         token_usage=42,

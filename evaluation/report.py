@@ -245,18 +245,21 @@ def generate_per_page_breakdown(results: list[dict]) -> str:
 
 def generate_temperature_comparison(results: list[dict]) -> str:
     """Generate table comparing different temperatures."""
-    # Aggregate by temperature
     temp_data = {}
     for r in results:
         if r.get("error"):
             continue
 
-        # Temperature not directly stored, derive from prompt_variant or skip
-        # For now, we'll need to add temperature to results
-        pass
+        temp = r.get("temperature", 0.0)
+        if temp not in temp_data:
+            temp_data[temp] = {"pages": 0, "total_time_ms": 0, "similarity_sum": 0}
+
+        temp_data[temp]["pages"] += 1
+        temp_data[temp]["total_time_ms"] += r["timing_ms"]
+        temp_data[temp]["similarity_sum"] += r["metrics"]["text_similarity"]
 
     if not temp_data:
-        return "*Temperature comparison not available (temperature not tracked in results)*"
+        return "*No data available for temperature comparison.*"
 
     headers = ["Temperature", "Pages", "Avg Similarity", "Avg Time (ms)"]
     rows = []

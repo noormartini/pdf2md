@@ -6,11 +6,7 @@ from typing import Optional
 
 @dataclass
 class ConversionResult:
-    """Result of converting one PDF page via an LLM strategy.
-
-    The caller already knows which strategy and model it invoked, so those
-    are not duplicated here.
-    """
+    """Result of converting one PDF page via a conversion strategy."""
     markdown: str
     timing_ms: float
     token_usage: Optional[int]

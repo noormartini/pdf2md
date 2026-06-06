@@ -1,12 +1,14 @@
 import argparse
 
+from config import DEFAULT_BASE_URL, DEFAULT_MODEL
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-i",
         "--input",
-        default="test_pdf_source.pdf",
+        default="pdf_source/test_pdf_source.pdf",
         help="Input PDF file",
     )
     parser.add_argument(
@@ -18,15 +20,15 @@ def parse_args():
     parser.add_argument(
         "-b",
         "--base-url",
-        default="http://127.0.0.1:1234/v1",
+        default=DEFAULT_BASE_URL,
         help="LM Studio base url",
     )
-    parser.add_argument("-m", "--model", default="google/gemma-3-4b", help="Model name")
+    parser.add_argument("-m", "--model", default=DEFAULT_MODEL, help="Model name")
     parser.add_argument(
         "-n",
         "--max-pages",
         type=int,
-        default=3,
+        default=20,
         help="Max pages to convert to markdown",
     )
     parser.add_argument(

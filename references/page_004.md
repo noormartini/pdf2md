@@ -1,40 +1,11 @@
-## Code Examples
+## Abstrakt
 
-This page demonstrates code block handling.
+### Recursive Backwards Q-Learning am Beispiel eines Ping-Pong-Spiels
 
-### Python Example
+In dieser Arbeit wird Recursive Backwards Q-Learning (RBQL) untersucht, ein Q-Learning Algorithmus für deterministische Umgebungen, der alle besuchten Zustände am Ende einer Episode bewertet und somit schneller konvergieren soll. Ziel ist es Trainingsprozesse effizienter zu gestalten, insbesondere bei großen Zustandsräumen, wie sie in modernen Lernumgebungen häufig auftreten. Als Anwendungsszenario dient ein Ping Pong Spiel, bei dem der Agent lernen soll mit einem Schläger einen Ball möglichst lange in der Luft zu halten. Im Vergleich zum klassischen Q-Learning und Experience Replay benötigt RBQL weniger Episoden, um das Spiel zu erlernen und es treten dabei auch weniger Fehler auf. Darüber hinaus wird gezeigt, dass ein einfaches neuronales Netz mit RBQL effektiv trainiert werden kann. Beim Trainieren eines neuronalen Netzes gibt es nur wenig Performance Unterschiede zwischen Experience Replay und RBQL. Die Ergebnisse verdeutlichen das Potential von RBQL in deterministischen Umgebungen und bildet eine Grundlage für zukünftige Untersuchungen in komplexeren, auch nicht deterministischen Szenarien.
 
-```python
-def extract_text_from_pdf(pdf_path: str, max_pages: int = None) -> list[str]:
-    """Extract text from each page of a PDF file.
+### Abstract
 
-    Args:
-        pdf_path: Path to the PDF file
-        max_pages: Maximum number of pages to extract (optional)
+### Recursive Backwards Q-Learning on the Example of a Ping-Pong Game
 
-    Returns:
-        List of text strings, one per page
-    """
-    import fitz  # PyMuPDF
-
-    doc = fitz.open(pdf_path)
-    pages = []
-
-    for i, page in enumerate(doc):
-        if max_pages and i >= max_pages:
-            break
-        text = page.get_text()
-        pages.append(text)
-
-    doc.close()
-    return pages
-```
-
-### Usage Example
-
-```python
-if __name__ == "__main__":
-    pages = extract_text_from_pdf("document.pdf", max_pages=5)
-    for i, text in enumerate(pages):
-        print(f"Page {i+1}: {len(text)} characters")
-```
+This thesis investigates Recursive Backwards Q-Learning (RBQL), a Q-learning algorithm for deterministic environments that evaluates all visited states at the end of an episode to achieve faster convergence. The goal is to make training processes more efficient, especially in large state spaces common in modern learning environments. A ping pong game serves as the application scenario, where an agent learns to keep a ball in the air using a paddle. Compared to classical Q-learning and Experience Replay, RBQL requires fewer episodes to learn the game and results in fewer errors. It was also shown that a simple neural network can be effectively trained with RBQL. Only minor performance differences were observed between Experience Replay and RBQL when training neural networks. The results highlight RBQL's potential in deterministic environments and provide a basis for future studies in more complex, including non-deterministic, scenarios.

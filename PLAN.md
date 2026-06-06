@@ -16,7 +16,7 @@ Your thesis "Multimodal conversion of PDF documents to Markdown" requires experi
    - Response: `data["choices"][0]["message"]["content"]`
 2. **Fix `--max-pages` type** — add `type=int` to the argparse argument (currently passed as string)
 3. **Remove unused `MODEL_NAME`** constant in `app.py`
-4. **Test end-to-end** with gemma-3-4b to confirm it works
+4. **Test end-to-end** with qwen/qwen3.5-9b to confirm it works
 
 ---
 
@@ -66,7 +66,7 @@ This is the core of your thesis title ("Multimodal"). Four strategies to impleme
    - `EMPTY` pages → skipped entirely
    - Implemented in `strategies/adaptive.py`, fully wired in `app.py`
 
-Vision models in LM Studio that support this: Gemma 3 (multimodal), Qwen-VL, LLaVA — check what's available.
+Vision models in LM Studio that support this: Qwen 2.5 VL (`qwen2.5-vl-7b-instruct-abliterated`), Qwen 3.5 (`qwen/qwen3.5-9b`).
 
 The adaptive strategy is the main thesis contribution — it outperforms any single fixed strategy by using the right approach per page. Expected finding: text-only wins on pure-text pages (speed), image-based wins on tables/formulas/diagrams.
 
@@ -117,8 +117,8 @@ Run the full experiment matrix:
 
 | Models | Strategies | Prompts |
 |--------|-----------|---------|
-| Gemma 3 4B | text-only | minimal, default, detailed |
-| Qwen 3.5 35B-A3B | image-only | minimal, default, detailed |
+| qwen/qwen3.5-9b | text-only | minimal, default, detailed |
+| qwen2.5-vl-7b-instruct-abliterated | image-only | minimal, default, detailed |
 | (other vision models) | hybrid | minimal, default, detailed |
 
 This matrix produces the results chapter of your thesis.

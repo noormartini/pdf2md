@@ -5,7 +5,7 @@ from strategies.result import ConversionResult
 
 
 def test_image_strategy_returns_conversion_result():
-    def fake(*args):
+    def fake(*args, **kwargs):
         return "# Hi", 7
 
     result = image_strategy(
@@ -51,3 +51,14 @@ def test_image_strategy_no_text_block_in_user_content():
     )
     user_content = captured["messages"][1]["content"]
     assert all(block["type"] == "image_url" for block in user_content)
+
+
+def test_image_strategy_handles_none_token_usage():
+    def fake(*args, **kwargs):
+        return "out", None
+
+    result = image_strategy(
+        base_url="x", model_name="m", images=["IMG"],
+        temperature=0.0, max_tokens=10, llm_call=fake,
+    )
+    assert result.token_usage is None

@@ -22,7 +22,7 @@ from evaluation.metrics import evaluate_conversion, EvaluationResult, aggregate_
 class ExperimentConfig:
     """Configuration for a single experiment run."""
     name: str
-    input_pdf: str
+    input_pdfs: list[str]
     reference_dir: str
     strategies: list[str]
     models: list[str]
@@ -37,9 +37,10 @@ def load_experiment_config(config_path: str) -> ExperimentConfig:
     with open(config_path, "r") as f:
         data = json.load(f)
 
+    raw = data.get("input_pdfs") or [data["input_pdf"]]
     return ExperimentConfig(
         name=data.get("name", "experiment"),
-        input_pdf=data["input_pdf"],
+        input_pdfs=raw,
         reference_dir=data["reference_dir"],
         strategies=data.get("strategies", ["text"]),
         models=data.get("models", ["default"]),
@@ -69,12 +70,15 @@ def run_strategy(
     strategy: str,
     base_url: str,
     model: str,
+    pdf_path: str,
+    page_num: int,
     page_text: str,
     page_image: Optional[str],
     temperature: float,
     max_tokens: int,
     prompt_variant: str,
     page_type: Optional[PageType] = None,
+    figures_dir: str = "output/figures",
 ) -> tuple[Optional[ConversionResult], Optional[str]]:
     """Run a conversion strategy and return (result, error).
 
@@ -87,10 +91,12 @@ def run_strategy(
                 result = text_strategy(
                     base_url=base_url,
                     model_name=model,
-                    text=page_text,
+                    pdf_path=pdf_path,
+                    page_num=page_num,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     prompt_variant=prompt_variant,
+                    figures_dir=figures_dir,
                 )
             case "image":
                 if page_image is None:
@@ -123,11 +129,13 @@ def run_strategy(
                 result = adaptive_strategy(
                     base_url=base_url,
                     model_name=model,
-                    text=page_text,
+                    pdf_path=pdf_path,
+                    page_num=page_num,
                     page_image=page_image,
                     page_type=page_type,
                     temperature=temperature,
                     max_tokens=max_tokens,
+                    figures_dir=figures_dir,
                 )
             case _:
                 raise ValueError(f"Unknown strategy: {strategy}")
@@ -138,23 +146,23 @@ def run_strategy(
         return None, str(e)
 
 
-def prepare_pages(config: ExperimentConfig) -> tuple[list[str], list[str]]:
-    """Extract text and rendered page images for the configured PDF.
+def prepare_pages(config: ExperimentConfig, pdf_path: str) -> tuple[list[str], list[str]]:
+    """Extract text and rendered page images for a single PDF.
 
     Resolves `max_pages=None` to the document's total page count so that
     downstream extractors (which require an int) get a concrete value.
     """
     if config.max_pages is None:
-        with fitz.open(config.input_pdf) as doc:
+        with fitz.open(pdf_path) as doc:
             max_pages = len(doc)
     else:
         max_pages = config.max_pages
 
     print("Extracting text from PDF...")
-    pages = extract_pages_from_pdf(config.input_pdf, max_pages=max_pages)
+    pages = extract_pages_from_pdf(pdf_path, max_pages=max_pages)
 
     print("Extracting images from PDF...")
-    images = extract_images_from_pdf(config.input_pdf, max_pages=max_pages)
+    images = extract_images_from_pdf(pdf_path, max_pages=max_pages)
 
     return pages, images
 
@@ -163,6 +171,7 @@ def run_combinations(
     pages: list[str],
     images: list[str],
     config: ExperimentConfig,
+    pdf_path: str,
     max_tokens: int = 4096,
     runner: Callable = run_strategy,
 ) -> list[EvaluationResult]:
@@ -178,7 +187,7 @@ def run_combinations(
     page_analyses = None
     if "adaptive" in config.strategies:
         print("Pre-analysing pages for adaptive strategy...")
-        doc = fitz.open(config.input_pdf)
+        doc = fitz.open(pdf_path)
         limit = config.max_pages if config.max_pages else len(doc)
         page_analyses = [analyze_page(doc[i]) for i in range(min(limit, len(doc)))]
         # Also build aligned image list for adaptive (render_page_as_base64 per page)
@@ -226,6 +235,8 @@ def run_combinations(
                             strategy=strategy,
                             base_url=config.base_url,
                             model=model,
+                            pdf_path=pdf_path,
+                            page_num=page_idx,
                             page_text=page_text,
                             page_image=page_image,
                             temperature=temperature,
@@ -250,6 +261,7 @@ def run_combinations(
                             strategy=strategy,
                             model=model,
                             prompt_variant=prompt_variant,
+                            temperature=temperature,
                             timing_ms=timing_ms,
                             token_usage=token_usage,
                             error=error,
@@ -264,7 +276,7 @@ def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[Eva
     print(f"\n{'='*60}")
     print(f"Experiment: {config.name}")
     print(f"{'='*60}")
-    print(f"Input PDF: {config.input_pdf}")
+    print(f"Input PDFs: {config.input_pdfs}")
     print(f"Reference dir: {config.reference_dir}")
     print(f"Strategies: {config.strategies}")
     print(f"Models: {config.models}")
@@ -272,10 +284,14 @@ def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[Eva
     print(f"Temperatures: {config.temperatures}")
     print(f"{'='*60}\n")
 
-    pages, images = prepare_pages(config)
-    print(f"Processing {len(pages)} pages\n")
-
-    return run_combinations(pages, images, config, max_tokens=max_tokens)
+    all_results: list[EvaluationResult] = []
+    for pdf_path in config.input_pdfs:
+        print(f"--- PDF: {pdf_path} ---")
+        pages, images = prepare_pages(config, pdf_path)
+        print(f"Processing {len(pages)} pages\n")
+        results = run_combinations(pages, images, config, pdf_path, max_tokens=max_tokens)
+        all_results.extend(results)
+    return all_results
 
 
 def save_results(results: list[EvaluationResult], output_path: str) -> None:

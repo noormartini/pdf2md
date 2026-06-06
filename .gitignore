@@ -1,3 +1,20 @@
 venv/
 __pycache__/
 output/
+PRESENTATION.md
+.DS_Store
+
+# LaTeX build artifacts
+Thesis_Paper/NoorMartini_Thesis.pdf
+Thesis_Paper/*.aux
+Thesis_Paper/*.fdb_latexmk
+Thesis_Paper/*.fls
+Thesis_Paper/*.log
+Thesis_Paper/*.out
+Thesis_Paper/*.synctex.gz
+Thesis_Paper/*.toc
+Thesis_Paper/images/*.aux
+Thesis_Paper/images/*.log
+Thesis_Paper/images/*.pdf
+
+writing rules

@@ -16,6 +16,19 @@ ADAPTIVE_MIN_TEXT_CHARACTERS: int = 50
 # DPI used when rendering a page to PNG for vision strategies
 ADAPTIVE_RENDER_DPI: int = 150
 
+# ---------------------------------------------------------------------------
+# LM Studio defaults
+# ---------------------------------------------------------------------------
+
+# Model loaded in LM Studio for vision/hybrid/adaptive strategies
+DEFAULT_MODEL: str = "qwen/qwen3.5-9b"
+
+# LM Studio local server URL
+DEFAULT_BASE_URL: str = "http://127.0.0.1:1234/v1"
+
+# Seconds to wait for a single LLM response (vision inference on CPU is slow)
+DEFAULT_LLM_TIMEOUT: int = 300
+
 
 @dataclass
 class Config:
@@ -27,3 +40,4 @@ class Config:
     strategy: str = "text"
     temperature: float = 0.2
     max_tokens: int = 4096
+    llm_timeout: int = DEFAULT_LLM_TIMEOUT

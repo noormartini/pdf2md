@@ -1,23 +1,11 @@
-## Data and Tables
+## Erklärung
 
-This page demonstrates table handling in PDF-to-Markdown conversion.
+Hiermit erkläre ich, dass ich die vorliegende Arbeit selbstständig verfasst und keine anderen als die angegebenen Quellen und Hilfsmittel benutzt habe.
 
-### Sample Data
+Mannheim, 14.08.2025
 
-| Model | Parameters | Accuracy | Speed |
-|-------|------------|----------|-------|
-| Gemma 3 | 4B | 85.2% | 120 ms |
-| Qwen 2.5 | 7B | 87.4% | 95 ms |
-| LLaMA 3 | 8B | 89.1% | 88 ms |
+Stephan Halder
 
-### Comparison Results
+Ich bin damit einverstanden, dass meine Arbeit veröffentlicht wird, d. h. dass die Arbeit elektronisch gespeichert, in andere Formate konvertiert, auf den Servern der Technische Hochschule Mannheim öffentlich zugänglich gemacht und über das Internet verbreitet werden darf.
 
-| Strategy | Text Similarity | Structure Score | Time (ms) |
-|----------|-----------------|-----------------|-----------|
-| Text-only | 0.82 | 0.75 | 450 |
-| Image-only | 0.88 | 0.91 | 1200 |
-| Hybrid | 0.91 | 0.94 | 1450 |
-
-### Key Findings
-
-The hybrid approach consistently outperforms single-modality strategies on structured content.
+Dieses Werk ist lizenziert unter einer Creative Commons „Namensnennung – Weitergabe unter gleichen Bedingungen 4.0 International" Lizenz.

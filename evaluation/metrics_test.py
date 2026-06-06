@@ -189,6 +189,7 @@ def test_evaluate_conversion_returns_all_metrics_and_token_usage():
         strategy="text",
         model="m",
         prompt_variant="default",
+        temperature=0.0,
         timing_ms=100.0,
         token_usage=42,
     )
@@ -206,6 +207,7 @@ def test_evaluate_conversion_with_error_zeroes_metrics():
         strategy="text",
         model="m",
         prompt_variant="default",
+        temperature=0.0,
         timing_ms=10.0,
         error="HTTP 500",
     )
@@ -217,12 +219,13 @@ def test_evaluate_conversion_with_error_zeroes_metrics():
 # aggregate_results
 # ---------------------------------------------------------------------------
 
-def _mk(strategy="text", model="m", page=1, similarity=0.5, timing=100.0, error=None):
+def _mk(strategy="text", model="m", page=1, similarity=0.5, timing=100.0, error=None, temperature=0.0):
     return EvaluationResult(
         page_number=page,
         strategy=strategy,
         model=model,
         prompt_variant="default",
+        temperature=temperature,
         metrics={
             "text_similarity": similarity,
             "heading_structure": similarity,

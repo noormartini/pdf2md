@@ -9,6 +9,7 @@ def call_llm(
     messages: list[dict],
     temperature: float,
     max_tokens: int,
+    timeout: int = 300,
 ) -> tuple[str, Optional[int]]:
     """Send messages to the LLM and return (content, total_token_usage).
 
@@ -22,7 +23,7 @@ def call_llm(
         "max_tokens": max_tokens,
     }
 
-    response = requests.post(f"{base_url}/chat/completions", json=payload, timeout=120)
+    response = requests.post(f"{base_url}/chat/completions", json=payload, timeout=timeout)
     response.raise_for_status()
     data = response.json()
     content = data["choices"][0]["message"]["content"]
