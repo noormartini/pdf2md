@@ -21,7 +21,7 @@ ADAPTIVE_RENDER_DPI: int = 150
 # ---------------------------------------------------------------------------
 
 # Model loaded in LM Studio for vision/hybrid/adaptive strategies
-DEFAULT_MODEL: str = "qwen/qwen3.5-9b"
+DEFAULT_MODEL: str = "qwen2.5-vl-7b-instruct-abliterated"
 
 # LM Studio local server URL
 DEFAULT_BASE_URL: str = "http://127.0.0.1:1234/v1"

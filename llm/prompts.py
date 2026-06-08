@@ -38,8 +38,15 @@ You are a PDF-to-Markdown conversion specialist. Convert the following PDF-extra
 - Fix broken line breaks within paragraphs (common PDF artifact).
 - Preserve meaningful paragraph breaks.
 - Detect headings and format as Markdown headings (# for title, ## for sections, ### for subsections).
+- If a heading includes a section number (e.g. "1.1 Motivation" or "2.3.4 Title"), preserve the number exactly as it appears — do not drop it.
+- Only use Markdown headings for text that marks a structural section — do NOT convert bold or italic text to a heading.
 - Format lists (bulleted or numbered) as proper Markdown lists.
 - Wrap source code in fenced code blocks with language identifier if detectable.
+
+**Figures & Captions:**
+- When you include an image link, look for a visible caption label near the figure in the page (e.g. "Figure 1.1: ...", "Abb. 1.1: ...", "Fig. 1: ...").
+- Include the caption as italic text on a new line immediately below the image link: `*Figure 1.1: caption text*`
+- Do not skip captions — they are part of the content.
 
 **Special Content:**
 - Convert inline mathematical formulas and symbols to LaTeX: $E = mc^2$
@@ -74,6 +81,7 @@ You are a PDF-to-Markdown conversion specialist. You will receive raw text extra
   - Section (e.g. "1.1 Title", "2.3 Title") → ##
   - Subsection (e.g. "1.1.1 Title", "2.3.4 Title") → ###
   - Deeper levels → ####
+- Only use Markdown headings for structural section titles — do NOT convert bold or italic text to a heading.
 - Format bullet and numbered lists correctly.
 - Detect and wrap source code in fenced code blocks with a language tag if identifiable.
 
@@ -116,6 +124,34 @@ You are a mathematical document converter. You will receive an image of a PDF pa
     },
 
     # ------------------------------------------------------------------
+    # table — used by the adaptive strategy for TABLE-classified pages.
+    # Optimised for pages whose primary content is structured tabular data.
+    # ------------------------------------------------------------------
+    "table": {
+        "system": """\
+You are a document table extraction specialist. You will receive an image of a PDF page containing one or more tables. Extract all table content and produce valid Markdown.
+
+## Rules
+
+**Table Formatting:**
+- Reconstruct every table using Markdown table syntax: | col | col | with a |---|---| separator after the header row.
+- Preserve all cell values exactly — do not paraphrase or summarise.
+- If a cell spans multiple columns, approximate it in flat Markdown and note the span if needed.
+- Align columns consistently.
+
+**Surrounding Text:**
+- Extract any text outside the tables (headings, captions, footnotes) and place it before or after the relevant table.
+- Preserve page numbers exactly as they appear.
+
+**Formulas:**
+- If a cell contains a formula or symbol, convert it to LaTeX: $formula$ inline, $$formula$$ for display.
+
+**Output:**
+- Return ONLY the Markdown — no preamble, no explanations.""",
+        "user": "{text}",
+    },
+
+    # ------------------------------------------------------------------
     # diagram — used by the adaptive strategy for IMAGE-classified pages.
     # Optimised for pages dominated by figures, charts, or diagrams.
     # ------------------------------------------------------------------
@@ -127,6 +163,7 @@ You are a document analysis specialist. You will receive an image of a PDF page 
 
 **Text Extraction:**
 - Extract all visible text: titles, axis labels, legends, annotations, captions.
+- If a heading includes a section number (e.g. "1.1 Motivation" or "2.3.4 Title"), preserve the number exactly — do not drop it.
 
 **Diagram Description:**
 - Identify the type of diagram (flowchart, bar chart, scatter plot, architecture diagram, etc.).

@@ -44,17 +44,17 @@ def _bulk_extract_markdown(pdf_path: str, num_pages: int, figures_dir: str) -> l
     return [chunk.get("text", "") for chunk in chunks]
 
 
-def _run_in_pool(num_pages: int, concurrency: int, worker) -> list[str]:
-    """Run `worker(i)` for i in [0, num_pages) concurrently and return results
+def _run_in_pool(indices: list[int], concurrency: int, worker) -> list[str]:
+    """Run `worker(i)` for each i in `indices` concurrently and return results
     in input order.
 
     `pool.map` preserves input order, so the final document join stays correct
-    without any indexing dance.  Concurrency is capped at `num_pages` to avoid
+    without any indexing dance.  Concurrency is capped at len(indices) to avoid
     spinning up idle threads on small documents.
     """
-    workers = max(1, min(concurrency, num_pages))
+    workers = max(1, min(concurrency, len(indices)))
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        return list(pool.map(worker, range(num_pages)))
+        return list(pool.map(worker, indices))
 
 
 def run(config: Config):
@@ -75,6 +75,8 @@ def run(config: Config):
         if num_pages == 0:
             raise ValueError("No pages could be read from the PDF.")
         page_labels = [_page_label(doc, i) for i in range(num_pages)]
+
+    page_indices = list(range(num_pages))
 
     match (config.strategy):
         case "text":
@@ -97,7 +99,7 @@ def run(config: Config):
                 )
                 return f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
 
-            cleaned_pages = _run_in_pool(num_pages, config.concurrency, _convert)
+            cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
 
         case "image":
             def _convert(i: int) -> str:
@@ -120,7 +122,7 @@ def run(config: Config):
                 )
                 return f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
 
-            cleaned_pages = _run_in_pool(num_pages, config.concurrency, _convert)
+            cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
 
         case "hybrid":
             pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
@@ -149,7 +151,7 @@ def run(config: Config):
                 )
                 return f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
 
-            cleaned_pages = _run_in_pool(num_pages, config.concurrency, _convert)
+            cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
 
         case "adaptive":
             # Bulk-extract once for any page that ends up classified as TEXT.
@@ -191,7 +193,7 @@ def run(config: Config):
                 )
                 return f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
 
-            cleaned_pages = _run_in_pool(num_pages, config.concurrency, _convert)
+            cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
 
         case _:
             raise ValueError(f"Unknown strategy: {config.strategy}")

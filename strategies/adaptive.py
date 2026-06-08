@@ -22,10 +22,11 @@ from strategies.result import ConversionResult
 
 
 class PageType(Enum):
-    TEXT = "text"       # Pure text   → text_strategy with "text" prompt
-    IMAGE = "image"     # Image-heavy → image_strategy with "diagram" prompt
-    FORMULA = "formula" # Math-heavy  → image_strategy with "formula" prompt
-    MIXED = "mixed"     # Text+visual → image_strategy with "default" prompt
+    TEXT = "text"       # Pure text    → text_strategy with "text" prompt
+    IMAGE = "image"     # Image-heavy  → image_strategy with "diagram" prompt
+    FORMULA = "formula" # Math-heavy   → image_strategy with "formula" prompt
+    TABLE = "table"     # Table-heavy  → image_strategy with "table" prompt
+    MIXED = "mixed"     # Text+visual  → image_strategy with "default" prompt
     EMPTY = "empty"     # Mostly empty → skip
 
 
@@ -35,7 +36,9 @@ class PageAnalysis:
     page_type: PageType
     has_images: bool
     has_formulas: bool
+    has_tables: bool
     image_count: int
+    table_count: int
     text_length: int
     vector_path_count: int
     confidence: float  # 0.0–1.0
@@ -88,12 +91,18 @@ def analyze_page(page: fitz.Page) -> PageAnalysis:
     has_formulas = _detect_formulas(page, drawings)
     text_length = len(page.get_text("text").strip())
 
+    finder = page.find_tables()
+    table_count = len(finder.tables)
+    has_tables = table_count > 0
+
     if text_length < 10 and not has_images and vector_path_count < 5:
         page_type, confidence = PageType.EMPTY, 0.9
     elif has_formulas and text_length < _MIN_TEXT_CHARACTERS:
         page_type, confidence = PageType.FORMULA, 0.85
     elif has_images and image_count > 3:
         page_type, confidence = PageType.IMAGE, 0.9
+    elif has_tables:
+        page_type, confidence = PageType.TABLE, 0.85
     elif has_images or has_formulas:
         page_type, confidence = PageType.MIXED, 0.75
     elif text_length >= _MIN_TEXT_CHARACTERS:
@@ -105,7 +114,9 @@ def analyze_page(page: fitz.Page) -> PageAnalysis:
         page_type=page_type,
         has_images=has_images,
         has_formulas=has_formulas,
+        has_tables=has_tables,
         image_count=image_count,
+        table_count=table_count,
         text_length=text_length,
         vector_path_count=vector_path_count,
         confidence=confidence,
@@ -201,6 +212,18 @@ def adaptive_strategy(
             temperature=temperature,
             max_tokens=max_tokens,
             prompt_variant="diagram",
+            figure_refs=figure_refs,
+            language=language,
+        )
+
+    if page_type == PageType.TABLE:
+        return image_call(
+            base_url=base_url,
+            model_name=model_name,
+            images=[page_image],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            prompt_variant="table",
             figure_refs=figure_refs,
             language=language,
         )
