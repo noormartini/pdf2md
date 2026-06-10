@@ -1,13 +1,15 @@
 from postprocess import (
     clean_page,
     postprocess_markdown,
-    _convert_toc_table,
+    _clean_toc_dot_leaders,
     _demote_outline_chapter_refs,
     _demote_unlabeled_single_word_headings,
     _format_figure_captions,
     _fix_ocr_superscripts,
+    _normalise_latex_delimiters,
     _reorder_captions_after_images,
     _recover_bare_number_headings,
+    _strip_bibliography_dash,
     _strip_bold_from_headings,
     _strip_duplicate_section_headers,
     _strip_running_headers,
@@ -291,56 +293,43 @@ def test_postprocess_markdown_strips_duplicate_running_headers():
     assert "Second page content." in result
 
 
-def test_convert_toc_table_basic():
+def test_clean_toc_dot_leaders_strips_dots_from_cell():
+    md = "| 1.1 Motivation . . . . . . . . . . . . 1 | 1 |\n"
+    result = _clean_toc_dot_leaders(md)
+    assert "1.1 Motivation" in result
+    assert ". . ." not in result
+
+
+def test_clean_toc_dot_leaders_moves_page_number_to_empty_cell():
+    # Page vi style: page number absorbed into title cell, second cell empty.
+    md = "| 6.4 Results . . . . . . . . . . . . . . 32 |  |\n"
+    result = _clean_toc_dot_leaders(md)
+    assert "6.4 Results" in result
+    assert ". . ." not in result
+    assert "32" in result
+
+
+def test_clean_toc_dot_leaders_leaves_non_table_lines_unchanged():
+    md = "Some text with . . . . dots in it.\n"
+    assert _clean_toc_dot_leaders(md) == md
+
+
+def test_clean_toc_dot_leaders_leaves_normal_tables_unchanged():
+    md = "| foo | bar |\n| --- | --- |\n| baz | qux |\n"
+    assert _clean_toc_dot_leaders(md) == md
+
+
+def test_clean_page_preserves_toc_table_format():
+    # TOC tables should remain as tables, not be converted to text.
     md = (
-        "| Contents |\n"
-        "| --- | --- |\n"
-        "| 1 Introduction | 1 |\n"
-        "| 1.1 Motivation | 1 |\n"
-        "| 2 Execution plan | 5 |\n"
-    )
-    result = _convert_toc_table(md)
-    assert "**Contents**" in result
-    assert "1 Introduction — 1" in result
-    assert "1.1 Motivation — 1" in result
-    assert "2 Execution plan — 5" in result
-    assert "|" not in result
-
-
-def test_convert_toc_table_no_table_syntax_in_output():
-    md = "| Contents |\n| --- | --- |\n| 3 Related work | 13 |\n"
-    result = _convert_toc_table(md)
-    assert "| --- |" not in result
-    assert "| 3 Related work |" not in result
-
-
-def test_convert_toc_table_german_header():
-    md = (
-        "| Inhaltsverzeichnis |\n"
+        "| Inhaltsverzeichnis |  |\n"
         "| --- | --- |\n"
         "| 1 Einleitung | 1 |\n"
-    )
-    result = _convert_toc_table(md)
-    assert "**Inhaltsverzeichnis**" in result
-    assert "1 Einleitung — 1" in result
-
-
-def test_convert_toc_table_leaves_non_toc_tables_alone():
-    md = "| Column A | Column B |\n| --- | --- |\n| foo | bar |\n"
-    assert _convert_toc_table(md) == md
-
-
-def test_clean_page_converts_toc_table():
-    md = (
-        "| Contents |\n"
-        "| --- | --- |\n"
-        "| 1 Introduction | 1 |\n"
-        "| 2 Background | 3 |\n"
+        "| 2 Grundlagen | 3 |\n"
     )
     result = clean_page(md)
-    assert "**Contents**" in result
-    assert "1 Introduction — 1" in result
-    assert "|" not in result
+    assert "|" in result
+    assert "1 Einleitung" in result
 
 
 def test_recover_bare_number_headings_patches_missing_title():
@@ -436,3 +425,106 @@ def test_strip_bold_leaves_plain_heading_unchanged():
 def test_strip_bold_works_on_all_heading_levels():
     assert _strip_bold_from_headings("# **Title**") == "# Title"
     assert _strip_bold_from_headings("### **Sub**") == "### Sub"
+
+
+# ── _strip_duplicate_section_headers new behaviour ───────────────────────────
+
+def test_strip_duplicate_numbered_heading_dropped():
+    # Exact same numbered heading appearing twice → second one removed.
+    md = "## 4.3 Training\n\nContent.\n\n## 4.3 Training\n\nMore."
+    result = _strip_duplicate_section_headers(md)
+    assert result.count("## 4.3 Training") == 1
+    assert "More." in result
+
+
+def test_strip_kapitel_running_header():
+    # "# Kapitel 2 Title" on an interior page should be removed if "Title" was
+    # already seen as a ## heading on the chapter-start page.
+    md = (
+        "# Kapitel 2\n\n## Theoretische Grundlagen\n\nContent.\n\n"
+        "---\n\n"
+        "# Kapitel 2 Theoretische Grundlagen\n\nNext page content."
+    )
+    result = _strip_duplicate_section_headers(md)
+    assert "# Kapitel 2 Theoretische Grundlagen" not in result
+    assert "# Kapitel 2\n" in result
+    assert "## Theoretische Grundlagen" in result
+
+
+def test_strip_kapitel_keeps_first_occurrence():
+    # If a "# Kapitel N Title" combined form appears before the ## heading,
+    # it is the first occurrence and must not be removed.
+    md = "# Kapitel 1 Einleitung\n\nContent."
+    result = _strip_duplicate_section_headers(md)
+    assert "# Kapitel 1 Einleitung" in result
+
+
+# ── _recover_bare_number_headings: title-without-number ──────────────────────
+
+def test_recover_adds_missing_section_number():
+    md = "## Neuronale Netze\n\nBody text."
+    raw = "2.3 Neuronale Netze\nBody text."
+    result = _recover_bare_number_headings(md, raw)
+    assert "## 2.3 Neuronale Netze" in result
+
+
+def test_recover_does_not_add_number_to_structural_keyword():
+    # "Einleitung" is a structural keyword and should keep no number even if
+    # fitz raw text has "1.1 Einleitung".
+    md = "## Einleitung\n\nContent."
+    raw = "1.1 Einleitung\nContent."
+    result = _recover_bare_number_headings(md, raw)
+    assert result == md  # unchanged
+
+
+def test_recover_does_not_add_number_when_already_numbered():
+    md = "## 2.3 Neuronale Netze\n\nBody."
+    raw = "2.3 Neuronale Netze\nBody."
+    result = _recover_bare_number_headings(md, raw)
+    assert result == md  # unchanged
+
+
+# ── _demote_unlabeled_single_word_headings: Abstrakt keyword ─────────────────
+
+def test_abstrakt_kept_as_heading():
+    # "Abstrakt" is a structural keyword and must not be demoted to bold.
+    result = _demote_unlabeled_single_word_headings("## Abstrakt")
+    assert result == "## Abstrakt"
+
+
+# ── _strip_bibliography_dash ─────────────────────────────────────────────────
+
+def test_strip_bibliography_dash_removes_leading_dash():
+    md = "**Halder, Stephan :**\n\n– Recursive Backwards Q-Learning.\n"
+    result = _strip_bibliography_dash(md)
+    assert result.startswith("**Halder, Stephan :**")
+    assert "– " not in result
+    assert "Recursive Backwards Q-Learning." in result
+
+
+def test_strip_bibliography_dash_leaves_inline_dash_unchanged():
+    # Em-dash that is NOT at the start of a paragraph is left alone.
+    md = "Some text – more text.\n"
+    assert _strip_bibliography_dash(md) == md
+
+
+# ── _normalise_latex_delimiters ──────────────────────────────────────────────
+
+def test_normalise_latex_inline():
+    assert _normalise_latex_delimiters(r"\( a + b \)") == "$a + b$"
+
+
+def test_normalise_latex_display():
+    assert _normalise_latex_delimiters(r"\[ E = mc^2 \]") == "$$E = mc^2$$"
+
+
+def test_normalise_latex_leaves_dollar_unchanged():
+    md = "$a + b$\n\n$$E = mc^2$$\n"
+    assert _normalise_latex_delimiters(md) == md
+
+
+def test_postprocess_markdown_normalises_latex():
+    md = r"See \( o_j = F(\varphi_j) \) for details."
+    result = postprocess_markdown(md)
+    assert r"\(" not in result
+    assert "$o_j = F(\\varphi_j)$" in result

@@ -14,6 +14,13 @@ _CAPTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Matches a label-only italic caption with no descriptive text, e.g. "*Figure 1:*"
+# or "*Abb. 2:*". These carry no information and should be removed.
+_EMPTY_ITALIC_CAPTION_RE = re.compile(
+    r"^\*((?:Figure|Fig\.|Abb\.|Abbildung|Table|Tabelle)\s+[\d.]+):?\*$",
+    re.IGNORECASE,
+)
+
 # Detects an italic figure caption that sits BEFORE an image link so the two
 # can be swapped.  By the time this regex runs, _format_figure_captions has
 # already converted all bold captions to italic, so only the italic form needs
@@ -84,18 +91,12 @@ _STRUCTURAL_KEYWORDS: frozenset[str] = frozenset({
     # German
     "einleitung", "zusammenfassung", "schluss", "literatur", "anhang",
     "vorwort", "danksagung", "inhaltsverzeichnis", "hintergrund",
-    "bewertung", "ergebnis", "ausblick", "fazit",
+    "bewertung", "ergebnis", "ausblick", "fazit", "abstrakt",
 })
 
-# Matches a 2-column Markdown table that the LLM generates for TOC pages.
-# The header cell is "Contents" or the German/French equivalents, the separator
-# row has at least one dash column, and the data rows are | title | page |.
-_TOC_TABLE_RE = re.compile(
-    r"^\| (?:Contents|Inhaltsverzeichnis|Table of Contents|Inhalt) \|\n"
-    r"\|[-| ]+\n"
-    r"((?:\| [^\n]+ \|\n?)+)",
-    re.MULTILINE | re.IGNORECASE,
-)
+# Matches dot-leader patterns in TOC table cells, e.g. " . . . . . . . . 32 "
+# at the end of a cell.  Group 1 = the page number.
+_DOT_LEADER_RE = re.compile(r"\s*\.(?:\s*\.)+\s*(\d+)\s*$")
 
 # Matches a PDF running header (Kopfzeile) line — a plain-text repetition of the
 # chapter/section title that appears at the top of every PDF page.
@@ -136,37 +137,45 @@ def _reorder_captions_after_images(md: str) -> str:
     return _CAPTION_BEFORE_IMAGE_RE.sub(r"\3\n\1", md)
 
 
-def _convert_toc_table(md: str) -> str:
-    """Convert a 2-column Contents/TOC Markdown table to plain-text lines.
+def _clean_toc_dot_leaders(md: str) -> str:
+    """Strip dot leaders from TOC table cells and recover embedded page numbers.
 
-    The LLM renders TOC pages as a table:
-        | Contents |
-        | --- | --- |
-        | 1 Introduction | 1 |
+    TOC tables from pymupdf4llm often embed dot leaders inside cells:
+        | 1.1 Motivation . . . . . . . . . . . . . . . . 1 | 1 |
+        | 6.4 Results . . . . . . . . . . . . . . . . . 32 |   |
+
+    This strips the ". . . ." pattern and, when the page number was absorbed
+    into the title cell leaving the second cell empty, moves it there:
         | 1.1 Motivation | 1 |
-
-    This converts each row to a plain line:
-        **Contents**
-
-        1 Introduction — 1
-        1.1 Motivation — 1
+        | 6.4 Results | 32 |
     """
-    def _replace(m: re.Match) -> str:
-        rows_text = m.group(1)
-        lines = []
-        for row in rows_text.splitlines():
-            cells = [c.strip() for c in row.strip().strip("|").split("|")]
-            if len(cells) == 2 and cells[0] and cells[1]:
-                lines.append(f"{cells[0]} — {cells[1]}")
-        header_match = re.match(
-            r"^\| (Contents|Inhaltsverzeichnis|Table of Contents|Inhalt) \|",
-            m.group(0),
-            re.IGNORECASE,
-        )
-        header = header_match.group(1) if header_match else "Contents"
-        return f"**{header}**\n\n" + "\n".join(lines)
-
-    return _TOC_TABLE_RE.sub(_replace, md)
+    lines = md.split("\n")
+    result = []
+    for line in lines:
+        if not line.startswith("|"):
+            result.append(line)
+            continue
+        cells = line.split("|")
+        # cells[0] = '' before first |, cells[-1] = '' after last |
+        if len(cells) < 3:
+            result.append(line)
+            continue
+        inner = cells[1:-1]
+        changed = False
+        for j, cell in enumerate(inner):
+            dm = _DOT_LEADER_RE.search(cell)
+            if dm:
+                page_num = dm.group(1)
+                cleaned = _DOT_LEADER_RE.sub("", cell).strip()
+                inner[j] = f" {cleaned} "
+                # If the adjacent page-number cell is empty, fill it in.
+                if j + 1 < len(inner) and not inner[j + 1].strip():
+                    inner[j + 1] = f" {page_num} "
+                changed = True
+        if changed:
+            line = "|" + "|".join(inner) + "|"
+        result.append(line)
+    return "\n".join(result)
 
 
 def _demote_unlabeled_single_word_headings(md: str) -> str:
@@ -289,11 +298,19 @@ def _format_figure_captions(md: str) -> str:
     i = 0
     while i < len(lines):
         line = lines[i]
+        # Drop label-only italic captions (no descriptive text), e.g. "*Figure 1:*"
+        if _EMPTY_ITALIC_CAPTION_RE.match(line):
+            i += 1
+            continue
+
         cm = _CAPTION_RE.match(line)
         if cm:
             label = cm.group(1).rstrip(":")
             text = cm.group(2).strip()
-            caption_line = f"*{label}: {text}*" if text else f"*{label}*"
+            if not text:
+                i += 1
+                continue  # label-only bold caption — drop it too
+            caption_line = f"*{label}: {text}*"
             # If the last non-blank line already ended with an image link, keep
             # the caption immediately after it without an extra blank line.
             last_content = next(
@@ -312,39 +329,61 @@ def _format_figure_captions(md: str) -> str:
 
 
 def _recover_bare_number_headings(md: str, raw_text: str) -> str:
-    """Patch bare section-number headings whose title was dropped by pymupdf4llm.
+    """Patch headings that are missing either their title or their section number.
 
-    pymupdf4llm sometimes extracts only the section number from a heading line,
-    silently dropping the title (e.g. a ligature like 'ﬂ' causes the span to
-    split and the title half is lost).  When `raw_text` (fitz plain-text of the
-    same page) is provided, each bare-number heading is looked up there; if the
-    raw text has "2.3.4 Some Title" on a single line, the title is re-attached.
+    pymupdf4llm sometimes drops the section number or the title from a heading:
+
+    Case A — bare number, e.g. "## 2.3" with no title:
+        The fitz raw text has "2.3 Neuronale Netze" → restored to "## 2.3 Neuronale Netze".
+
+    Case B — title without number, e.g. "## Neuronale Netze":
+        The fitz raw text has "2.3 Neuronale Netze" → number prepended: "## 2.3 Neuronale Netze".
+        Only fires for N.N or N.N.N numbered sections (single-number chapter titles
+        like "1 Einleitung" are intentionally excluded — they become # headings elsewhere).
     """
     if not raw_text:
         return md
 
-    # Build a lookup: section_number → title from fitz raw text.
-    fitz_titles: dict[str, str] = {}
-    for line in raw_text.splitlines():
-        line = line.strip()
-        m = re.match(r"^(\d{1,3}(?:\.\d{1,3}){1,2})\s+(.+)$", line)
+    # Build lookup tables from fitz raw text.
+    fitz_titles: dict[str, str] = {}   # number → title  (case A)
+    fitz_numbers: dict[str, str] = {}  # normalised title → number  (case B)
+    for raw_line in raw_text.splitlines():
+        raw_line = raw_line.strip()
+        m = re.match(r"^(\d{1,3}(?:\.\d{1,3}){1,2})\s+(.+)$", raw_line)
         if m:
             num, title = m.group(1), m.group(2).strip()
-            # Normalise common ligatures that fitz preserves verbatim.
             title = title.replace("ﬂ", "fl").replace("ﬁ", "fi")
             fitz_titles[num] = title
+            fitz_numbers[title.lower()] = num
 
     if not fitz_titles:
         return md
 
-    def _patch(m: re.Match) -> str:
+    # Case A: heading is just a bare number ("## 2.3") — attach the title.
+    def _patch_bare_number(m: re.Match) -> str:
         hashes, num = m.group(1), m.group(2).strip()
         title = fitz_titles.get(num)
         if title:
             return f"{hashes} {num} {title}"
         return m.group(0)
 
-    return re.sub(r"^(#{1,6})\s+(\d[\d.]+)[ \t]*$", _patch, md, flags=re.MULTILINE)
+    md = re.sub(r"^(#{1,6})\s+(\d[\d.]+)[ \t]*$", _patch_bare_number, md, flags=re.MULTILINE)
+
+    # Case B: heading has a title but no number prefix — prepend the number.
+    def _patch_missing_number(m: re.Match) -> str:
+        hashes, content = m.group(1), m.group(2).strip()
+        # Skip if the heading already starts with a number.
+        if re.match(r"^\d", content):
+            return m.group(0)
+        # Skip structural keywords — they are unnumbered by design.
+        if content.lower() in _STRUCTURAL_KEYWORDS:
+            return m.group(0)
+        num = fitz_numbers.get(content.lower())
+        if num:
+            return f"{hashes} {num} {content}"
+        return m.group(0)
+
+    return re.sub(r"^(#{2,6})\s+(\S[^\n]*)$", _patch_missing_number, md, flags=re.MULTILINE)
 
 
 def _merge_split_headings(md: str) -> str:
@@ -453,7 +492,7 @@ def clean_page(md: str, raw_page_text: str = "") -> str:
     md = re.sub(r"(^#{1,6} .+\n)\n*([ \t]*(-{3,}|\*{3,}|_{3,})[ \t]*\n)", r"\1\n", md, flags=re.MULTILINE)
 
     md = _strip_running_headers(md)
-    md = _convert_toc_table(md)
+    md = _clean_toc_dot_leaders(md)
     md = _unwrap_symbol_italics(md)
     md = _fix_ocr_superscripts(md)
     md = _format_figure_captions(md)
@@ -472,44 +511,119 @@ def clean_page(md: str, raw_page_text: str = "") -> str:
 
 
 def _strip_duplicate_section_headers(md: str) -> str:
-    """Remove ## headings that repeat a section title without its number.
+    """Remove heading duplicates produced by PDF running headers.
 
-    PDF running headers repeat the current section title on every page.  When
-    the LLM processes those pages it promotes the plain-text header to a ##
-    heading, producing a duplicate:
+    Two kinds of duplicates are handled:
 
-        ## 2.2 Dataset research   ← real heading (first page of section)
-        ...
-        ## Dataset research       ← running header on the next page (no number)
+    1. Numbered → unnumbered: the title text of a numbered ## heading was
+       already seen, and a later unnumbered ## heading repeats it.
+         ## 2.2 Dataset research   (real)
+         ...
+         ## Dataset research       (running header — drop)
 
-    The pass scans left-to-right, collecting the title portion of every numbered
-    ## heading seen so far.  Any later unnumbered ## heading whose text matches
-    a collected title is dropped.
+    2. Exact numbered duplicate: the PDF embeds the same numbered heading
+       twice on the same page (e.g. "4.3 Training…" appears in both the
+       body and a sidebar), so pymupdf4llm outputs it twice.
+         ## 4.3 Training…          (real — keep)
+         ## 4.3 Training…          (duplicate — drop)
+
+    3. # Kapitel N Title running header: interior pages of a chapter carry a
+       combined "Kapitel N Title" header.  If the Title part was already seen
+       as a standalone ## heading, the combined form is a running header.
+         # Kapitel 2               (real chapter marker — keep)
+         ## Theoretische Grundlagen (real section heading — keep, record title)
+         ...
+         # Kapitel 2 Theoretische Grundlagen  (interior page header — drop)
     """
     lines = md.split("\n")
-    seen_titles: set[str] = set()
+    seen_titled_headings: set[str] = set()   # titles from numbered ## headings
+    seen_all_headings: set[str] = set()       # every heading title seen
+    seen_exact_numbered: set[str] = set()     # full text of numbered headings
     result: list[str] = []
 
     for line in lines:
-        m_numbered = re.match(r"^##\s+\d[\d.]*\s+(.+)$", line)
+        # ── numbered ## heading ──────────────────────────────────────────────
+        m_numbered = re.match(r"^##\s+(\d[\d.]*\s+.+)$", line)
         if m_numbered:
-            seen_titles.add(m_numbered.group(1).strip().lower())
+            full = m_numbered.group(1).strip()
+            key = full.lower()
+            if key in seen_exact_numbered:
+                continue  # exact duplicate numbered heading — drop
+            seen_exact_numbered.add(key)
+            title_part = re.sub(r"^\d[\d.]*\s+", "", full).strip().lower()
+            seen_titled_headings.add(title_part)
+            seen_all_headings.add(title_part)
             result.append(line)
             continue
 
+        # ── unnumbered ## heading ─────────────────────────────────────────────
         m_unnumbered = re.match(r"^##\s+(\S[^\n]*)$", line)
-        if m_unnumbered and m_unnumbered.group(1).strip().lower() in seen_titles:
-            continue  # drop the duplicate running header
+        if m_unnumbered:
+            title = m_unnumbered.group(1).strip().lower()
+            if title in seen_titled_headings:
+                continue  # unnumbered repeat of a numbered heading — drop
+            seen_all_headings.add(title)
+            result.append(line)
+            continue
+
+        # ── # Kapitel/Chapter N Title running header ──────────────────────────
+        m_kapitel = re.match(
+            r"^#\s+(?:Kapitel|Chapter)\s+\d+\s+(.+)$", line, re.IGNORECASE
+        )
+        if m_kapitel:
+            title = m_kapitel.group(1).strip().lower()
+            if title in seen_all_headings:
+                continue  # already seen as a real heading — this is a repeat
+            seen_all_headings.add(title)
+            result.append(line)
+            continue
 
         result.append(line)
 
     return "\n".join(result)
 
 
+def _strip_bibliography_dash(md: str) -> str:
+    """Remove em-dash artifacts at the start of bibliography paragraphs.
+
+    In German academic PDFs, bibliography entries use the format:
+        Author, Name:
+        – Title / Author. – Publisher, Year.
+
+    The '–' is a typographic separator within the citation, but pymupdf4llm
+    places it at the start of the paragraph (the line-break falls right there).
+    This strips the leading '– ' or '— ' from any standalone paragraph that
+    directly follows a bold label line (the author name formatted as **Name :**).
+    """
+    return re.sub(
+        r"(^\*\*[^\n]+\*\*\s*\n\n)([–—])\s+",
+        r"\1",
+        md,
+        flags=re.MULTILINE,
+    )
+
+
+def _normalise_latex_delimiters(md: str) -> str:
+    """Unify LaTeX math delimiters to the $ / $$ style.
+
+    pymupdf4llm and some LLMs output inline math as \\(...\\) and display math
+    as \\[...\\].  Normalise these to the dollar-sign style used everywhere else
+    in the document so renderers don't need to support both conventions.
+        \\( expr \\)  →  $expr$
+        \\[ expr \\]  →  $$expr$$
+    """
+    # Display math first (so \\[ isn't accidentally matched by the inline rule).
+    md = re.sub(r"\\\[\s*(.*?)\s*\\\]", r"$$\1$$", md, flags=re.DOTALL)
+    md = re.sub(r"\\\(\s*(.*?)\s*\\\)", r"$\1$", md, flags=re.DOTALL)
+    return md
+
+
 def postprocess_markdown(md: str) -> str:
     """Final cleanup applied to the fully joined Markdown document."""
     md = md.replace("\r\n", "\n").replace("\r", "\n")
     md = _strip_duplicate_section_headers(md)
+    md = _strip_bibliography_dash(md)
+    md = _normalise_latex_delimiters(md)
 
     # Remove PDF page-footer numbers that pymupdf4llm extracts as lone lines.
     # They appear as a bare 1–3 digit number at the end of each page chunk,
