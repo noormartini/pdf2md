@@ -1,10 +1,14 @@
 from postprocess import (
     clean_page,
+    postprocess_markdown,
+    _convert_toc_table,
     _demote_outline_chapter_refs,
     _demote_unlabeled_single_word_headings,
     _format_figure_captions,
     _fix_ocr_superscripts,
     _reorder_captions_after_images,
+    _recover_bare_number_headings,
+    _strip_duplicate_section_headers,
     _strip_running_headers,
     _unwrap_symbol_italics,
 )
@@ -219,6 +223,26 @@ def test_demote_unlabeled_single_word_headings_deep_level():
     assert _demote_unlabeled_single_word_headings("#### Company") == "**Company**"
 
 
+def test_demote_unlabeled_single_word_headings_citation_label():
+    assert _demote_unlabeled_single_word_headings("## Köhler, Sven :") == "**Köhler, Sven :**"
+
+
+def test_demote_unlabeled_single_word_headings_citation_label_no_space_kept():
+    # Only the ' :' (space-colon) pattern is a citation label; plain ':' is kept
+    assert _demote_unlabeled_single_word_headings("## Some Section:") == "## Some Section:"
+
+
+def test_demote_unlabeled_single_word_headings_long_title():
+    long_title = "Influence of Hyper-Parameter and pipeline tuning for supervised machine classification"
+    assert len(long_title) > 80
+    assert _demote_unlabeled_single_word_headings(f"## {long_title}") == f"**{long_title}**"
+
+
+def test_demote_unlabeled_single_word_headings_long_numbered_kept():
+    long_numbered = "2.3.4 Tensorflow as ML Framework for deep learning classification tasks and pipelines"
+    assert _demote_unlabeled_single_word_headings(f"## {long_numbered}") == f"## {long_numbered}"
+
+
 def test_clean_page_demotes_bold_label_headings():
     md = "## Company\n\nAcme Corp\n\n## Department\n\nEngineering"
     result = clean_page(md)
@@ -226,3 +250,153 @@ def test_clean_page_demotes_bold_label_headings():
     assert "**Department**" in result
     assert "## Company" not in result
     assert "## Department" not in result
+
+
+def test_strip_duplicate_section_headers_removes_unnumbered_repeat():
+    md = "## 2.2 Dataset research\n\nSome content.\n\n---\n\n## Dataset research\n\nMore content."
+    result = _strip_duplicate_section_headers(md)
+    assert "## 2.2 Dataset research" in result
+    assert result.count("## Dataset research") == 0
+    assert "More content." in result
+
+
+def test_strip_duplicate_section_headers_keeps_first_occurrence():
+    # Unnumbered heading with no prior numbered counterpart must be kept.
+    md = "## Execution plan\n\nSome content."
+    result = _strip_duplicate_section_headers(md)
+    assert "## Execution plan" in result
+
+
+def test_strip_duplicate_section_headers_case_insensitive():
+    md = "## 2.2 Dataset Research\n\nContent.\n\n## Dataset research\n\nMore."
+    result = _strip_duplicate_section_headers(md)
+    assert "## 2.2 Dataset Research" in result   # numbered version kept
+    assert "## Dataset research" not in result    # unnumbered duplicate removed
+
+
+def test_strip_duplicate_section_headers_keeps_different_title():
+    md = "## 2.2 Dataset research\n\nContent.\n\n## Prototyping\n\nMore."
+    result = _strip_duplicate_section_headers(md)
+    assert "## Prototyping" in result
+
+
+def test_postprocess_markdown_strips_duplicate_running_headers():
+    page1 = "<!-- Page 6 -->\n\n## 2.2 Dataset research\n\nFirst page content."
+    page2 = "<!-- Page 7 -->\n\n## Dataset research\n\nSecond page content."
+    md = f"{page1}\n\n---\n\n{page2}"
+    result = postprocess_markdown(md)
+    assert "## 2.2 Dataset research" in result
+    assert result.count("## Dataset research") == 0
+    assert "Second page content." in result
+
+
+def test_convert_toc_table_basic():
+    md = (
+        "| Contents |\n"
+        "| --- | --- |\n"
+        "| 1 Introduction | 1 |\n"
+        "| 1.1 Motivation | 1 |\n"
+        "| 2 Execution plan | 5 |\n"
+    )
+    result = _convert_toc_table(md)
+    assert "**Contents**" in result
+    assert "1 Introduction — 1" in result
+    assert "1.1 Motivation — 1" in result
+    assert "2 Execution plan — 5" in result
+    assert "|" not in result
+
+
+def test_convert_toc_table_no_table_syntax_in_output():
+    md = "| Contents |\n| --- | --- |\n| 3 Related work | 13 |\n"
+    result = _convert_toc_table(md)
+    assert "| --- |" not in result
+    assert "| 3 Related work |" not in result
+
+
+def test_convert_toc_table_german_header():
+    md = (
+        "| Inhaltsverzeichnis |\n"
+        "| --- | --- |\n"
+        "| 1 Einleitung | 1 |\n"
+    )
+    result = _convert_toc_table(md)
+    assert "**Inhaltsverzeichnis**" in result
+    assert "1 Einleitung — 1" in result
+
+
+def test_convert_toc_table_leaves_non_toc_tables_alone():
+    md = "| Column A | Column B |\n| --- | --- |\n| foo | bar |\n"
+    assert _convert_toc_table(md) == md
+
+
+def test_clean_page_converts_toc_table():
+    md = (
+        "| Contents |\n"
+        "| --- | --- |\n"
+        "| 1 Introduction | 1 |\n"
+        "| 2 Background | 3 |\n"
+    )
+    result = clean_page(md)
+    assert "**Contents**" in result
+    assert "1 Introduction — 1" in result
+    assert "|" not in result
+
+
+def test_recover_bare_number_headings_patches_missing_title():
+    md = "## 2.3.4\n\nTensorFlow is an open source library."
+    raw = "2.3.4 Tensorflow as ML Framework\nTensorFlow is an open source library."
+    result = _recover_bare_number_headings(md, raw)
+    assert result == "## 2.3.4 Tensorflow as ML Framework\n\nTensorFlow is an open source library."
+
+
+def test_recover_bare_number_headings_normalises_ligature():
+    md = "## 2.3.4\n\nBody text."
+    raw = "2.3.4 Tensorﬂow as ML Framework\nBody text."
+    result = _recover_bare_number_headings(md, raw)
+    assert "Tensorflow as ML Framework" in result
+    assert "ﬂ" not in result
+
+
+def test_recover_bare_number_headings_no_raw_text_unchanged():
+    md = "## 2.3.4\n\nBody text."
+    assert _recover_bare_number_headings(md, "") == md
+
+
+def test_recover_bare_number_headings_complete_heading_unchanged():
+    md = "## 2.3.3 Scikit-Learn as ML-Framework\n\nBody text."
+    raw = "2.3.3 Scikit-Learn as ML-Framework\nBody text."
+    result = _recover_bare_number_headings(md, raw)
+    assert result == md
+
+
+def test_clean_page_recovers_bare_heading_from_raw_text():
+    md = "## **2.3.4**\n\nTensorFlow is an open source library."
+    raw = "2.3.4 Tensorflow as ML Framework\nTensorFlow is an open source library."
+    result = clean_page(md, raw_page_text=raw)
+    assert "### 2.3.4 Tensorflow as ML Framework" in result
+
+
+def test_postprocess_markdown_strips_page_footer_before_separator():
+    page1 = "<!-- Page 2 -->\n\nSome content here.\n\n2"
+    page2 = "<!-- Page 3 -->\n\nNext page content."
+    md = f"{page1}\n\n---\n\n{page2}"
+    result = postprocess_markdown(md)
+    assert "\n2\n" not in result
+    assert "Some content here." in result
+    assert "Next page content." in result
+
+
+def test_postprocess_markdown_strips_page_footer_at_end():
+    md = "<!-- Page 11 -->\n\nFinal content.\n\n11"
+    result = postprocess_markdown(md)
+    assert result.strip().endswith("Final content.")
+    assert "\n\n11" not in result
+
+
+def test_postprocess_markdown_keeps_numbers_in_content():
+    # A number that is part of actual text (not a lone footer) must be kept.
+    page1 = "<!-- Page 2 -->\n\nThere are 2 approaches.\n\n2"
+    page2 = "<!-- Page 3 -->\n\nNext."
+    md = f"{page1}\n\n---\n\n{page2}"
+    result = postprocess_markdown(md)
+    assert "There are 2 approaches." in result

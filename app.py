@@ -86,6 +86,8 @@ def run(config: Config):
 
             def _convert(i: int) -> str:
                 label = page_labels[i]
+                with fitz.open(config.input) as worker_doc:
+                    raw_text = worker_doc[i].get_text("text")
                 print(f"Converting page {i+1}/{num_pages} (page {label}) to Markdown...")
                 result = text_strategy(
                     base_url=config.base_url,
@@ -97,7 +99,7 @@ def run(config: Config):
                     figures_dir=figures_dir,
                     pre_extracted_markdown=page_markdown[i] if i < len(page_markdown) else "",
                 )
-                return f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
+                return f"<!-- Page {label} -->\n\n{clean_page(result.markdown, raw_page_text=raw_text)}"
 
             cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
 
@@ -164,6 +166,7 @@ def run(config: Config):
                 label = page_labels[i]
                 with fitz.open(config.input) as worker_doc:
                     page = worker_doc[i]
+                    raw_text = page.get_text("text")
                     analysis = analyze_page(page)
                     print(
                         f"Page {i+1}/{num_pages} (page {label}) → "
@@ -191,7 +194,7 @@ def run(config: Config):
                     pre_extracted_markdown=page_markdown[i] if i < len(page_markdown) else None,
                     image_call=partial(image_strategy, llm_call=llm_call),
                 )
-                return f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
+                return f"<!-- Page {label} -->\n\n{clean_page(result.markdown, raw_page_text=raw_text)}"
 
             cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
 
