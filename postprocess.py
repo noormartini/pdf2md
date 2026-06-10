@@ -92,7 +92,7 @@ _STRUCTURAL_KEYWORDS: frozenset[str] = frozenset({
 # row has at least one dash column, and the data rows are | title | page |.
 _TOC_TABLE_RE = re.compile(
     r"^\| (?:Contents|Inhaltsverzeichnis|Table of Contents|Inhalt) \|\n"
-    r"\| [-| ]+\n"
+    r"\|[-| ]+\n"
     r"((?:\| [^\n]+ \|\n?)+)",
     re.MULTILINE | re.IGNORECASE,
 )
@@ -189,7 +189,7 @@ def _demote_unlabeled_single_word_headings(md: str) -> str:
             return f"**{content}**"
         if content.endswith(" :"):
             return f"**{content}**"
-        if len(content) > 80:
+        if len(content) > 80 and hashes != "#":
             return f"**{content}**"
         return m.group(0)
 
@@ -383,18 +383,25 @@ def _merge_split_headings(md: str) -> str:
 
 
 def _strip_bold_from_headings(md: str) -> str:
-    """Remove bold/italic markers from inside heading lines.
+    """Remove redundant bold markers from heading lines, preserving italic.
 
     pymupdf4llm emits lines like '## **Section Title**' when the heading text
-    is also bold in the PDF.  Markdown headings are already visually distinct
-    (larger, heavier) so the bold wrapper is redundant and looks wrong in
-    rendered output.  This pass converts '## **text**' → '## text'.
+    is bold in the PDF — redundant because headings are already visually bold.
+    Bold-italic content like '## _**Bag of Words**_' should keep the italic
+    marker so the formatting intent is preserved: → '## _Bag of Words_'.
+
+    Rules:
+      ***text*** → _text_   (bold-italic: drop bold, keep italic)
+      **text**   → text     (plain bold: drop entirely)
+      __text__   → text     (plain bold with underscores: drop entirely)
+      _text_ and *text* are left untouched (they carry italic meaning).
     """
     def _strip_markers(m: re.Match) -> str:
         hashes = m.group(1)
         content = m.group(2)
-        content = re.sub(r"\*{1,2}(.+?)\*{1,2}", r"\1", content)
-        content = re.sub(r"_{1,2}(.+?)_{1,2}", r"\1", content)
+        content = re.sub(r"\*\*\*(.+?)\*\*\*", r"_\1_", content)
+        content = re.sub(r"\*\*(.+?)\*\*", r"\1", content)
+        content = re.sub(r"__(.+?)__", r"\1", content)
         return f"{hashes} {content.strip()}"
 
     return re.sub(r"^(#{1,6}) (.+)$", _strip_markers, md, flags=re.MULTILINE)

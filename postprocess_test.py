@@ -8,6 +8,7 @@ from postprocess import (
     _fix_ocr_superscripts,
     _reorder_captions_after_images,
     _recover_bare_number_headings,
+    _strip_bold_from_headings,
     _strip_duplicate_section_headers,
     _strip_running_headers,
     _unwrap_symbol_italics,
@@ -400,3 +401,38 @@ def test_postprocess_markdown_keeps_numbers_in_content():
     md = f"{page1}\n\n---\n\n{page2}"
     result = postprocess_markdown(md)
     assert "There are 2 approaches." in result
+
+
+# ── _strip_bold_from_headings ────────────────────────────────────────────────
+
+def test_strip_bold_strips_double_asterisk():
+    assert _strip_bold_from_headings("## **Section Title**") == "## Section Title"
+
+
+def test_strip_bold_strips_double_underscore():
+    assert _strip_bold_from_headings("## __Section Title__") == "## Section Title"
+
+
+def test_strip_bold_preserves_italic_underscore():
+    # pymupdf4llm emits bold-italic headings as "## _**text**_"
+    # After stripping **, the italic _ wrapper must be kept.
+    assert _strip_bold_from_headings("## _**Bag of Words**_") == "## _Bag of Words_"
+
+
+def test_strip_bold_preserves_plain_italic():
+    # Headings that are only italic should not be touched.
+    assert _strip_bold_from_headings("## _Sentiment Analysis_") == "## _Sentiment Analysis_"
+
+
+def test_strip_bold_converts_triple_asterisk_to_italic():
+    # ***text*** means bold-italic; strip bold, keep italic.
+    assert _strip_bold_from_headings("## ***Introduction***") == "## _Introduction_"
+
+
+def test_strip_bold_leaves_plain_heading_unchanged():
+    assert _strip_bold_from_headings("## 2.3 Related Work") == "## 2.3 Related Work"
+
+
+def test_strip_bold_works_on_all_heading_levels():
+    assert _strip_bold_from_headings("# **Title**") == "# Title"
+    assert _strip_bold_from_headings("### **Sub**") == "### Sub"
