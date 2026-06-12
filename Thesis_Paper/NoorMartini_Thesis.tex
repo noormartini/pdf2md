@@ -773,86 +773,79 @@ about text and visual content together.
 
 \subsection{LLM-based Document Understanding}
 
-Large language models with vision capabilities have changed how researchers
-approach document understanding. Rather than building multi-stage pipelines with
-separate layout detection, OCR, and parsing steps, these models read page images
-directly and produce structured output in a single pass.
+Before large language models, document understanding depended on chains of
+specialised tools. Subramani et al.\ \cite{subramani2020} showed that even
+deep-learning OCR broke down on complex layouts, mixed scripts, and
+low-resolution pages. Vision-capable language models changed this: they read a
+rendered page image and produce structured output in a single forward pass,
+with no hand-coded layout rules in between.
 
 Blecher et al.\ \cite{blecher2023} introduced Nougat (Neural Optical
-Understanding for Academic Documents), a Visual Transformer model that converts
-images of PDF pages into a structured markup language. Nougat is trained on
-paired PDF-markup data and can infer semantic structure, including headings,
-equations, tables, and citations, without a separate layout analysis step.
-This showed that a single multimodal model can replace a multi-stage OCR
-pipeline, at least for academic documents.
-Adhikari and Agarwal \cite{adhikari2024} confirmed this in a direct comparison:
-for scientific documents, tools that output structured formats such as Markdown
-or \LaTeX{} outperformed all rule-based parsers, with Nougat specifically
-demonstrating superior performance on these categories.
+Understanding for Academic Documents), a Visual Transformer trained on paired
+PDF-markup data. It infers headings, equations, tables, and citations without a
+separate layout step. Adhikari and Agarwal \cite{adhikari2024} confirmed this in
+a direct comparison: structured-output tools led by Nougat outperformed all
+rule-based parsers on scientific documents. A single multimodal model can replace
+the multi-stage pipeline, at least for academic documents.
 
-Wang et al.\ \cite{wang2024} built on this idea with MinerU, an open-source
-dual-engine system that combines Vision-Language Models and OCR to convert PDFs
-and other document types into structured Markdown and JSON. MinerU supports 109
-languages and detects automatically whether a page is scanned or digitally born,
-routing each page to the appropriate engine. Duan \cite{cassel2025}
-takes this further, showing that end-to-end decoder transformer models outperform
-pipeline-based methods on accuracy metrics and handle diverse document types more
-flexibly.
+Wang et al.\ \cite{wang2024} extended this to a broader class of documents with
+MinerU, an open-source dual-engine system. MinerU detects automatically whether
+each page is scanned or digitally born, routing it to either a Vision-Language
+Model or a classical OCR path. It supports 109 languages and outputs structured
+Markdown or JSON. Duan \cite{cassel2025} pushes the argument further:
+end-to-end decoder transformers outperform pipeline-based systems on accuracy
+because they never pass an incorrect intermediate result down a fixed processing
+chain.
 
-Ding et al.\ \cite{ding2025} survey deep learning approaches for Visually Rich
-Document Content Understanding (VRD-CU), covering documents that combine text,
-layout, and visual elements. Models that integrate all three modalities through
-pretraining consistently outperform text-only approaches. The most recent
-LLM-based architectures, trained with instruction tuning, achieve cross-modal
-reasoning that earlier models could not. But the survey also identifies
-persistent gaps: fine-grained word-level representations miss higher-level
-semantic structure, and multi-page documents with mixed visual and textual
-content remain an open challenge. For this thesis, this means a vision LLM can
-handle pages where text extraction alone fails, but no current model covers all
-content types reliably.
+Ding et al.\ \cite{ding2025} survey Visually Rich Document Content Understanding
+(VRD-CU), covering documents that combine text, layout, and visual elements.
+Models pretrained across all three modalities consistently outperform text-only
+approaches. Instruction-tuned LLM architectures now achieve cross-modal reasoning
+that earlier models could not. Persistent gaps remain: word-level representations
+miss document-level semantic structure, and multi-page documents with mixed
+content are still an open challenge.
+
+No current model covers all content types reliably. This gap motivates the
+image-based strategy in this thesis, where rendered page images are passed to a
+multimodal LLM and a postprocessing pipeline corrects structural failures in the
+output.
 
 \subsection{Evaluation Methods for Document Conversion}
 
 Evaluating document conversion is harder than evaluating plain text extraction.
 The output combines headings, paragraphs, tables, formulas, and figures, and each
-element type can fail in different ways. Early studies used string-similarity
-metrics: edit distance (Levenshtein similarity) and BLEU score compare the
-extracted text against a reference string, token by token or character by
-character \cite{adhikari2024}. Adhikari and Agarwal \cite{adhikari2024} added
-local alignment as a third metric alongside these two. Local alignment allows
-gaps between matched segments, so it detects word-order errors, such as merged
-columns or reversed reading order, that BLEU misses because BLEU counts
-matching n-grams regardless of position. These metrics are easy to compute and
-well understood in NLP, but they still treat the full output as a flat sequence. A table
-with one column shifted will receive a low Levenshtein score even though nearly
-all the content is correct.
+element type can fail in a different way. Early work used string-similarity
+metrics: BLEU score and edit distance (Levenshtein similarity) both compare
+extracted text against a reference string, character by character
+\cite{adhikari2024}. Adhikari and Agarwal \cite{adhikari2024} added local
+alignment as a third metric, which allows gaps between matched segments and
+catches word-order errors, such as merged columns or reversed reading order, that
+BLEU misses.
 
-For table evaluation, TEDS (Tree Edit Distance based Similarity) is a widely used
-alternative. It compares the tree structure of a predicted table against a
-reference and gives partial credit when individual cells are correct even if the
-overall structure differs. Zhang et al.\ \cite{parsing2024} survey the range of
-metrics across document parsing sub-tasks and find that no single metric covers
-all content types. Layout analysis uses mean Average Precision (mAP), text
-extraction uses character- or token-level edit metrics, and table evaluation uses
-TEDS or similar structural measures.
+All three metrics treat the full output as a flat sequence. A table with one
+column shifted receives a low Levenshtein score even when nearly all the content
+is correct. TEDS (Tree Edit Distance based Similarity) addresses this for tables:
+it compares the predicted tree structure against a reference and gives partial
+credit when individual cells are right even if the overall structure differs.
+Zhang et al.\ \cite{parsing2024} survey metrics across document parsing
+sub-tasks and conclude that no single metric covers all content types, with layout
+analysis using mean Average Precision (mAP), text extraction using edit metrics,
+and table evaluation using TEDS.
 
-The deeper problem is that text similarity scores can be high even when the
-parsed output is not usable. A parser may produce text that looks close to the
-reference under BLEU or edit distance but has a misaligned table header or a
-dropped superscript that would cause a downstream process to fail. Zhang et al.\
-\cite{parsebench2026} make this case clearly. Their ParseBench framework evaluates parsers across five separate dimensions,
-each with its own scoring method: table structure, chart data extraction, content
-faithfulness, semantic formatting, and visual grounding. Across 14 parsers, no system performed well on all
-five dimensions, showing that aggregate text-similarity scores hide capability
-gaps that dimension-specific evaluation reveals.
+Aggregate text-similarity scores hide capability gaps. A parser may score well
+under BLEU or edit distance but have a misaligned table header or a dropped
+superscript that breaks any downstream process. Zhang et al.\
+\cite{parsebench2026} tested 14 parsers in ParseBench across five capability
+dimensions: table structure, chart data extraction, content faithfulness, semantic
+formatting, and visual grounding. No system performed well on all five, confirming
+that a single aggregate score cannot capture document parsing quality.
 
-For conversion to Markdown specifically, N-gram metrics such as BLEU and ROUGE
-carry an additional limitation: they do not account for Markdown syntax. A heading
-written with a \texttt{\#} prefix and the same text written as bold have
-near-identical character content but very different semantic meaning in the
-rendered document. The evaluation approach used in Chapter 4 accounts for this by
-measuring structural, content, and formatting dimensions separately rather than
-collapsing everything into a single score.
+For conversion to Markdown specifically, N-gram metrics carry an additional
+limitation: they ignore syntax. A heading marked with \texttt{\#} and the same
+text written as bold have near-identical character content but different semantic
+meaning in the rendered document. This is why the evaluation in Chapter 4 scores
+structural, content, and formatting dimensions separately rather than collapsing
+them into one number.
 
 % ================================================================
 \section{Methodology}
@@ -861,12 +854,34 @@ collapsing everything into a single score.
 This chapter describes the research design, dataset preparation, evaluation metrics, and experimental setup used to compare the four extraction strategies examined in this thesis.
 
 \subsection{Research Design}
-\begin{itemize}
-    \item Comparative Study Framework
-    \item Research Questions Mapping
-\end{itemize}
 
-The choice of Markdown as the target output format is a deliberate design decision justified by its properties relative to the alternatives. Table~\ref{tab:format_comparison} compares PDF, Word, and Markdown across eight key criteria relevant to automated document processing.
+This thesis uses a comparative study to evaluate four PDF extraction strategies
+against a shared test corpus and scoring framework. The comparative approach is
+standard for PDF parsing research. Adhikari and Agarwal \cite{adhikari2024}
+applied it to benchmark seven tools across five document categories. Ingemarsson
+and Persson \cite{ingemarsson2024} used the same design to rank model families
+by accuracy and computational cost. Using a shared methodology means the results
+sit alongside that published work rather than in isolation.
+
+The four strategies are text-only, image-only, hybrid, and adaptive. The first
+three are fixed: every page goes through the same pathway regardless of content
+type. The adaptive system classifies each page first, then routes it to the
+appropriate extraction method. This is the only design that can skip the LLM
+entirely on plain-text pages. That is what RQ3 tests.
+
+The five research questions each target a different aspect of this comparison.
+RQ1 and RQ2 compare accuracy across all four strategies: RQ1 asks whether the
+adaptive system beats every fixed strategy, and RQ2 asks how the fixed
+strategies rank against each other across document categories. RQ3 covers
+efficiency: processing time, token usage, and LLM call count per strategy. RQ4
+drives the metric design in Section~4.3. RQ5 checks whether the strategy
+rankings stay consistent across all four document categories.
+
+Markdown is the target output format for all strategies. Unlike PDF or Word, it
+stores structure in plain text, requires no proprietary software to read, and
+works directly with LLM and RAG systems \cite{cone2019, khan2024}.
+Table~\ref{tab:format_comparison} compares all three formats across eight
+properties.
 
 \begin{table}[h!]
 \centering
@@ -890,11 +905,36 @@ Long-term archival stability & High & Moderate & \textbf{High} \\
 \end{table}
 
 \subsection{Dataset and Ground Truth Preparation}
-\begin{itemize}
-    \item Document Selection Criteria
-    \item Document Categories and Characteristics
-    \item Ground Truth Creation Process
-\end{itemize}
+
+The test corpus covers four document categories: academic papers, administrative
+forms, presentation slides, and scanned archival documents. Each category
+exercises a different aspect of the extraction problem. Academic papers stress
+formula recognition, citation handling, and multi-column layout. Administrative
+forms test table reconstruction and field alignment. Presentation slides mix
+figures, bullet lists, and short text blocks on the same page. Scanned archival
+documents test whether the system handles pages with no native text layer.
+
+Documents were drawn from real sources rather than synthetic benchmarks.
+Adhikari and Agarwal \cite{adhikari2024} found that tool performance varies
+significantly by document type, which is why the corpus was built to include
+both straightforward and structurally complex examples within each category.
+The documents are primarily in German, with a subset in English, reflecting the
+intended usage context. Each selected document contains at least one
+structurally challenging page: a formula-heavy spread, a merged-cell table, a
+figure-dense slide, or a degraded scan. The final corpus consists of
+\textit{[N]}\,documents and \textit{[M]}\,pages across the four
+categories.\footnote{\textit{Work in progress: the test corpus is not yet
+finalised. Document and page counts will be updated before final submission.}}
+
+Each test document has a corresponding reference Markdown file, created by
+hand. Each reference captures the full document structure: heading hierarchy,
+paragraph flow, table cells, list nesting, and code blocks where present.
+Pfitzmann et al.\ \cite{pfitzmann2022} argue that human-created annotation is
+the only reliable baseline for evaluating document parsing tools, because
+automated references embed the same systematic errors as the tools being
+tested. Creating the reference by hand ensures that the evaluation measures
+real output quality rather than agreement between two imperfect automated
+systems.
 
 \subsection{Evaluation Metrics}
 \begin{itemize}
@@ -1071,11 +1111,14 @@ the body text size and promote larger spans to Markdown heading levels H1--H3.
 \newpage
 \begin{thebibliography}{99}
 
-\bibitem{zhu2022}
-Zhu, W., Sokhandan, N., Yang, G., Martin, S., \& Sathyanarayana, S. (2022).
-DocBed: A multi-stage OCR solution for documents with complex layouts.
-In \textit{Proceedings of the Thirty-Sixth AAAI Conference on Artificial
-Intelligence (AAAI-22)}, pp.\ 12643--12649. AAAI Press.
+% ---------------------------------------------------------------
+% Chapter 2: Background and Fundamentals
+% ---------------------------------------------------------------
+
+\bibitem{whitington2012}
+Whitington, J. (2012).
+\textit{PDF Explained: The ISO Standard for Document Exchange}.
+O'Reilly Media.
 
 \bibitem{darvishy2018}
 Darvishy, A. (2018).
@@ -1092,35 +1135,6 @@ In \textit{Proceedings of the 11th Annual International ACM/IEEE Joint
 Conference on Digital Libraries (JCDL 2011)}, pp.\ 11--20. ACM.
 \url{https://dl.acm.org/doi/10.1145/1998076.1998079}
 
-\bibitem{whitington2012}
-Whitington, J. (2012).
-\textit{PDF Explained: The ISO Standard for Document Exchange}.
-O'Reilly Media.
-
-\bibitem{subramani2020}
-Subramani, N., Matton, A., Greaves, M., \& Lam, A. (2020).
-A survey of deep learning approaches for OCR and document understanding.
-\textit{arXiv preprint arXiv:2011.13534}.
-\url{https://arxiv.org/abs/2011.13534}
-
-\bibitem{blecher2023}
-Blecher, L., Cucurull, G., Scialom, T., \& Stojnic, R. (2023).
-Nougat: Neural Optical Understanding for Academic Documents.
-\textit{arXiv preprint arXiv:2308.13418}.
-\url{https://arxiv.org/abs/2308.13418}
-
-\bibitem{cassel2025}
-Duan, C. (2025).
-Accelerating end-to-end PDF to Markdown conversion through assisted generation.
-\textit{arXiv preprint arXiv:2512.18122}.
-\url{https://arxiv.org/abs/2512.18122}
-
-\bibitem{wang2024}
-Wang, B., et al. (2024).
-MinerU: An open-source solution for precise document content extraction.
-\textit{arXiv preprint arXiv:2409.18839}.
-\url{https://arxiv.org/abs/2409.18839}
-
 \bibitem{smith2007}
 Smith, R. (2007).
 An overview of the Tesseract OCR engine.
@@ -1128,11 +1142,32 @@ In \textit{Proceedings of the Ninth International Conference on Document
 Analysis and Recognition (ICDAR 2007)}, vol.\ 2, pp.\ 629--633. IEEE.
 \url{https://doi.org/10.1109/ICDAR.2007.4376991}
 
-\bibitem{adhikari2024}
-Adhikari, N.S., \& Agarwal, S. (2024).
-A comparative study of PDF parsing tools across diverse document categories.
-\textit{arXiv preprint arXiv:2410.09871}.
-\url{https://arxiv.org/abs/2410.09871}
+\bibitem{cone2019}
+Cone, M. (2019).
+\textit{The Markdown Guide}.
+Available at: \url{https://www.markdownguide.org}
+
+% ---------------------------------------------------------------
+% Chapter 3: Related Work
+% -- Sections 3.1--3.2: Traditional and Modern Document Parsing --
+% ---------------------------------------------------------------
+
+\bibitem{subramani2020}
+Subramani, N., Matton, A., Greaves, M., \& Lam, A. (2020).
+A survey of deep learning approaches for OCR and document understanding.
+\textit{arXiv preprint arXiv:2011.13534}.
+\url{https://arxiv.org/abs/2011.13534}
+
+\bibitem{zhu2022}
+Zhu, W., Sokhandan, N., Yang, G., Martin, S., \& Sathyanarayana, S. (2022).
+DocBed: A multi-stage OCR solution for documents with complex layouts.
+In \textit{Proceedings of the Thirty-Sixth AAAI Conference on Artificial
+Intelligence (AAAI-22)}, pp.\ 12643--12649. AAAI Press.
+
+\bibitem{ingemarsson2024}
+Ingemarsson, P., \& Persson, D. (2024).
+PDF Parsing, Unveiling the Most Efficient Method.
+Engineering Degree Project, Linnaeus University.
 
 \bibitem{parsing2024}
 Zhang, Q., et al. (2024).
@@ -1140,42 +1175,6 @@ Document parsing unveiled: Techniques, challenges, and prospects for structured
 information extraction.
 \textit{arXiv preprint arXiv:2410.21169}.
 \url{https://arxiv.org/abs/2410.21169}
-
-\bibitem{parsebench2026}
-Zhang, B., et al. (2026).
-ParseBench: A document parsing benchmark for AI agents.
-\textit{arXiv preprint arXiv:2604.08538}.
-\url{https://arxiv.org/abs/2604.08538}
-
-\bibitem{khan2024}
-Khan, A.A., et al. (2024).
-Developing retrieval augmented generation (RAG) based LLM systems from PDFs:
-An experience report.
-\textit{arXiv preprint arXiv:2410.15944}.
-\url{https://arxiv.org/abs/2410.15944}
-
-\bibitem{cone2019}
-Cone, M. (2019).
-\textit{The Markdown Guide}.
-Available at: \url{https://www.markdownguide.org}
-
-\bibitem{cheng2024}
-Cheng, N., Yan, Z., Wang, Z., Li, Z., Yu, J., Zheng, Z., Tu, K., Xu, J., \& Han, W. (2024).
-Potential and limitations of LLMs in capturing structured semantics: A case study on SRL.
-In \textit{Proceedings of the 20th International Conference on Advanced Intelligent Computing
-Technology and Applications (ICIC 2024)}, LNAI vol.\ 14867, pp.\ 50--61. Springer.
-\url{https://doi.org/10.1007/978-981-97-5663-6_5}
-
-\bibitem{ingemarsson2024}
-Ingemarsson, P., \& Persson, D. (2024).
-PDF Parsing, Unveiling the Most Efficient Method.
-Engineering Degree Project, Linnaeus University.
-
-\bibitem{ding2025}
-Ding, Y., Han, S.C., Lee, J., \& Hovy, E. (2025).
-Deep learning based visually rich document content understanding: A survey.
-\textit{arXiv preprint arXiv:2408.01287}.
-\url{https://arxiv.org/abs/2408.01287}
 
 \bibitem{gotocr2024}
 Wei, H., Liu, C., Chen, J., Wang, J., Kong, L., Xu, Y., Ge, Z., Zhao, L.,
@@ -1190,6 +1189,76 @@ PDF-WuKong: A large multimodal model for efficient long PDF reading with
 end-to-end sparse sampling.
 \textit{International Journal of Computer Vision} (accepted 2026).
 \url{https://arxiv.org/abs/2410.05970}
+
+\bibitem{parsebench2026}
+Zhang, B., et al. (2026).
+ParseBench: A document parsing benchmark for AI agents.
+\textit{arXiv preprint arXiv:2604.08538}.
+\url{https://arxiv.org/abs/2604.08538}
+
+% -- Section 3.3: LLM-based Document Understanding --
+
+\bibitem{blecher2023}
+Blecher, L., Cucurull, G., Scialom, T., \& Stojnic, R. (2023).
+Nougat: Neural Optical Understanding for Academic Documents.
+\textit{arXiv preprint arXiv:2308.13418}.
+\url{https://arxiv.org/abs/2308.13418}
+
+\bibitem{adhikari2024}
+Adhikari, N.S., \& Agarwal, S. (2024).
+A comparative study of PDF parsing tools across diverse document categories.
+\textit{arXiv preprint arXiv:2410.09871}.
+\url{https://arxiv.org/abs/2410.09871}
+
+\bibitem{wang2024}
+Wang, B., et al. (2024).
+MinerU: An open-source solution for precise document content extraction.
+\textit{arXiv preprint arXiv:2409.18839}.
+\url{https://arxiv.org/abs/2409.18839}
+
+\bibitem{cassel2025}
+Duan, C. (2025).
+Accelerating end-to-end PDF to Markdown conversion through assisted generation.
+\textit{arXiv preprint arXiv:2512.18122}.
+\url{https://arxiv.org/abs/2512.18122}
+
+\bibitem{ding2025}
+Ding, Y., Han, S.C., Lee, J., \& Hovy, E. (2025).
+Deep learning based visually rich document content understanding: A survey.
+\textit{arXiv preprint arXiv:2408.01287}.
+\url{https://arxiv.org/abs/2408.01287}
+
+% -- Section 3.4: Evaluation Methods --
+
+\bibitem{papineni2002}
+Papineni, K., Roukos, S., Ward, T., \& Zhu, W. (2002).
+BLEU: A method for automatic evaluation of machine translation.
+In \textit{Proceedings of the 40th Annual Meeting of the Association for
+Computational Linguistics (ACL 2002)}, pp.\ 311--318. ACL.
+
+\bibitem{zhong2020}
+Zhong, X., ShafieiBavani, E., \& Jimeno Yepes, A. (2020).
+Image-based table recognition: Data, model, and evaluation.
+\textit{arXiv preprint arXiv:1911.10683}.
+\url{https://arxiv.org/abs/1911.10683}
+
+% ---------------------------------------------------------------
+% Chapter 4: Methodology
+% ---------------------------------------------------------------
+
+\bibitem{khan2024}
+Khan, A.A., et al. (2024).
+Developing retrieval augmented generation (RAG) based LLM systems from PDFs:
+An experience report.
+\textit{arXiv preprint arXiv:2410.15944}.
+\url{https://arxiv.org/abs/2410.15944}
+
+\bibitem{pfitzmann2022}
+Pfitzmann, B., Auer, C., Dolfi, M., Nassar, A.S., \& Staar, P. (2022).
+DocLayNet: A large human-annotated dataset for document-layout analysis.
+In \textit{Proceedings of the 28th ACM SIGKDD Conference on Knowledge
+Discovery and Data Mining (KDD 2022)}, pp.\ 3743--3751. ACM.
+\url{https://doi.org/10.1145/3534678.3539043}
 
 \end{thebibliography}
 

@@ -3,15 +3,19 @@ from postprocess import (
     postprocess_markdown,
     _clean_toc_dot_leaders,
     _demote_outline_chapter_refs,
+    _demote_title_page_headings,
     _demote_unlabeled_single_word_headings,
     _format_figure_captions,
     _fix_ocr_superscripts,
+    _merge_kapitel_headings,
     _normalise_latex_delimiters,
     _reorder_captions_after_images,
     _recover_bare_number_headings,
     _strip_bibliography_dash,
     _strip_bold_from_headings,
     _strip_duplicate_section_headers,
+    _strip_mid_doc_page_numbers,
+    _strip_mid_doc_running_headers,
     _strip_running_headers,
     _unwrap_symbol_italics,
 )
@@ -528,3 +532,173 @@ def test_postprocess_markdown_normalises_latex():
     result = postprocess_markdown(md)
     assert r"\(" not in result
     assert "$o_j = F(\\varphi_j)$" in result
+
+
+# ── _demote_title_page_headings ───────────────────────────────────────────────
+
+def test_demote_title_page_headings_basic():
+    md = (
+        "# My Thesis Title\n\n"
+        "## Author Name\n\n"
+        "## 14.08.2025\n\n"
+        "## Abstrakt\n\n"
+        "Some abstract text.\n"
+    )
+    result = _demote_title_page_headings(md)
+    assert "## Author Name" not in result
+    assert "Author Name" in result
+    assert "## 14.08.2025" not in result
+    assert "14.08.2025" in result
+    assert "## Abstrakt" in result  # structural section kept
+
+
+def test_demote_title_page_headings_keeps_h1_title():
+    md = (
+        "# The Title\n\n"
+        "## Some Metadata\n\n"
+        "## Erklärung\n\n"
+        "Declaration text.\n"
+    )
+    result = _demote_title_page_headings(md)
+    assert "# The Title" in result
+    assert "## Some Metadata" not in result
+    assert "## Erklärung" in result
+
+
+def test_demote_title_page_headings_no_structural_section_unchanged():
+    md = "# Title\n\n## Section One\n\nSome text.\n"
+    assert _demote_title_page_headings(md) == md
+
+
+def test_postprocess_markdown_strips_bold_from_headings():
+    # No front-matter boundary present, so no title-page demotion fires.
+    md = "## **Section Title**\n\nSome text.\n"
+    result = postprocess_markdown(md)
+    assert "## **Section Title**" not in result
+    assert "## Section Title" in result
+
+
+# ── _merge_kapitel_headings ───────────────────────────────────────────────────
+
+def test_merge_kapitel_headings_basic():
+    md = "## Kapitel 1\n\n## Einleitung\n\n## 1.1 Background\n"
+    result = _merge_kapitel_headings(md)
+    assert "## Kapitel 1" not in result
+    assert "# 1 Einleitung" in result
+    assert "## 1.1 Background" in result
+
+
+def test_merge_kapitel_headings_multiple_chapters():
+    md = (
+        "## Kapitel 1\n\n## Introduction\n\nText.\n\n"
+        "## Kapitel 2\n\n## Background\n\nText.\n"
+    )
+    result = _merge_kapitel_headings(md)
+    assert "# 1 Introduction" in result
+    assert "# 2 Background" in result
+    assert "## Kapitel" not in result
+
+
+def test_merge_kapitel_headings_no_following_heading_drops_line():
+    md = "## Kapitel 3\n\nSome plain text.\n"
+    result = _merge_kapitel_headings(md)
+    assert "## Kapitel 3" not in result
+    assert "Some plain text." in result
+
+
+def test_postprocess_markdown_merges_kapitel_headings():
+    md = "## **Kapitel 2**\n\n## **Grundlagen**\n\n## **2.1 Basics**\n"
+    result = postprocess_markdown(md)
+    assert "# 2 Grundlagen" in result
+    assert "## 2.1 Basics" in result
+    assert "Kapitel" not in result
+
+
+# ── _strip_mid_doc_page_numbers ───────────────────────────────────────────────
+
+def test_strip_mid_doc_page_numbers_removes_lone_number():
+    md = "Some text.\n\n3\n\nMore text.\n"
+    result = _strip_mid_doc_page_numbers(md)
+    assert "\n\n3\n\n" not in result
+    assert "Some text." in result
+    assert "More text." in result
+
+
+def test_strip_mid_doc_page_numbers_removes_number_with_space():
+    md = "End of para.\n\n12 \n\nNext para.\n"
+    result = _strip_mid_doc_page_numbers(md)
+    assert "12" not in result
+
+
+def test_strip_mid_doc_page_numbers_leaves_inline_numbers():
+    md = "There are 3 items listed here.\n"
+    assert _strip_mid_doc_page_numbers(md) == md
+
+
+def test_strip_mid_doc_page_numbers_removes_roman_numeral_v():
+    md = "End of section.\n\nv\n\nNext chapter.\n"
+    result = _strip_mid_doc_page_numbers(md)
+    assert "\n\nv\n\n" not in result
+    assert "End of section." in result
+    assert "Next chapter." in result
+
+
+def test_strip_mid_doc_page_numbers_removes_roman_numeral_vi():
+    md = "Some text.\n\nvi\n\nMore text.\n"
+    result = _strip_mid_doc_page_numbers(md)
+    assert "vi" not in result
+
+
+def test_strip_mid_doc_page_numbers_leaves_inline_roman():
+    # Roman numeral not isolated — leave alone.
+    md = "Section vi is discussed in chapter v of the document.\n"
+    assert _strip_mid_doc_page_numbers(md) == md
+
+
+# ── _strip_mid_doc_running_headers ────────────────────────────────────────────
+
+def test_strip_mid_doc_running_headers_removes_kapitel_line():
+    md = "Body text.\n\nKapitel 2 Theoretische Grundlagen\n\nMore body.\n"
+    result = _strip_mid_doc_running_headers(md)
+    assert "Kapitel 2 Theoretische Grundlagen" not in result
+    assert "Body text." in result
+    assert "More body." in result
+
+
+def test_strip_mid_doc_running_headers_removes_numbered_section():
+    md = "Para one.\n\n2.1 Reinforcement Learning\n\nPara two.\n"
+    result = _strip_mid_doc_running_headers(md)
+    assert "2.1 Reinforcement Learning" not in result
+
+
+def test_strip_mid_doc_running_headers_keeps_heading_lines():
+    md = "## 2.1 Reinforcement Learning\n\nPara.\n"
+    assert _strip_mid_doc_running_headers(md) == md
+
+
+def test_strip_mid_doc_running_headers_keeps_non_isolated_line():
+    # Not surrounded by blank lines — leave it alone.
+    md = "Some text.\n2.1 Something Capital\nMore text.\n"
+    result = _strip_mid_doc_running_headers(md)
+    assert "2.1 Something Capital" in result
+
+
+def test_strip_mid_doc_running_headers_removes_inhaltsverzeichnis():
+    # TOC continuation page header appearing as plain text.
+    md = "Last toc entry.\n\nInhaltsverzeichnis\n\nNext toc entry.\n"
+    result = _strip_mid_doc_running_headers(md)
+    assert "Inhaltsverzeichnis" not in result
+    assert "Last toc entry." in result
+    assert "Next toc entry." in result
+
+
+def test_strip_mid_doc_running_headers_removes_abstract_header():
+    md = "Some para.\n\nAbstrakt\n\nNext para.\n"
+    result = _strip_mid_doc_running_headers(md)
+    assert "Abstrakt" not in result
+
+
+def test_strip_mid_doc_running_headers_keeps_non_isolated_front_matter():
+    # Embedded in a sentence — not a running header.
+    md = "See the Inhaltsverzeichnis for details.\n"
+    assert _strip_mid_doc_running_headers(md) == md

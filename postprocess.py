@@ -510,6 +510,99 @@ def clean_page(md: str, raw_page_text: str = "") -> str:
     return md.strip()
 
 
+_FRONT_MATTER_SECTIONS: frozenset[str] = frozenset({
+    "erklärung", "declaration",
+    "abstrakt", "abstract",
+    "inhaltsverzeichnis", "table of contents", "contents",
+    "vorwort", "preface",
+    "zusammenfassung", "summary",
+    "danksagung", "acknowledgements", "acknowledgments",
+})
+
+_KAPITEL_RE = re.compile(r"^##\s+Kapitel\s+(\d+)\s*$", re.IGNORECASE)
+
+
+def _demote_title_page_headings(md: str) -> str:
+    """Demote title-page metadata lines that pymupdf4llm promotes to headings.
+
+    The title page spans from the start of the document to the first structural
+    front-matter section (Erklärung, Abstrakt, Inhaltsverzeichnis, …).  Within
+    that zone every H2+ heading is really a styled label — author name, date,
+    institution, document type — and should be plain text, not a heading.
+
+    The document title itself (first H1 in the zone) is kept as-is.
+    """
+    lines = md.split("\n")
+
+    # Find the line index of the first structural front-matter heading.
+    title_page_end = len(lines)
+    for i, line in enumerate(lines):
+        m = re.match(r"^#{1,6}\s+(.+)$", line)
+        if m:
+            title = m.group(1).strip().lower()
+            if title in _FRONT_MATTER_SECTIONS:
+                title_page_end = i
+                break
+
+    if title_page_end == len(lines):
+        return md  # no structural section found — leave untouched
+
+    result = []
+    found_h1 = False
+    for i, line in enumerate(lines):
+        if i >= title_page_end:
+            result.append(line)
+            continue
+        m = re.match(r"^(#{1,6})\s+(.+)$", line)
+        if m:
+            level = len(m.group(1))
+            if level == 1 and not found_h1:
+                found_h1 = True
+                result.append(line)  # keep document title
+            elif level >= 2:
+                content = m.group(2).strip().rstrip(": ")
+                result.append(content)  # demote to plain text
+            else:
+                result.append(line)
+        else:
+            result.append(line)
+    return "\n".join(result)
+
+
+def _merge_kapitel_headings(md: str) -> str:
+    """Merge German chapter-separator headings with the chapter title.
+
+    PDF chapter cover pages produce two consecutive headings:
+        ## Kapitel 1
+        ## Einleitung
+    These should become a single top-level heading:
+        # 1 Einleitung
+    """
+    lines = md.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        m = _KAPITEL_RE.match(lines[i])
+        if m:
+            chapter_num = m.group(1)
+            # Find the next non-blank line.
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines):
+                m2 = re.match(r"^#{1,6}\s+(.+)$", lines[j])
+                if m2:
+                    result.append(f"# {chapter_num} {m2.group(1).strip()}")
+                    i = j + 1
+                    continue
+            # No following heading — just drop the Kapitel line.
+            i += 1
+            continue
+        result.append(lines[i])
+        i += 1
+    return "\n".join(result)
+
+
 def _strip_duplicate_section_headers(md: str) -> str:
     """Remove heading duplicates produced by PDF running headers.
 
@@ -603,6 +696,53 @@ def _strip_bibliography_dash(md: str) -> str:
     )
 
 
+def _strip_mid_doc_page_numbers(md: str) -> str:
+    """Remove lone page-footer numbers that appear mid-document.
+
+    pymupdf4llm sometimes extracts PDF page-footer numbers as isolated
+    paragraphs in the middle of the document (not just before a page-break
+    separator).  A paragraph consisting solely of 1–3 digits is almost always
+    a page number artefact, not body content.
+    """
+    # Lone Arabic number between two blank lines (middle of document).
+    md = re.sub(r"\n\n\d{1,3} ?\n\n", "\n\n", md)
+    # Lone Roman numeral page number (i–xiii range covers all typical front-matter).
+    md = re.sub(r"\n\n[ivxIVX]{1,8} ?\n\n", "\n\n", md)
+    return md
+
+
+def _strip_mid_doc_running_headers(md: str) -> str:
+    """Remove plain-text running headers that appear mid-document.
+
+    PDF page headers (Kopfzeilen) repeat the current chapter or section title
+    at the top of every page.  pymupdf4llm extracts these as standalone plain-
+    text paragraphs, e.g. "Kapitel 2 Theoretische Grundlagen" or "4.1 Setup".
+    They are surrounded by blank lines and carry no new information.
+    """
+    lines = md.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].strip()
+        if (
+            stripped
+            and stripped[0] not in ("#", "-", "*", ">", "!", "[", "|", "`", "_")
+            and not stripped.startswith("**")
+            and (
+                _RUNNING_HEADER_RE.match(stripped)
+                or stripped.lower() in _FRONT_MATTER_SECTIONS
+            )
+        ):
+            prev_blank = i == 0 or not lines[i - 1].strip()
+            next_blank = i == len(lines) - 1 or not lines[i + 1].strip()
+            if prev_blank and next_blank:
+                i += 1
+                continue
+        result.append(lines[i])
+        i += 1
+    return "\n".join(result)
+
+
 def _normalise_latex_delimiters(md: str) -> str:
     """Unify LaTeX math delimiters to the $ / $$ style.
 
@@ -621,13 +761,17 @@ def _normalise_latex_delimiters(md: str) -> str:
 def postprocess_markdown(md: str) -> str:
     """Final cleanup applied to the fully joined Markdown document."""
     md = md.replace("\r\n", "\n").replace("\r", "\n")
+    md = _strip_bold_from_headings(md)
+    md = _demote_title_page_headings(md)
+    md = _merge_kapitel_headings(md)
     md = _strip_duplicate_section_headers(md)
     md = _strip_bibliography_dash(md)
     md = _normalise_latex_delimiters(md)
 
-    # Remove PDF page-footer numbers that pymupdf4llm extracts as lone lines.
-    # They appear as a bare 1–3 digit number at the end of each page chunk,
-    # just before the "---" page separator or at the end of the document.
+    md = _strip_mid_doc_page_numbers(md)
+    md = _strip_mid_doc_running_headers(md)
+
+    # Remove PDF page-footer numbers before page-break separators or at end.
     md = re.sub(r"\n\n(\d{1,3})\n\n---", "\n\n---", md)
     md = re.sub(r"\n\n(\d{1,3})\s*$", "", md)
 
