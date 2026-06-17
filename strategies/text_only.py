@@ -58,7 +58,7 @@ def text_strategy(
 
     if llm_call is None:
         elapsed_ms = (time.perf_counter() - start) * 1000
-        return ConversionResult(markdown=raw_markdown, timing_ms=elapsed_ms, token_usage=None)
+        return ConversionResult(markdown=raw_markdown, timing_ms=elapsed_ms, token_usage=0, llm_calls=0)
 
     prompt = PROMPTS.get(prompt_variant, PROMPTS["text"])
     messages = [
@@ -67,4 +67,4 @@ def text_strategy(
     ]
     response, token_usage = llm_call(base_url, model_name, messages, temperature, max_tokens)
     elapsed_ms = (time.perf_counter() - start) * 1000
-    return ConversionResult(markdown=response, timing_ms=elapsed_ms, token_usage=token_usage)
+    return ConversionResult(markdown=response, timing_ms=elapsed_ms, token_usage=token_usage, llm_calls=1)

@@ -283,6 +283,7 @@ def run_combinations(
 
                         timing_ms = result.timing_ms if result else 0.0
                         token_usage = result.token_usage if result else None
+                        llm_calls = result.llm_calls if result else 0
                         markdown = result.markdown if result else ""
 
                         if error:
@@ -302,6 +303,7 @@ def run_combinations(
                             token_usage=token_usage,
                             error=error,
                             category=category,
+                            llm_calls=llm_calls,
                         )
                         results.append(eval_result)
 

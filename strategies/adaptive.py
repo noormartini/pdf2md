@@ -172,7 +172,7 @@ def adaptive_strategy(
         ConversionResult for this page.
     """
     if page_type == PageType.EMPTY:
-        return ConversionResult(markdown="*[Empty page — skipped]*", timing_ms=0.0, token_usage=None)
+        return ConversionResult(markdown="*[Empty page — skipped]*", timing_ms=0.0, token_usage=0, llm_calls=0)
 
     if page_type == PageType.TEXT:
         # TEXT pages have no images and no formulas (per analyze_page), so

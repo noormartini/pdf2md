@@ -28,6 +28,7 @@ class EvaluationResult:
     token_usage: Optional[int] = None
     error: Optional[str] = None
     category: Optional[str] = None
+    llm_calls: int = 0
 
 
 def text_similarity(reference: str, candidate: str) -> float:
@@ -235,6 +236,7 @@ def evaluate_conversion(
     token_usage: Optional[int] = None,
     error: Optional[str] = None,
     category: Optional[str] = None,
+    llm_calls: int = 0,
 ) -> EvaluationResult:
     """
     Evaluate a single conversion against a reference.
@@ -261,6 +263,7 @@ def evaluate_conversion(
             token_usage=token_usage,
             error=error,
             category=category,
+            llm_calls=llm_calls,
         )
 
     metrics = {
@@ -283,6 +286,7 @@ def evaluate_conversion(
         timing_ms=timing_ms,
         token_usage=token_usage,
         category=category,
+        llm_calls=llm_calls,
     )
 
 
@@ -321,6 +325,8 @@ def aggregate_results(results: list[EvaluationResult]) -> dict:
         by_strategy[strategy] = {
             "count": len(strat_results),
             "avg_timing_ms": sum(r.timing_ms for r in strat_results) / len(strat_results),
+            "total_llm_calls": sum(r.llm_calls for r in strat_results),
+            "avg_llm_calls": sum(r.llm_calls for r in strat_results) / len(strat_results),
             "metrics": {
                 metric: sum(r.metrics[metric] for r in strat_results) / len(strat_results)
                 for metric in metric_names
