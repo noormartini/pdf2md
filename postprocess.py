@@ -519,7 +519,71 @@ _FRONT_MATTER_SECTIONS: frozenset[str] = frozenset({
     "danksagung", "acknowledgements", "acknowledgments",
 })
 
-_KAPITEL_RE = re.compile(r"^##\s+Kapitel\s+(\d+)\s*$", re.IGNORECASE)
+_KAPITEL_RE = re.compile(r"^##\s+(?:Kapitel|Chapter)\s+(\d+)\s*$", re.IGNORECASE)
+
+# Heading whose entire content is a single italic span — almost always a
+# styled subtitle or repeated title, not a real section heading.
+_FULLY_ITALIC_HEADING_RE = re.compile(
+    r"^#{1,6}\s+(_[^_\n]+_)\s*$", re.MULTILINE
+)
+
+# Heading that is really a numbered source-code line: "## 11 `return ...`"
+# pymupdf4llm misidentifies the line number as a section number.
+_CODE_LISTING_HEADING_RE = re.compile(
+    r"^#{1,6}\s+(\d+\s+`[^`\n]+`)\s*$", re.MULTILINE
+)
+
+# OCR text block extracted from a figure image, wrapped in marker lines.
+_PICTURE_TEXT_BLOCK_RE = re.compile(
+    r"\*\*----- Start of picture text -----\*\*<br>\n(.*?)"
+    r"\*\*----- End of picture text -----\*\*<br>",
+    re.DOTALL,
+)
+
+
+def _demote_italic_headings(md: str) -> str:
+    """Demote headings whose entire content is italic to plain italic text.
+
+    pymupdf4llm promotes styled subtitle lines (e.g. the paper title repeated
+    in italic below '## Abstract') to headings.  A heading like
+        ## _A System for Research Paper Generation_
+    should be body text, not a section heading.
+    """
+    return _FULLY_ITALIC_HEADING_RE.sub(r"\1", md)
+
+
+def _demote_code_listing_headings(md: str) -> str:
+    """Demote numbered source-code lines misidentified as section headings.
+
+    pymupdf4llm sometimes promotes a code listing line like
+        ## 11 `return ''.join(parts)`
+    to a heading because the line number looks like a section number.
+    These are converted back to list items to match adjacent listing lines:
+        - 11 `return ''.join(parts)`
+    """
+    return _CODE_LISTING_HEADING_RE.sub(r"- \1", md)
+
+
+def _clean_picture_text_blocks(md: str) -> str:
+    """Replace picture-text block markers with a clean blockquote.
+
+    pymupdf4llm wraps OCR text from embedded figures in noisy delimiter lines:
+        **----- Start of picture text -----**<br>
+        Some text<br>More text<br>
+        **----- End of picture text -----**<br>
+    The delimiters are stripped, <br> tags are converted to newlines, and the
+    remaining content is wrapped in a Markdown blockquote so it is visually
+    distinct from body text without losing the OCR information.
+    """
+    def _replace(m: re.Match) -> str:
+        content = m.group(1)
+        content = content.replace("<br>\n", "\n").replace("<br>", "\n")
+        lines = [line for line in content.splitlines() if line.strip()]
+        if not lines:
+            return ""
+        return "\n".join(f"> {line}" for line in lines)
+
+    return _PICTURE_TEXT_BLOCK_RE.sub(_replace, md)
 
 
 def _demote_title_page_headings(md: str) -> str:
@@ -570,13 +634,13 @@ def _demote_title_page_headings(md: str) -> str:
 
 
 def _merge_kapitel_headings(md: str) -> str:
-    """Merge German chapter-separator headings with the chapter title.
+    """Merge chapter-separator headings with the chapter title.
 
     PDF chapter cover pages produce two consecutive headings:
-        ## Kapitel 1
-        ## Einleitung
+        ## Kapitel 1        ## Chapter 1
+        ## Einleitung       ## Introduction
     These should become a single top-level heading:
-        # 1 Einleitung
+        # 1 Einleitung      # 1 Introduction
     """
     lines = md.split("\n")
     result: list[str] = []
@@ -762,6 +826,9 @@ def postprocess_markdown(md: str) -> str:
     """Final cleanup applied to the fully joined Markdown document."""
     md = md.replace("\r\n", "\n").replace("\r", "\n")
     md = _strip_bold_from_headings(md)
+    md = _demote_italic_headings(md)
+    md = _demote_code_listing_headings(md)
+    md = _clean_picture_text_blocks(md)
     md = _demote_title_page_headings(md)
     md = _merge_kapitel_headings(md)
     md = _strip_duplicate_section_headers(md)

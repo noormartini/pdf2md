@@ -2,6 +2,9 @@ from postprocess import (
     clean_page,
     postprocess_markdown,
     _clean_toc_dot_leaders,
+    _clean_picture_text_blocks,
+    _demote_code_listing_headings,
+    _demote_italic_headings,
     _demote_outline_chapter_refs,
     _demote_title_page_headings,
     _demote_unlabeled_single_word_headings,
@@ -606,12 +609,140 @@ def test_merge_kapitel_headings_no_following_heading_drops_line():
     assert "Some plain text." in result
 
 
+def test_merge_kapitel_headings_english_chapter():
+    md = "## Chapter 1\n\n## Introduction\n\n## 1.1 Background\n"
+    result = _merge_kapitel_headings(md)
+    assert "## Chapter 1" not in result
+    assert "# 1 Introduction" in result
+    assert "## 1.1 Background" in result
+
+
+def test_merge_kapitel_headings_english_multiple():
+    md = (
+        "## Chapter 1\n\n## Introduction\n\nText.\n\n"
+        "## Chapter 2\n\n## Foundations\n\nText.\n"
+    )
+    result = _merge_kapitel_headings(md)
+    assert "# 1 Introduction" in result
+    assert "# 2 Foundations" in result
+    assert "## Chapter" not in result
+
+
 def test_postprocess_markdown_merges_kapitel_headings():
     md = "## **Kapitel 2**\n\n## **Grundlagen**\n\n## **2.1 Basics**\n"
     result = postprocess_markdown(md)
     assert "# 2 Grundlagen" in result
     assert "## 2.1 Basics" in result
     assert "Kapitel" not in result
+
+
+# ── _demote_italic_headings ───────────────────────────────────────────────────
+
+def test_demote_italic_headings_abstract_subtitle():
+    md = "## Abstract\n\n## _A Long Italic Paper Title Here_\n\nBody text.\n"
+    result = _demote_italic_headings(md)
+    assert "## _A Long Italic Paper Title Here_" not in result
+    assert "_A Long Italic Paper Title Here_" in result
+    assert "## Abstract" in result
+
+
+def test_demote_italic_headings_multiple():
+    md = "## Abstract\n\n## _Title EN_\n\n## Abstrakt\n\n## _Title DE_\n\nText.\n"
+    result = _demote_italic_headings(md)
+    assert "## _Title EN_" not in result
+    assert "## _Title DE_" not in result
+    assert "_Title EN_" in result
+    assert "_Title DE_" in result
+
+
+def test_demote_italic_headings_leaves_partial_italic():
+    # Only part of the heading is italic — should not be demoted.
+    md = "## 3.1 _Related Work_ Overview\n\nText.\n"
+    assert _demote_italic_headings(md) == md
+
+
+def test_demote_italic_headings_leaves_normal_headings():
+    md = "## Introduction\n\n## Background\n"
+    assert _demote_italic_headings(md) == md
+
+
+def test_postprocess_markdown_demotes_italic_abstract_subtitle():
+    md = "## Abstract\n\n## _Full Paper Title in Italic_\n\nSome abstract text.\n"
+    result = postprocess_markdown(md)
+    assert "## _Full Paper Title in Italic_" not in result
+    assert "_Full Paper Title in Italic_" in result
+
+
+# ── _demote_code_listing_headings ─────────────────────────────────────────────
+
+def test_demote_code_listing_headings_converts_to_list_item():
+    md = "- 10 `parts.append(x)`\n\n## 11 `return ''.join(parts)`\n"
+    result = _demote_code_listing_headings(md)
+    assert "## 11" not in result
+    assert "- 11 `return ''.join(parts)`" in result
+
+
+def test_demote_code_listing_headings_different_level():
+    md = "### 3 `some_function()`\n"
+    result = _demote_code_listing_headings(md)
+    assert "### 3" not in result
+    assert "- 3 `some_function()`" in result
+
+
+def test_demote_code_listing_headings_leaves_real_sections():
+    # Real numbered section headings — no backtick code span.
+    md = "## 3.1 Related Work\n\n## 4 System Design\n"
+    assert _demote_code_listing_headings(md) == md
+
+
+def test_postprocess_markdown_demotes_code_listing_heading():
+    md = "- 9 `if x:`\n\n## 11 `return result`\n\nText after.\n"
+    result = postprocess_markdown(md)
+    assert "## 11" not in result
+    assert "- 11 `return result`" in result
+
+
+# ── _clean_picture_text_blocks ────────────────────────────────────────────────
+
+_PTB_START = "**----- Start of picture text -----**<br>"
+_PTB_END = "**----- End of picture text -----**<br>"
+
+
+def test_clean_picture_text_blocks_removes_markers():
+    md = f"{_PTB_START}\nSome OCR text<br>\nMore text<br>\n{_PTB_END}\n"
+    result = _clean_picture_text_blocks(md)
+    assert "Start of picture text" not in result
+    assert "End of picture text" not in result
+
+
+def test_clean_picture_text_blocks_preserves_content_as_blockquote():
+    md = f"{_PTB_START}\nPhase One<br>\nPhase Two<br>\n{_PTB_END}\n"
+    result = _clean_picture_text_blocks(md)
+    assert "> Phase One" in result
+    assert "> Phase Two" in result
+
+
+def test_clean_picture_text_blocks_converts_br_to_newlines():
+    md = f"{_PTB_START}\nA<br>B<br>C<br>\n{_PTB_END}\n"
+    result = _clean_picture_text_blocks(md)
+    assert "<br>" not in result
+
+
+def test_clean_picture_text_blocks_leaves_normal_content_alone():
+    md = "## Introduction\n\nSome text.\n"
+    assert _clean_picture_text_blocks(md) == md
+
+
+def test_postprocess_markdown_cleans_picture_text_block():
+    md = (
+        "Body text.\n\n"
+        f"{_PTB_START}\nDiagram label<br>\n{_PTB_END}\n\n"
+        "**Figure 1:** Caption.\n"
+    )
+    result = postprocess_markdown(md)
+    assert "Start of picture text" not in result
+    assert "> Diagram label" in result
+    assert "**Figure 1:** Caption." in result
 
 
 # ── _strip_mid_doc_page_numbers ───────────────────────────────────────────────
