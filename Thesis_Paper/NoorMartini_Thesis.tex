@@ -937,21 +937,75 @@ real output quality rather than agreement between two imperfect automated
 systems.
 
 \subsection{Evaluation Metrics}
-\begin{itemize}
-    \item Structural Accuracy (heading hierarchy, lists, tables)
-    \item Content Accuracy (text fidelity, completeness)
-    \item Formatting Accuracy (links, code blocks, special elements)
-    \item Limitations of N-gram Metrics (BLEU/ROUGE) for Markdown
-\end{itemize}
+
+RQ4 asks how Markdown quality can be measured beyond BLEU and ROUGE.
+Section~3.4 showed that flat sequence metrics reward correct content in
+the wrong structure. The answer is to score each element type separately.
+Seven metrics are used, grouped into three categories: content accuracy,
+structural accuracy, and formatting accuracy.
+
+Two metrics measure how much text was preserved. Text similarity uses
+difflib's SequenceMatcher, which compares candidate and reference character
+by character and returns a ratio between 0 and 1. Word overlap computes
+the Jaccard similarity on the word sets of both outputs. Text similarity
+catches character-level noise such as OCR artefacts. Word overlap catches
+word-level omissions such as missing paragraphs.
+
+Three metrics target document structure. Heading structure score compares
+the candidate and reference heading counts at each level from H1 to H6,
+skipping levels that are absent in both. List structure score checks that
+bullet and numbered lists appear at the correct nesting level. Paragraph
+count score compares paragraph counts with a 20 per cent tolerance: a
+candidate within that range of the reference scores 1.0, with a linear
+penalty beyond it. A document can have high text similarity and still fail
+all three of these if the extractor collapses the heading hierarchy into
+plain text.
+
+Two metrics cover formatting elements. Table detection score checks for the
+presence and count of pipe tables. Code block score checks for fenced code
+blocks. Both are low-frequency elements, but a single missed table is a
+meaningful failure for any document that contains one. These metrics make
+that failure visible rather than diluted by high text similarity on the
+surrounding prose.
+
+TEDS (Tree Edit Distance based Similarity) offers finer-grained table
+evaluation by comparing cell-level tree structure \cite{zhong2020}. It was
+considered but not used. The test corpus does not include tables complex
+enough to require cell-level scoring, and producing cell-level annotations
+by hand for a multi-document corpus carries a high annotation cost.
+Table detection score covers the relevant case for this evaluation.
 
 \subsection{Experimental Design}
-\begin{itemize}
-    \item Strategy Comparison (Text vs Image vs Hybrid)
-    \item Model Variations and Parameters
-    \item Baseline Comparisons
-\end{itemize}
 
-Table~\ref{tab:strategy_comparison} provides a preliminary comparison of the three fixed extraction strategies evaluated in this thesis alongside the adaptive approach proposed here, based on characteristics reported in the related literature \cite{adhikari2024, parsing2024}.
+The experiment applies each of the four strategies to every document in
+the corpus. For each strategy, three temperature settings are tested:
+0.0, 0.2, and 0.5. Temperature 0.0 produces deterministic output and
+is the primary setting for comparing strategies. The two higher settings
+test whether output quality varies with sampling randomness.
+
+Two models are used. Text pages, under the text strategy and under the
+adaptive strategy when it routes to text, use Qwen~3.5~9B. Visual pages,
+under image-only, hybrid, and the visual path of adaptive, use
+Qwen2.5-VL~7B, a vision-language model. Using the most suitable local
+model for each modality reflects the real deployment scenario, where
+different models can be assigned to different extraction paths.
+
+Text-only extraction at temperature 0.0 is the baseline. It is the
+simplest possible extraction method: raw text from PyMuPDF, processed by
+an LLM with no image input. A strategy must outperform it on at least
+two of the three metric categories to justify its additional computational
+cost. Processing time and token usage are also recorded per page, providing
+the raw measurements for RQ3. Table~\ref{tab:strategy_comparison}
+summarises the expected strengths and weaknesses of each approach based on
+the literature \cite{adhikari2024, parsing2024}.
+
+Results are reported as mean scores per document category across all pages
+in that category. Adhikari and Agarwal \cite{adhikari2024} used the same
+category-level reporting and found that tools which rank well on one
+document type often rank poorly on another. Category-level means make this
+pattern visible. A strategy that wins overall but fails on one specific
+category is a weaker result than one that performs consistently
+across all four.
 
 \begin{table}[h!]
 \centering

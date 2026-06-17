@@ -30,6 +30,13 @@ class ExperimentConfig:
     temperatures: list[float]
     max_pages: Optional[int] = None
     base_url: str = "http://localhost:1234/v1"
+    # Maps each PDF path to its document category label (e.g. "academic", "forms").
+    # Populated from entries like {"path": "...", "category": "..."} in the config.
+    pdf_categories: dict[str, str] = None
+
+    def __post_init__(self):
+        if self.pdf_categories is None:
+            self.pdf_categories = {}
 
 
 def load_experiment_config(config_path: str) -> ExperimentConfig:
@@ -38,9 +45,21 @@ def load_experiment_config(config_path: str) -> ExperimentConfig:
         data = json.load(f)
 
     raw = data.get("input_pdfs") or [data["input_pdf"]]
+    input_pdfs: list[str] = []
+    pdf_categories: dict[str, str] = {}
+    for entry in raw:
+        if isinstance(entry, str):
+            input_pdfs.append(entry)
+        else:
+            path = entry["path"]
+            input_pdfs.append(path)
+            if "category" in entry:
+                pdf_categories[path] = entry["category"]
+
     return ExperimentConfig(
         name=data.get("name", "experiment"),
-        input_pdfs=raw,
+        input_pdfs=input_pdfs,
+        pdf_categories=pdf_categories,
         reference_dir=data["reference_dir"],
         strategies=data.get("strategies", ["text"]),
         models=data.get("models", ["default"]),
@@ -174,6 +193,7 @@ def run_combinations(
     pdf_path: str,
     max_tokens: int = 4096,
     runner: Callable = run_strategy,
+    category: Optional[str] = None,
 ) -> list[EvaluationResult]:
     """Loop over every (strategy, model, prompt, temperature, page) combination.
 
@@ -265,6 +285,7 @@ def run_combinations(
                             timing_ms=timing_ms,
                             token_usage=token_usage,
                             error=error,
+                            category=category,
                         )
                         results.append(eval_result)
 
@@ -286,10 +307,14 @@ def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[Eva
 
     all_results: list[EvaluationResult] = []
     for pdf_path in config.input_pdfs:
-        print(f"--- PDF: {pdf_path} ---")
+        category = config.pdf_categories.get(pdf_path)
+        print(f"--- PDF: {pdf_path} (category: {category or 'unset'}) ---")
         pages, images = prepare_pages(config, pdf_path)
         print(f"Processing {len(pages)} pages\n")
-        results = run_combinations(pages, images, config, pdf_path, max_tokens=max_tokens)
+        results = run_combinations(
+            pages, images, config, pdf_path,
+            max_tokens=max_tokens, category=category,
+        )
         all_results.extend(results)
     return all_results
 
