@@ -59,6 +59,40 @@ def test_load_reference_missing_returns_none(tmp_path: Path):
     assert load_reference(str(tmp_path), 99) is None
 
 
+def test_load_reference_per_pdf_subdir(tmp_path: Path):
+    # References stored in references/my_thesis/page_001.md
+    subdir = tmp_path / "my_thesis"
+    subdir.mkdir()
+    (subdir / "page_001.md").write_text("# Correct ref", encoding="utf-8")
+    result = load_reference(str(tmp_path), 1, pdf_path="path/to/my_thesis.pdf")
+    assert result is not None
+    assert "Correct ref" in result
+
+
+def test_load_reference_per_pdf_prefers_subdir_over_flat(tmp_path: Path):
+    # Both subdir and flat exist — subdir wins
+    (tmp_path / "page_001.md").write_text("# Wrong ref", encoding="utf-8")
+    subdir = tmp_path / "my_doc"
+    subdir.mkdir()
+    (subdir / "page_001.md").write_text("# Right ref", encoding="utf-8")
+    result = load_reference(str(tmp_path), 1, pdf_path="my_doc.pdf")
+    assert "Right ref" in result
+
+
+def test_load_experiment_config_parses_category_objects(tmp_path: Path):
+    p = tmp_path / "exp.json"
+    p.write_text(json.dumps({
+        "input_pdfs": [
+            {"path": "a.pdf", "category": "academic"},
+            "b.pdf",
+        ],
+        "reference_dir": "refs",
+    }), encoding="utf-8")
+    cfg = load_experiment_config(str(p))
+    assert cfg.input_pdfs == ["a.pdf", "b.pdf"]
+    assert cfg.pdf_categories == {"a.pdf": "academic"}
+
+
 # ---------------------------------------------------------------------------
 # load_experiment_config
 # ---------------------------------------------------------------------------

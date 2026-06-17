@@ -70,17 +70,33 @@ def load_experiment_config(config_path: str) -> ExperimentConfig:
     )
 
 
-def load_reference(reference_dir: str, page_number: int) -> Optional[str]:
-    """Load reference markdown for a specific page."""
-    ref_path = Path(reference_dir) / f"page_{page_number:03d}.md"
+def load_reference(reference_dir: str, page_number: int, pdf_path: str = "") -> Optional[str]:
+    """Load reference markdown for a specific page of a specific PDF.
 
-    if ref_path.exists():
-        return ref_path.read_text(encoding="utf-8")
+    References are stored in per-PDF subdirectories:
+        references/<pdf-stem>/page_001.md
 
-    # Also try without zero-padding
-    ref_path = Path(reference_dir) / f"page_{page_number}.md"
-    if ref_path.exists():
-        return ref_path.read_text(encoding="utf-8")
+    A flat fallback (references/page_001.md) is also checked for backward
+    compatibility with older single-PDF setups.
+    """
+    candidates: list[Path] = []
+
+    if pdf_path:
+        pdf_stem = Path(pdf_path).stem
+        candidates += [
+            Path(reference_dir) / pdf_stem / f"page_{page_number:03d}.md",
+            Path(reference_dir) / pdf_stem / f"page_{page_number}.md",
+        ]
+
+    # Flat fallback
+    candidates += [
+        Path(reference_dir) / f"page_{page_number:03d}.md",
+        Path(reference_dir) / f"page_{page_number}.md",
+    ]
+
+    for path in candidates:
+        if path.exists():
+            return path.read_text(encoding="utf-8")
 
     return None
 
@@ -236,7 +252,7 @@ def run_combinations(
                               f"Page {page_num} | {strategy} | {model} | "
                               f"prompt={prompt_variant} | temp={temperature}")
 
-                        reference = load_reference(config.reference_dir, page_num)
+                        reference = load_reference(config.reference_dir, page_num, pdf_path)
                         if reference is None:
                             print(f"  ⚠ No reference found for page {page_num}, skipping")
                             continue

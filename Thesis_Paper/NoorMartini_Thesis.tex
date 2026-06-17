@@ -218,9 +218,9 @@ The main goal of this thesis is:
 that converts PDF documents into structured Markdown by selecting an extraction
 strategy per page based on detected content type, using LM Studio as a local
 LLM runtime to ensure full reproducibility without dependence on external cloud
-services, and to test whether this adaptive approach outperforms fixed
-text-only, image-only, and hybrid strategies in terms of accuracy, structural
-fidelity, and computational cost.}
+services, and to test whether this per-page selection outperforms any single
+fixed strategy when applied to documents with diverse content types, while
+reducing computational cost by skipping the LLM on plain-text pages.}
 \end{quote}
 
 In practice, plain-text pages are routed to PyMuPDF and visually complex pages
@@ -229,10 +229,9 @@ use both pathways, depending on what each page contains.
 
 This leads to five research questions.
 
-\textbf{RQ1 --- Adaptivity.} Does a system that selects an extraction strategy
-per page based on detected content type (plain text, image, table, source code,
-formula, etc.) achieve higher accuracy and structural fidelity than any single
-fixed strategy applied to the full document?
+\textbf{RQ1 --- Adaptivity.} On documents with diverse content types, does
+per-page strategy selection achieve higher accuracy and structural fidelity
+than any single fixed strategy applied uniformly to the full document?
 
 \textbf{RQ2 --- Strategy comparison.} How do text-only, image-only, and hybrid
 strategies compare in terms of content and structural accuracy across different
@@ -253,9 +252,11 @@ forms, slides, and scanned documents?
 These questions are tested against four hypotheses, which are evaluated against
 the experimental results in Chapter~6.
 
-\textbf{H1 --- Adaptive superiority.} The adaptive system should outperform
-any single fixed strategy overall, because different page types have different
-extraction requirements and no one strategy handles all of them well.
+\textbf{H1 --- Adaptive superiority.} On documents with diverse page content,
+the adaptive system should outperform any single fixed strategy applied
+uniformly, because it matches the best-suited strategy to each page type.
+On documents with only one content type, adaptive should equal the
+corresponding fixed strategy rather than exceed it.
 
 \textbf{H2 --- Strategy-content fit.} Text-only will work well on plain-text
 pages but fail on image-heavy or formula-rich content. Vision-based strategies
