@@ -1,4 +1,3 @@
-**==> picture [137 x 38] intentionally omitted <==**
 
 # A Human-in-the-Loop System for Research Paper Generation Using Local Large Language Models
 

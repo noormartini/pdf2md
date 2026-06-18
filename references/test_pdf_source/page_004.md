@@ -4,7 +4,7 @@
 
 In dieser Arbeit wird Recursive Backwards Q-Learning (RBQL) untersucht, ein Q-Learning Algorithmus für deterministische Umgebungen, der alle besuchten Zustände am Ende einer Episode bewertet und somit schneller konvergieren soll. Ziel ist es Trainingsprozesse effizienter zu gestalten, insbesondere bei großen Zustandsräumen, wie sie in modernen Lernumgebungen häufig auftreten. Als Anwendungsszenario dient ein Ping Pong Spiel, bei dem der Agent lernen soll mit einem Schläger einen Ball möglichst lange in der Luft zu halten. Im Vergleich zum klassischen Q-Learning und Experience Replay benötigt RBQL weniger Episoden, um das Spiel zu erlernen und es treten dabei auch weniger Fehler auf. Darüber hinaus wird gezeigt, dass ein einfaches neuronales Netz mit RBQL effektiv trainiert werden kann. Beim Trainieren eines neuronalen Netzes gibt es nur wenig Performance Unterschiede zwischen Experience Replay und RBQL. Die Ergebnisse verdeutlichen das Potential von RBQL in deterministischen Umgebungen und bildet eine Grundlage für zukünftige Untersuchungen in komplexeren, auch nicht deterministischen Szenarien.
 
-### Abstract
+## Abstract
 
 ### Recursive Backwards Q-Learning on the Example of a Ping-Pong Game
 
