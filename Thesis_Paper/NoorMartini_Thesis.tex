@@ -285,7 +285,7 @@ than any single fixed strategy applied uniformly to the full document?
 
 \textbf{RQ2 --- Strategy comparison.} How do text-only, image-only, and hybrid
 strategies compare in terms of content and structural accuracy across different
-PDF document categories?
+bachelor and master thesis documents?
 
 \textbf{RQ3 --- Efficiency.} What are the computational costs (processing time,
 token usage, and LLM call count) of each strategy and of the adaptive system,
@@ -295,9 +295,9 @@ and how do those costs relate to accuracy?
 beyond BLEU and ROUGE, given that structured output requires evaluating heading
 hierarchy, list fidelity, and table reconstruction?
 
-\textbf{RQ5 --- Generalizability.} Do the performance differences between
-strategies hold consistently across document types such as academic papers,
-forms, slides, and scanned documents?
+\textbf{RQ5 --- Consistency.} Do the performance differences between strategies
+hold consistently across different bachelor and master thesis documents, or does
+the relative ranking between strategies depend on the specific document?
 
 These questions are tested against four hypotheses, which are evaluated against
 the experimental results in Chapter~6.
@@ -888,7 +888,7 @@ adaptive system beats every fixed strategy, and RQ2 asks how the fixed
 strategies rank against each other across document categories. RQ3 covers
 efficiency: processing time, token usage, and LLM call count per strategy. RQ4
 drives the metric design in Section~4.3. RQ5 checks whether the strategy
-rankings stay consistent across all four document categories.
+rankings stay consistent across different thesis documents.
 
 Markdown is the target output format for all strategies. Unlike PDF or Word, it
 stores structure in plain text, requires no proprietary software to read, and
@@ -919,25 +919,24 @@ Long-term archival stability & High & Moderate & \textbf{High} \\
 
 \subsection{Dataset and Ground Truth Preparation}
 
-The test corpus covers four document categories: academic papers, administrative
-forms, presentation slides, and scanned archival documents. Each category
-exercises a different aspect of the extraction problem. Academic papers stress
-formula recognition, citation handling, and multi-column layout. Administrative
-forms test table reconstruction and field alignment. Presentation slides mix
-figures, bullet lists, and short text blocks on the same page. Scanned archival
-documents test whether the system handles pages with no native text layer.
+The test corpus consists of bachelor and master thesis documents. This scope
+was chosen because academic theses are structurally demanding: they combine
+dense body text, mathematical formulas, multi-column layouts, citations, tables,
+and figures, often within the same document. They also represent the primary
+use case this system targets. Testing across multiple thesis documents rather
+than a single one allows RQ5 to check whether strategy rankings are stable
+across documents or vary by the specific content mix of each thesis.
 
 Documents were drawn from real sources rather than synthetic benchmarks.
 Meuschke et al.\ \cite{meuschke2023} found that tool performance varies
-significantly by document type, which is why the corpus was built to include
-both straightforward and structurally complex examples within each category.
-The documents are primarily in German, with a subset in English, reflecting the
-intended usage context. Each selected document contains at least one
-structurally challenging page: a formula-heavy spread, a merged-cell table, a
-figure-dense slide, or a degraded scan. The final corpus consists of
-\textit{[N]}\,documents and \textit{[M]}\,pages across the four
-categories.\footnote{\textit{Work in progress: the test corpus is not yet
-finalised. Document and page counts will be updated before final submission.}}
+significantly by document structure, which is why the corpus was built to
+include theses with different content mixes and layouts. The documents are
+primarily in German, with a subset in English, reflecting the intended usage
+context. Each selected document contains at least one structurally challenging
+page: a formula-heavy section, a multi-column spread, or a table with complex
+cell structure. The final corpus consists of \textit{[N]}\,documents and
+\textit{[M]}\,pages.\footnote{\textit{Work in progress: document and page
+counts will be updated before final submission.}}
 
 Each test document has a corresponding reference Markdown file, created by
 hand. Each reference captures the full document structure: heading hierarchy,
