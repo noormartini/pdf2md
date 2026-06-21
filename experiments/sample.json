@@ -16,22 +16,16 @@
   ],
   "reference_dir": "references",
   "strategies": [
-    "text",
-    "image",
-    "hybrid",
     "adaptive"
   ],
   "models": [
-    "qwen/qwen3.5-9b",
     "qwen2.5-vl-7b-instruct-abliterated"
   ],
   "prompt_variants": [
     "default"
   ],
   "temperatures": [
-    0.0,
-    0.2,
-    0.5
+    0.0
   ],
   "max_pages": 10,
   "base_url": "http://localhost:1234/v1"

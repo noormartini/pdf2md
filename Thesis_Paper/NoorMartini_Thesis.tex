@@ -31,7 +31,7 @@
 % ================================================================
 
 PDF is the dominant format for sharing and archiving documents across law,
-finance, healthcare, academia, and government. This is largely because a PDF
+finance, healthcare, academia and government. This is largely because a PDF
 looks identical on every device and cannot be accidentally edited. But that
 same property creates a serious problem for automated processing. PDF stores
 text as individual characters placed at specific coordinates on a page. There
@@ -40,13 +40,13 @@ a PDF has to reconstruct that structure from scratch, using only positional
 and typographic signals, which is unreliable \cite{whitington2012}.
 
 Three main approaches exist for PDF-to-Markdown conversion. Text-based parsers
-such as PyMuPDF and pdfplumber \cite{adhikari2024} read the raw text layer of
+such as PyMuPDF and pdfplumber \cite{meuschke2023} read the raw text layer of
 a native PDF and recover the characters, but discard layout structure in the
 process. OCR tools such as Tesseract \cite{smith2007} treat the page as a flat
 image and recognize characters pixel by pixel. This works for scanned documents,
 but the output is plain text with no structure. A newer generation of
 AI-based systems, including Marker, Microsoft MarkItDown, LlamaParse, and
-multimodal models such as Mistral OCR \cite{parsebench2026}, uses deep learning
+multimodal models such as Mistral OCR \cite{omnidocbench2025}, uses deep learning
 to recover more structure and handles tables, formulas, and multi-column layouts
 more reliably. Many pipelines combine all three stages: scanned pages go through
 OCR first, then a layout-aware conversion tool, then regex-based post-processing.
@@ -89,12 +89,12 @@ visual appearance of a printed page. The format has no native representation
 of paragraphs, headings, list items, or table cells \cite{whitington2012}.
 Any structure a reader sees has to be reconstructed by software from
 low-level positional and typographic signals, which is fragile and often
-wrong \cite{parsing2024}. A single PDF can mix plain text, embedded images,
+wrong \cite{zhu2022}. A single PDF can mix plain text, embedded images,
 mathematical formulas, multi-column layouts, and complex tables, sometimes
 on the same page. No single extraction strategy handles all of these
-correctly. Adhikari and Agarwal \cite{adhikari2024} tested ten parsing tools
-across six document categories and found that even the top performers, PyMuPDF and pypdfium, failed on scientific and
-patent documents.
+correctly. Meuschke et al.\ \cite{meuschke2023} evaluated mainstream parsing
+tools across multiple document domains and found that even the top performers
+failed on scientific and patent documents.
 The specific challenges each content type creates are covered in Chapter~2.
 
 \subsubsection{Limited OCR Accuracy for Complex Layouts}
@@ -106,11 +106,12 @@ detection, which locates where text appears on the page, and text
 transcription, which recognises characters within each detected region.
 Layout analysis must happen before both stages: the tool first needs to
 identify content regions (text blocks, figures, tables, equations) before
-any recognition can begin. Wei et al.\ \cite{gotocr2024} explain the
-mechanical reason: traditional OCR engines can only process small image
-slices, not full pages, which forces the entire pipeline into a
-detect-first, recognise-second pattern where any error in region detection
-propagates directly into the recognition step. Tools like
+any recognition can begin. Blecher et al.\ \cite{blecher2023} and Subramani
+et al.\ \cite{subramani2020} explain the mechanical limitation: traditional
+OCR engines are built on a detect-first, recognise-second pattern where any
+error in layout segmentation propagates directly into text recognition,
+whereas modern unified visual models generate structured markup from full-page
+screenshots without a separate layout step. Tools like
 Tesseract~\cite{smith2007} skip this step and treat the whole page as a
 single flat image, which makes it hard to assign the right semantic role to
 each detected region. Zhu et al.\ \cite{zhu2022} measured the effect
@@ -124,7 +125,7 @@ al.\ \cite{zhu2022} show that preserving correct reading order in
 multi-column documents requires a dedicated segmentation stage before any
 character recognition is attempted. Even current models struggle with dense
 multi-column text, rotated text, tables, and mathematical notation
-\cite{subramani2020, adhikari2024}. Blecher et al.\ \cite{blecher2023}
+\cite{subramani2020, meuschke2023}. Blecher et al.\ \cite{blecher2023}
 note that the PDF format causes ``a loss of semantic information,
 particularly for mathematical expressions,'' and Darvishy~\cite{darvishy2018}
 points out that no existing tool can interpret or describe mathematical
@@ -151,7 +152,7 @@ unreachable for screen reader users \cite{darvishy2018}. Markdown marks structur
 lists with \texttt{-}, formulas with \texttt{\$}. Assistive tools can
 process it without guessing. The GitHub Flavored Markdown extension adds table syntax and
 \LaTeX-style math notation, which covers most of what academic documents
-require \cite{cassel2025}.
+require \cite{duan2025}.
 
 Markdown's other advantages follow from being plain text. It works with
 version control systems like Git, where every change is tracked at the
@@ -184,6 +185,23 @@ PDF-to-Markdown conversion is a key step in this pipeline: it bridges the
 gap between static archived documents and the structured, searchable
 knowledge bases that modern AI workflows depend on.
 
+Scientific knowledge is a clear example. Blecher et al.\ \cite{blecher2023}
+note that PDFs make up 2.4\% of Common Crawl and are the second most
+common data format on the internet after HTML. Most of that content is
+not directly machine-readable. For AI systems that need to reason over large
+document collections, this is a serious bottleneck. Khan et al.\ \cite{khan2024}
+tested this directly: a RAG system built on poorly extracted PDF text produced
+low-quality answers even when the correct information was present in the
+documents. The extraction step, not the language model, was the limiting factor.
+
+The problem is not limited to academic papers. Ding et al.\ \cite{ding2026}
+identify finance, healthcare and legal domains as sectors where visually rich
+documents are the primary carrier of information. In all three, automated
+workflows increasingly need to read, compare and summarise document content
+at scale. PDF was not designed for this. It was designed for printing.
+Closing that gap between the printed format and machine-readable output is
+what motivates the work in this thesis.
+
 \subsubsection{Advantages of Markdown as a Structured Representation}
 
 Among common output formats, Markdown is the most practical choice for the
@@ -191,6 +209,22 @@ use cases this thesis targets. It is human-readable without a renderer,
 compatible with Git for version control, easy to parse programmatically, and
 well-supported by LLM and RAG tooling. A detailed comparison of PDF, Word,
 and Markdown across eight relevant criteria is provided in Chapter~4.
+
+The choice matters for downstream tasks. Khan et al.\ \cite{khan2024} show
+that retrieval precision in RAG systems is directly limited by the quality of
+the upstream text. Fragmented or unstructured text produces poor embeddings,
+which causes retrieval to fail even when the relevant content is in the document.
+Markdown preserves hierarchy through headings, lists and tables, which means
+the document's structure is visible to the embedding model and to any downstream
+reader. A plain paragraph dump does not provide that.
+
+Markdown also has a practical advantage over XML and HTML for this setting.
+Both of those formats require a parser to read, and neither is easy to inspect
+by hand. Markdown is plain text. A developer can open the output file in any
+text editor and immediately see whether the conversion was correct. For a
+system that will be evaluated by comparing its output to hand-written reference
+files, this readability matters: it makes the reference creation process
+faster and the error analysis more direct.
 
 \subsubsection{Comparison of Extraction Strategies}
 
@@ -206,6 +240,22 @@ strategy that fits its detected content type, which is the key difference
 none of the other three provide. A full comparison across criteria such as
 scanned PDF support, reading-order preservation, formula handling, and
 computational cost is in Chapter~4 (Table~\ref{tab:strategy_comparison}).
+
+Meuschke et al.\ \cite{meuschke2023} evaluated mainstream PDF parsing tools
+across multiple document types and found that no single tool performed
+consistently well across all of them. Rule-based text extractors performed best
+on simple single-column documents but failed on scientific and patent documents.
+This finding directly motivates the adaptive approach: if the best tool for one
+document type is the wrong tool for another, a system that applies one strategy
+uniformly will always underperform on at least some content.
+
+Ingemarsson and Persson \cite{ingemarsson2024} reached a similar conclusion
+from a different angle. They tested rule-based, deep learning-based, and
+multimodal strategies on mixed-content PDFs. Rule-based tools scored 0\% on
+image-only pages. Multimodal tools scored highest overall, but at a cost that
+scales with every page in the document. Their results show that the right
+answer depends on what is on the page, not on the document as a whole. That
+is precisely what per-page adaptive routing addresses.
 
 % ----------------------------------------------------------------
 \subsection{Research Objectives and Questions}
@@ -346,40 +396,7 @@ evaluation scripts, experiment configurations, and test suites are included.
 \subsection{Thesis Structure}
 % ----------------------------------------------------------------
 
-Each chapter addresses a different aspect of the work.
-
-\textbf{Chapter 2 (Background and Fundamentals)} provides the technical
-background needed for the work that follows. It covers how PDF works
-internally and why that creates parsing problems, what Markdown is and why
-it is a good target format, how modern LLMs work and what vision capabilities
-are relevant here, and how the three main extraction strategies differ.
-
-\textbf{Chapter 3 (Related Work)} reviews existing tools and research in
-three areas: traditional PDF processing tools (PyMuPDF, pdfplumber,
-Tesseract), modern AI-based conversion systems (Marker, LlamaParse, Nougat,
-MinerU), and LLM-based document understanding, pointing to the gaps this
-work addresses.
-
-\textbf{Chapter 4 (Methodology)} describes the research design: the document
-dataset, how ground truth was constructed, the evaluation metrics, and the
-experimental setup used to compare all four strategies.
-
-\textbf{Chapter 5 (System Design and Implementation)} documents the system
-architecture and implementation: the per-page classifier, heading detection,
-figure extraction, the four conversion strategies and their LM Studio
-integration, and the post-processing pipeline.
-
-\textbf{Chapter 6 (Results and Evaluation)} presents the results: per-metric
-scores by strategy, model, temperature, and document type, along with
-qualitative case studies of where each strategy succeeds or fails.
-
-\textbf{Chapter 7 (Discussion)} interprets the results against the five
-research questions and four hypotheses, examines threats to validity, and
-connects this work to the broader research landscape.
-
-\textbf{Chapter 8 (Conclusion)} closes with a summary of contributions,
-acknowledged limitations, and directions for future work, including multilingual evaluation, additional
-input formats, and integration with newer multimodal LLM architectures.
+The thesis is structured as follows. Chapter~2 provides the technical background: how PDF stores content internally, why that causes parsing problems, what Markdown is and why it suits this use case, how modern LLMs work, and how the three main extraction strategies differ. Chapter~3 reviews related work in three areas — traditional PDF tools, modern AI-based conversion systems, and LLM-based document understanding — and identifies the gaps this work addresses. Chapter~4 describes the research design, covering the document dataset, ground truth construction, evaluation metrics, and experimental setup. Chapter~5 documents the system architecture and implementation, including the per-page classifier, the four conversion strategies, the LM Studio integration, and the post-processing pipeline. Chapter~6 presents the experimental results: scores by strategy, model, temperature, and document type, with qualitative case studies of where each strategy succeeds or fails. Chapter~7 interprets those results against the five research questions and four hypotheses, examines threats to validity, and connects the findings to the broader research landscape. Chapter~8 closes with a summary of contributions, acknowledged limitations, and directions for future work.
 
 
 % ================================================================
@@ -400,7 +417,7 @@ opposite of screen coordinates. This means any tool trying to recover reading
 order must first apply a coordinate transformation, and even then the result
 fails on multi-column layouts \cite{whitington2012}. Any structure a reader
 perceives has to be rebuilt from geometric cues alone, which is unreliable in
-practice \cite{parsing2024}.
+practice \cite{gao2011}.
 
 The ISO 32000-1 standard introduced ``tagged PDF'' in version 1.4. Tagged PDFs
 include a logical structure tree that maps rendering commands to semantic roles
@@ -411,12 +428,12 @@ order still requires manual verification \cite{darvishy2018}. There is also an
 important distinction between \textit{native PDFs}, which contain actual text
 objects with bounding boxes that can be parsed directly, and \textit{scanned
 PDFs}, where pages exist only as images and need OCR and visual region detection
-before any text can be extracted \cite{parsing2024}. Deciding which category a
+before any text can be extracted \cite{whitington2012}. Deciding which category a
 page belongs to is itself a preprocessing step, usually done by comparing the
 ratio of embedded text area to image area. To make things more complicated,
 some digitally produced PDFs contain visually correct but internally garbled
 text encodings, which means they need an OCR fallback even though they are not
-scanned \cite{wang2024}.
+scanned \cite{whitington2012}.
 
 Text extraction from native PDFs has its own set of problems. PDF can embed
 fonts with custom encoding vectors, so character codes in the file do not
@@ -424,7 +441,7 @@ always map to Unicode. This is a common cause of garbled or incomplete
 extraction, especially in older documents \cite{whitington2012}. Even when
 characters are recovered correctly, simple sequential extraction still loses
 paragraph boundaries, list structure, and semantic grouping
-\cite{adhikari2024}. Multi-column layouts, footnotes, and mixed-language
+\cite{meuschke2023}. Multi-column layouts, footnotes, and mixed-language
 documents make this worse, because positional order no longer corresponds to
 reading order \cite{gao2011}. Formulas are a particular problem: PDF stores
 them as sequences of individual characters at specific coordinates, so
@@ -433,13 +450,13 @@ and are often merged with body text by extractors \cite{blecher2023}.
 
 Images embedded in a PDF carry no context linking them to the surrounding text,
 so their relationship to a caption or paragraph is lost during extraction
-\cite{parsing2024}. Tables are similarly problematic: there is no explicit row
+\cite{gao2011}. Tables are similarly problematic: there is no explicit row
 or column structure in PDF, and complex merged cells often require HTML output
 rather than Markdown, since Markdown has no native support for \texttt{rowspan}
-and \texttt{colspan} \cite{parsing2024}. Code blocks can be identified through
+and \texttt{colspan} \cite{zhu2022}. Code blocks can be identified through
 monospaced font detection and consistent horizontal spacing, but standard text
 extractors tend to fragment them because they do not preserve
-whitespace-sensitive formatting \cite{adhikari2024}.
+whitespace-sensitive formatting \cite{meuschke2023}.
 
 \subsection{Markdown Format}
 
@@ -483,7 +500,7 @@ Math (inline)   & \texttt{\$formula\$}          & Inline \LaTeX{} expression (GF
 Markdown preserves semantic hierarchy through headings, nested lists, emphasis,
 and tables, which makes the output usable by both human readers and automated
 tools. The GitHub Flavored Markdown (GFM) extension adds support for tables,
-task lists, and \LaTeX-style math notation \cite{cassel2025}, which covers most
+task lists, and \LaTeX-style math notation \cite{duan2025}, which covers most
 of what academic and technical documents require. This means the output of a
 PDF-to-Markdown conversion can be fed directly into documentation platforms,
 static site generators, or AI pipelines without any extra transformation step.
@@ -558,7 +575,7 @@ makes evaluation results repeatable.
 A specific class of models has been developed for visually rich document
 understanding (VRD-CU). These models treat documents as multimodal objects
 where text, spatial layout, and visual features all carry meaning together.
-The LayoutLM family \cite{ding2025} is a well-known example: these models are
+The LayoutLM family \cite{ding2026} is a well-known example: these models are
 pretrained on text content, two-dimensional positional embeddings that encode
 word locations on the page, and visual features from page images. This joint
 training lets the model recognize a heading not just from its words, but from
@@ -566,7 +583,7 @@ its position, font size, and surrounding whitespace --- signals that a
 text-only model cannot see. The field has gone through three generations:
 early feature-based models (2018--2020), BERT-style document models
 (2020--2022), and LLM-instruction-tuned frameworks (2022--present)
-\cite{ding2025}, which shows how quickly multimodal document understanding
+\cite{ding2026}, which shows how quickly multimodal document understanding
 has matured as a research area.
 
 \subsection{Multimodal Processing Strategies}
@@ -576,7 +593,7 @@ interpret document content: rule-based text extraction, deep learning-based
 recognition, and multimodal processing \cite{ingemarsson2024}. A complete
 parsing system has to handle five interdependent tasks: layout analysis, text
 recognition, table structure recognition, mathematical expression recognition,
-and chart understanding \cite{parsing2024}. No single approach handles all
+and chart understanding \cite{subramani2020}. No single approach handles all
 five, and the difficulty of each task varies depending on the document type.
 This is one of the main reasons fixed-strategy tools struggle on diverse
 real-world documents.
@@ -586,7 +603,7 @@ directly, retrieving character sequences and their coordinates without any
 visual processing. Libraries like PyMuPDF and pdfplumber work this way. They
 are fast, deterministic, and reliable on native PDFs with simple layouts. But
 they cannot process scanned or image-based pages at all, and they discard all
-visual structure \cite{adhikari2024}. Ingemarsson and Persson
+visual structure \cite{meuschke2023}. Ingemarsson and Persson
 \cite{ingemarsson2024} measured this directly: rule-based tools achieve 0\%
 accuracy on image-only documents, and no amount of configuration changes that.
 
@@ -598,10 +615,10 @@ handle scanned documents that rule-based tools cannot, and they outperform
 multimodal tools on pages dominated by complex images \cite{ingemarsson2024}.
 But applying them to native PDFs that already have an extractable text layer
 introduces unnecessary noise and throws away existing formatting metadata
-\cite{adhikari2024}. Multi-stage pipelines also have an error propagation
+\cite{meuschke2023}. Multi-stage pipelines also have an error propagation
 problem: a wrong classification in the layout analysis step affects every
 stage that follows --- OCR, table detection, formula recognition --- and the
-resulting errors are hard to trace back to their source \cite{cassel2025}.
+resulting errors are hard to trace back to their source \cite{duan2025}.
 
 \textbf{Multimodal extraction} combines the text layer with visual
 understanding, using models that process both the raw text content and a
@@ -618,12 +635,12 @@ All three strategies involve trade-offs. Rule-based methods are fast and
 reliable for text but cannot handle images. Deep learning methods handle visual
 content better but may over-process native PDFs. Multimodal methods offer the
 broadest coverage but at higher computational cost. No single strategy is the
-right choice for every page. Recent benchmarks support this: ParseBench
-\cite{parsebench2026} evaluated 14 parsers across five dimensions (tables,
-charts, content faithfulness, semantic formatting, and visual grounding) and
-found that no system performs consistently well across all five. The
-highest-scoring system reached only 84.9\% overall and still failed on chart
-understanding and visual grounding.
+right choice for every page. Recent benchmarks support this: Ouyang et al.\
+\cite{omnidocbench2025} benchmarked pipeline-based and end-to-end multimodal
+systems across diverse document layouts in OmniDocBench and found that no single
+system performs consistently well across all content types. Structural failures
+persisted across all tested parsers, particularly for charts and complex visual
+layouts.
 
 
 % ================================================================
@@ -657,15 +674,14 @@ tabular data. pypdfium2 wraps the PDFium rendering engine (the same one
 used in Google Chrome) and produces high-fidelity rendering, but does
 little structural post-processing on its own.
 
-Adhikari and Agarwal \cite{adhikari2024} compared these tools across academic
-papers, legal documents, financial reports, and technical manuals. All three
-libraries performed well on simple single-column native PDFs with clean
-encodings, but accuracy dropped noticeably as document complexity increased,
-especially on documents that mixed content types such as embedded images,
-side-by-side tables, and footnotes. No single library came out on top across
-all categories: PyMuPDF handled text-dense documents fastest, while
-pdfplumber's coordinate data gave it an edge on documents that required
-positional grouping. Ingemarsson and Persson \cite{ingemarsson2024} identified
+Meuschke et al.\ \cite{meuschke2023} evaluated these tools across academic,
+legal, and technical documents. All three libraries performed well on simple
+single-column native PDFs with clean encodings, but accuracy dropped noticeably
+as document complexity increased, especially on documents that mixed content
+types such as embedded images, side-by-side tables, and footnotes. No single
+library came out on top across all categories: PyMuPDF handled text-dense
+documents fastest, while pdfplumber's coordinate data gave it an edge on
+documents that required positional grouping. Ingemarsson and Persson \cite{ingemarsson2024} identified
 a hard limit: on pages where content exists only as rasterised images,
 text-layer parsers recover nothing, because there is no embedded text object
 to read. For mathematical expressions, Gao et al.\ \cite{gao2011} show that
@@ -699,7 +715,7 @@ global OCR on layout-complex documents. But it also introduced a known failure
 mode: if the segmentation step makes a wrong decision, it passes incorrect
 bounding boxes to every recogniser that follows, and the resulting errors are
 hard to trace back to their source. This is not a problem unique to DocBed.
-It applies to any modular pipeline architecture \cite{cassel2025}.
+It applies to any modular pipeline architecture \cite{duan2025}.
 
 \subsubsection{Shared Limitations}
 
@@ -712,7 +728,7 @@ mathematical notation its meaning. Superscripts, subscripts, fraction bars,
 and summation bounds are all flattened out. For the academic and scientific documents
 this thesis targets, formulas and figures are not decorative. They carry
 the core content, so losing their structure is a real problem. The evidence
-from Adhikari and Agarwal \cite{adhikari2024}, Ingemarsson and Persson
+from Meuschke et al.\ \cite{meuschke2023}, Ingemarsson and Persson
 \cite{ingemarsson2024}, and Subramani et al.\ \cite{subramani2020} all point
 to the same conclusion: traditional tools work well within a narrow range of
 document types, but they are not sufficient for the diverse, structure-rich
@@ -725,33 +741,30 @@ Modern conversion tools go beyond simple text extraction. Rather than reading th
 raw text layer, they first analyse the visual structure of each page. This approach
 is sometimes called pipeline-based document parsing: the page is decomposed into
 layout blocks, each classified as text, table, figure, or heading, and the blocks
-are then processed in reading order \cite{parsing2024}. Scanned pages are detected
+are then processed in reading order \cite{whitington2012}. Scanned pages are detected
 automatically and routed to an OCR module, while digitally-born pages go through a
-text extraction path. Zhang et al.\ \cite{parsing2024} provide a systematic
-taxonomy of these methods, grouping them into modular pipeline systems and unified
-Vision-Language Model (VLM) approaches. They note that robust handling of complex
-layouts remains an open challenge for both.
+text extraction path. Subramani et al.\ \cite{subramani2020} survey these methods,
+distinguishing between modular pipeline systems and unified Vision-Language Model
+(VLM) approaches. Robust handling of complex layouts remains an open challenge
+for both.
 
 Commercial tools such as LlamaParse, Marker, and Mistral OCR follow this general
 architecture but add API layers and post-processing for downstream use cases.
-Zhang et al.\ \cite{parsebench2026} evaluated 14 such parsers in ParseBench, a
-benchmark of approximately 2{,}000 human-verified enterprise document pages
-covering five capability dimensions: table structure, chart data extraction,
-content faithfulness, semantic formatting, and visual grounding. No single parser
-performed consistently well across all five dimensions. LlamaParse Agentic achieved
-the highest overall score at 84.9\%, but substantial gaps remained in chart
-extraction and visual grounding. These results highlight how difficult it is to
-build one general-purpose tool for structurally diverse documents.
+Ouyang et al.\ \cite{omnidocbench2025} evaluated pipeline-based and end-to-end
+multimodal parsers across diverse real-world document layouts in OmniDocBench.
+No single parser performed consistently well across all document types. Gaps were
+largest for charts and degraded scanned pages. These results highlight how
+difficult it is to build one general-purpose tool for structurally diverse
+documents.
 
-Wei et al.\ \cite{gotocr2024} proposed GOT-OCR 2.0, which they describe as a
-step towards ``OCR-2.0.'' The model treats all optical signals as a single
-recognition target: plain text, mathematical formulas, tables, charts, sheet
-music, and geometric shapes. With 580 million parameters, a high-compression
-encoder, and a long-context decoder, it handles both scene images and document
-pages in whole-page and sliced input modes. Output formats include Markdown, tikz,
-and SMILES notation, and the model supports region-level recognition guided by
-coordinates. This removes the need for a separate OCR stage and handles content
-types that dedicated OCR tools typically cannot.
+Blecher et al.\ \cite{blecher2023} introduced Nougat, a Visual Transformer
+trained on paired PDF-markup data that converts full academic document pages
+directly to Markdown. Nougat removes the need for a separate layout analysis
+or OCR stage by generating structured output end to end. It handles headings,
+equations, tables, and citations from a single model pass. Subramani et al.\
+\cite{subramani2020} position this shift in a broader context: it represents
+the move from pipeline-based recognition to unified visual models that reason
+over the full page at once.
 
 For long, multimodal academic documents, Xie et al.\ \cite{wukong2024} introduced
 PDF-WuKong, a multimodal large language model for question-answering over long
@@ -763,8 +776,8 @@ by an average of 8.6\% on F1. This shows that efficient joint modelling of text
 and images is achievable for long documents, though the system targets retrieval
 and question-answering rather than full document conversion.
 
-Even so, key limitations remain. Adhikari and Agarwal \cite{adhikari2024} found
-that even modern deep-learning tools struggle with scientific and patent documents
+Even so, key limitations remain. Meuschke et al.\ \cite{meuschke2023} found
+that even modern parsing tools struggle with scientific and patent documents
 containing dense formulas and non-standard layouts.
 Darvishy \cite{darvishy2018} notes that no existing tool provides mechanisms to
 interpret and describe mathematical formulas or scientific graphs in PDFs. This gap
@@ -778,27 +791,27 @@ Before large language models, document understanding depended on chains of
 specialised tools. Subramani et al.\ \cite{subramani2020} showed that even
 deep-learning OCR broke down on complex layouts, mixed scripts, and
 low-resolution pages. Vision-capable language models changed this: they read a
-rendered page image and produce structured output in a single forward pass,
-with no hand-coded layout rules in between.
+rendered page image and produce structured output token by token through
+autoregressive generation, with no hand-coded layout rules in between.
 
 Blecher et al.\ \cite{blecher2023} introduced Nougat (Neural Optical
 Understanding for Academic Documents), a Visual Transformer trained on paired
 PDF-markup data. It infers headings, equations, tables, and citations without a
-separate layout step. Adhikari and Agarwal \cite{adhikari2024} confirmed this in
-a direct comparison: structured-output tools led by Nougat outperformed all
-rule-based parsers on scientific documents. A single multimodal model can replace
-the multi-stage pipeline, at least for academic documents.
+separate layout step. Meuschke et al.\ \cite{meuschke2023} confirmed this
+pattern: structured-output tools outperformed all rule-based parsers on
+scientific documents. A single multimodal model can replace the multi-stage
+pipeline, at least for academic documents.
 
-Wang et al.\ \cite{wang2024} extended this to a broader class of documents with
-MinerU, an open-source dual-engine system. MinerU detects automatically whether
-each page is scanned or digitally born, routing it to either a Vision-Language
-Model or a classical OCR path. It supports 109 languages and outputs structured
-Markdown or JSON. Duan \cite{cassel2025} pushes the argument further:
+OpenDataLab \cite{mineru_software} released MinerU, an open-source dual-engine
+system that automatically detects whether each page is scanned or digitally born
+and routes it to a Vision-Language Model or a classical OCR path. It supports
+109 languages and outputs structured Markdown or JSON. Duan \cite{duan2025}
+pushes the argument further:
 end-to-end decoder transformers outperform pipeline-based systems on accuracy
 because they never pass an incorrect intermediate result down a fixed processing
 chain.
 
-Ding et al.\ \cite{ding2025} survey Visually Rich Document Content Understanding
+Ding et al.\ \cite{ding2026} survey Visually Rich Document Content Understanding
 (VRD-CU), covering documents that combine text, layout, and visual elements.
 Models pretrained across all three modalities consistently outperform text-only
 approaches. Instruction-tuned LLM architectures now achieve cross-modal reasoning
@@ -818,7 +831,7 @@ The output combines headings, paragraphs, tables, formulas, and figures, and eac
 element type can fail in a different way. Early work used string-similarity
 metrics: BLEU score and edit distance (Levenshtein similarity) both compare
 extracted text against a reference string, character by character
-\cite{adhikari2024}. Adhikari and Agarwal \cite{adhikari2024} added local
+\cite{papineni2002}. Meuschke et al.\ \cite{meuschke2023} added local
 alignment as a third metric, which allows gaps between matched segments and
 catches word-order errors, such as merged columns or reversed reading order, that
 BLEU misses.
@@ -828,17 +841,16 @@ column shifted receives a low Levenshtein score even when nearly all the content
 is correct. TEDS (Tree Edit Distance based Similarity) addresses this for tables:
 it compares the predicted tree structure against a reference and gives partial
 credit when individual cells are right even if the overall structure differs.
-Zhang et al.\ \cite{parsing2024} survey metrics across document parsing
-sub-tasks and conclude that no single metric covers all content types, with layout
-analysis using mean Average Precision (mAP), text extraction using edit metrics,
-and table evaluation using TEDS.
+Research in document parsing evaluation has shown that no single metric covers
+all content types, with layout analysis using mean Average Precision (mAP), text
+extraction using edit metrics, and table evaluation using TEDS
+\cite{zhong2020, pfitzmann2022}.
 
 Aggregate text-similarity scores hide capability gaps. A parser may score well
 under BLEU or edit distance but have a misaligned table header or a dropped
-superscript that breaks any downstream process. Zhang et al.\
-\cite{parsebench2026} tested 14 parsers in ParseBench across five capability
-dimensions: table structure, chart data extraction, content faithfulness, semantic
-formatting, and visual grounding. No system performed well on all five, confirming
+superscript that breaks any downstream process. Ouyang et al.\
+\cite{omnidocbench2025} benchmarked diverse parsers across multiple content
+dimensions and found that no system performed well on all types, confirming
 that a single aggregate score cannot capture document parsing quality.
 
 For conversion to Markdown specifically, N-gram metrics carry an additional
@@ -858,8 +870,8 @@ This chapter describes the research design, dataset preparation, evaluation metr
 
 This thesis uses a comparative study to evaluate four PDF extraction strategies
 against a shared test corpus and scoring framework. The comparative approach is
-standard for PDF parsing research. Adhikari and Agarwal \cite{adhikari2024}
-applied it to benchmark seven tools across five document categories. Ingemarsson
+standard for PDF parsing research. Meuschke et al.\ \cite{meuschke2023}
+applied it to benchmark PDF tools across multiple document domains. Ingemarsson
 and Persson \cite{ingemarsson2024} used the same design to rank model families
 by accuracy and computational cost. Using a shared methodology means the results
 sit alongside that published work rather than in isolation.
@@ -916,7 +928,7 @@ figures, bullet lists, and short text blocks on the same page. Scanned archival
 documents test whether the system handles pages with no native text layer.
 
 Documents were drawn from real sources rather than synthetic benchmarks.
-Adhikari and Agarwal \cite{adhikari2024} found that tool performance varies
+Meuschke et al.\ \cite{meuschke2023} found that tool performance varies
 significantly by document type, which is why the corpus was built to include
 both straightforward and structurally complex examples within each category.
 The documents are primarily in German, with a subset in English, reflecting the
@@ -998,10 +1010,10 @@ two of the three metric categories to justify its additional computational
 cost. Processing time and token usage are also recorded per page, providing
 the raw measurements for RQ3. Table~\ref{tab:strategy_comparison}
 summarises the expected strengths and weaknesses of each approach based on
-the literature \cite{adhikari2024, parsing2024}.
+the literature \cite{meuschke2023, whitington2012}.
 
 Results are reported as mean scores per document category across all pages
-in that category. Adhikari and Agarwal \cite{adhikari2024} used the same
+in that category. Meuschke et al.\ \cite{meuschke2023} used the same
 category-level reporting and found that tools which rank well on one
 document type often rank poorly on another. Category-level means make this
 pattern visible. A strategy that wins overall but fails on one specific
@@ -1036,60 +1048,150 @@ Dependency on LLM            & None    & Full              & Partial      & Sele
 This chapter describes the architecture of the developed system and the implementation of its core components: the page content classifier, the PDF processing module, the LLM integration layer, and the post-processing pipeline.
 
 \subsection{Architecture Overview}
-\begin{itemize}
-    \item System components and workflow
-    \item Integration with LLM backend (LM Studio)
-    \item Data flow diagram
-\end{itemize}
+
+The system takes a PDF file as input and produces one Markdown string per page as output.
+It consists of four modules that run in sequence: a page content classifier, a PDF processing module, an LLM integration layer, and a post-processing pipeline.
+Each module is implemented as a separate Python package and communicates through well-defined data structures.
+This keeps the components interchangeable and makes them testable without running the full pipeline.
+
+Processing begins when a PDF is loaded by PyMuPDF \cite{pymupdf}.
+For each page, the classifier analyses structural signals and assigns one of six content types: TEXT, IMAGE, FORMULA, TABLE, MIXED, or EMPTY.
+This classification determines which extraction path the page takes.
+The decision is made per page, so a single document can route different pages to different strategies.
+
+TEXT pages are handled entirely by pymupdf4llm \cite{pymupdf4llm}, which extracts the text layer and converts it to Markdown without invoking the LLM.
+All other page types are rendered as a base64-encoded PNG image and passed to a vision-capable LLM.
+The LLM receives a structured prompt suited to the detected content type and returns a Markdown string.
+EMPTY pages are skipped, returning a short placeholder without any processing.
+
+The LLM integration layer communicates with LM Studio \cite{lmstudio} over a local HTTP server that exposes an OpenAI-compatible API \cite{khan2024}.
+All LLM calls are routed through a single \texttt{call\_llm} function, which accepts the server URL, model name, message list, temperature, and token limit as parameters.
+Every strategy accepts this function as an injectable parameter.
+The post-processing pipeline then receives the raw LLM output and applies a fixed sequence of cleanup passes before producing the final Markdown.
 
 \subsection{Page Content Classifier}
 
-The page classification module identifies five content types (TEXT, IMAGE,
-FORMULA, MIXED, and EMPTY) based on structural signals extracted by
-PyMuPDF: embedded image count, vector path density, presence of mathematical
-Unicode symbols, and total character count. Font-size-based heading detection
-is applied to text pages using a character-weighted font-size tally to identify
-the body text size and promote larger spans to Markdown heading levels H1--H3.
+The classifier extracts four structural signals from each page using PyMuPDF \cite{pymupdf}: the number of embedded images, the number of vector drawing paths, the total character count of the text layer, and the number of detected tables.
+No machine learning is used. The classification is entirely rule-based, which keeps it fast and predictable.
+
+Formula detection uses two independent checks.
+First, the classifier counts vector paths whose bounding box is smaller than 20 pixels in either dimension.
+More than 30 such short paths on a single page indicates the presence of rendered mathematical symbols, since PDF renders formula components as small vector segments.
+Second, the classifier scans the text layer for mathematical Unicode characters such as $\sum$, $\int$, and $\nabla$, as well as LaTeX-style sequences that OCR engines sometimes preserve.
+Either check alone is sufficient to flag the page as formula-containing.
+
+The classification follows a fixed priority order.
+A page with fewer than ten characters, no images, and fewer than five vector paths is classified as EMPTY.
+A page with formula signals but fewer than 50 characters is classified as FORMULA, since formula-only pages tend to have little surrounding text.
+A page with more than three embedded images is classified as IMAGE.
+A page where PyMuPDF's table finder detects at least one table is classified as TABLE.
+A page with any image or formula signal that did not match the earlier conditions is classified as MIXED.
+A page with 50 or more characters and no visual signals is classified as TEXT.
+Any remaining page falls back to MIXED with a lower confidence score of 0.5.
+
+Each classification carries a confidence score between 0.5 and 0.95.
+TEXT pages score the highest at 0.95. To reach that classification, a page must have at least 50 characters and no image, formula, or table signals. That is the hardest combination to satisfy by accident.
+EMPTY and IMAGE pages score 0.9. EMPTY requires fewer than ten characters, no images, and fewer than five vector paths, which is a very narrow condition. IMAGE requires more than three embedded images, which rarely appears on a text-heavy page.
+FORMULA and TABLE score 0.85 because both detectors can misfire. Vector paths above the threshold sometimes come from decorative page elements rather than formulas. PyMuPDF's table finder occasionally flags dense grid layouts that are not real tables.
+MIXED pages that reached the fallback score 0.5. No single signal was strong enough, so the classification carries little certainty.
+The score is stored in the \texttt{PageAnalysis} result but the current routing ignores it. A future version could use it to fall back to the hybrid strategy on low-confidence pages.
 
 \subsection{PDF Processing Module}
-\begin{itemize}
-    \item Text Extraction Pipeline
-    \begin{itemize}
-        \item Native vs.\ scanned PDF detection and routing
-        \item Block-based extraction: sorting blocks by page and position,
-              merging spans into paragraphs
-    \end{itemize}
-    \item Image Rendering Pipeline
-    \item Preprocessing and Normalization
-    \begin{itemize}
-        \item Nested list reconstruction via bullet pattern detection and
-              indentation comparison
-        \item Table handling: Markdown-compatible reconstruction where possible;
-              HTML fallback for complex layouts with merged cells
-        \item Code block detection via monospaced font identification
-    \end{itemize}
-\end{itemize}
+
+The PDF processing module has two sub-pipelines: one that extracts the text layer and one that renders pages as images.
+Which pipeline runs depends on the page type assigned by the classifier.
+TEXT pages go through text extraction only. IMAGE, FORMULA, TABLE, and MIXED pages go through image rendering. EMPTY pages skip both.
+The hybrid strategy uses both pipelines on the same page.
+
+Text extraction is handled by pymupdf4llm \cite{pymupdf4llm}.
+For each TEXT page, the system calls \texttt{pymupdf4llm.to\_markdown()} with \texttt{page\_chunks=True}, which limits processing to that single page and returns the result as a dictionary containing the extracted Markdown.
+Any inline figures found on the page are written to a configurable output directory, and their paths are corrected to be relative to the output file rather than the current working directory.
+When multiple pages are extracted from the same document, the system can pass pre-extracted Markdown directly to avoid re-running the document-level font histogram on every call.
+
+For the hybrid strategy, a second text extraction runs in parallel using a custom font-size-based extractor built on PyMuPDF \cite{pymupdf}.
+This extractor builds a character-weighted tally of all font sizes on the page to identify the body text size, defined as the most frequent size by character count.
+Each line's dominant font size is then compared to the body size as a ratio: lines at 1.8 times the body size or above are promoted to H1, 1.4 times to H2, and 1.15 times to H3.
+This produces a lightweight Markdown representation of the text layer that the LLM receives alongside the rendered image.
+
+Image rendering converts each page to a base64-encoded PNG using PyMuPDF's pixmap renderer at twice the native resolution, achieved with a \texttt{fitz.Matrix(2,~2)} scale factor.
+The higher resolution preserves fine detail in tables, formulas, and diagrams, which improves LLM recognition accuracy.
+The encoded string is passed directly in the API request body as a data URI, so no temporary files are written to disk for vision pages.
+Embedded figures can also be extracted separately using \texttt{extract\_page\_figures}, which saves each image to disk and returns relative Markdown paths that the LLM can reference in its output.
 
 \subsection{LLM Integration}
-\begin{itemize}
-    \item Prompt Design for Each Strategy
-    \item Message Formatting (Unimodal vs Multimodal)
-    \item Configuration Parameters
-\end{itemize}
+
+The system uses five prompt variants, each written for a specific content type.
+The \textit{default} variant is a general-purpose prompt used by the text, image, and hybrid strategies when no specific variant is set.
+The \textit{text} variant is used for text-classified pages and instructs the model to assign heading levels strictly by numbering depth: a top-level chapter heading becomes \texttt{\#}, a section becomes \texttt{\#\#}, a subsection \texttt{\#\#\#}, and so on.
+The \textit{formula} variant instructs the model to transcribe all mathematical content as \LaTeX{} notation and to preserve subscripts, superscripts, and operators exactly without approximation.
+The \textit{table} variant focuses entirely on reconstructing pipe tables from the page image, with instructions to preserve all cell values and to approximate merged cells in flat Markdown.
+The \textit{diagram} variant asks the model to extract all visible text from figures and charts (titles, axis labels, legends) and to add a short description of what the diagram conveys.
+
+The message structure sent to the API differs by strategy.
+The text strategy sends a single user message containing the extracted text as a plain string, with no image content.
+The image strategy sends a multipart user message containing one or more base64-encoded images as \texttt{image\_url} content blocks; no text from the PDF is included.
+The hybrid strategy sends both: the extracted text is the first content block, followed by the image.
+All three strategies pass the selected system prompt in a system-role message before the user turn, using the OpenAI-compatible chat completions format (see Section~\ref{sec:background:llms}).
+
+When embedded figures have been extracted from the page in advance, a short text block is prepended to the user message listing them as Markdown image links.
+This instructs the model to include those links at the appropriate positions in its output rather than describing the figures with placeholder text.
+For non-English documents, a language-preservation note is appended to the system prompt by the \texttt{with\_language\_hint} function.
+The note names the document language and instructs the model to keep all text in the original language.
+This prevents the model from silently translating German or French content into English.
+
+The adaptive strategy routes each page type to a specific prompt variant.
+FORMULA pages use the \textit{formula} prompt, TABLE pages the \textit{table} prompt, IMAGE pages the \textit{diagram} prompt, and MIXED pages the general \textit{default} prompt.
+TEXT pages are handled differently: the system calls the text strategy with \texttt{llm\_call=None}, which returns the raw pymupdf4llm output without invoking the LLM at all.
+This saves the full round-trip cost on every plain-text page, which is the primary source of efficiency gain for the adaptive strategy on text-heavy documents.
 
 \subsection{Post-processing Pipeline}
-\begin{itemize}
-    \item Markdown cleanup and validation
-    \item Element Extraction (Links, References)
-    \item Quality Assurance Checks
-\end{itemize}
+
+The raw output from pymupdf4llm and the LLM both contain predictable artefacts that must be removed before the Markdown is usable.
+The pipeline applies a fixed sequence of passes in two stages.
+The first stage runs per page via \texttt{clean\_page()}, before individual pages are joined into a document.
+The second stage runs on the full joined document via \texttt{postprocess\_markdown()}.
+Separating the two stages matters because some artefacts, such as duplicate running headers, only become visible once multiple pages are combined.
+
+The first group of passes removes structural noise introduced by the PDF format.
+Running headers are repeated chapter or section titles that PDF places at the top of every page; pymupdf4llm extracts these as plain-text lines, which the pipeline detects using a regex pattern and removes from the first line of each page chunk.
+A second pass removes them again mid-document, where they appear as isolated paragraphs surrounded by blank lines.
+Lone page-number paragraphs consisting of one to three Arabic digits or Roman numerals are also stripped.
+Two further passes remove artefacts specific to LLM output: one strips decorative horizontal rules that appear directly after a heading (PDF underlines misread as Markdown separators), and another removes prompt instruction text that some models copy verbatim into their output.
+
+The second group targets heading quality.
+pymupdf4llm often collapses all headings to the same level (\texttt{\#\#}), so the pipeline re-assigns levels based on section-number patterns: a line matching \texttt{1.1.1 Title} becomes \texttt{\#\#\#}, a line matching \texttt{1.1 Title} becomes \texttt{\#\#}, and a standalone chapter title becomes \texttt{\#}.
+A separate pass merges the cases where the section number and its title were emitted as two consecutive heading lines at the same level.
+Headings that are single words with no recognised structural keyword (such as a person's name promoted by bold font), headings whose entire content is italic, and headings that are really numbered source-code listing lines are all demoted to plain or list text.
+Title-page metadata lines promoted by bold styling are demoted to plain text by identifying everything before the first structural front-matter section (Erklärung, Abstract, Inhaltsverzeichnis).
+Duplicate headings produced by mid-document running headers are removed by tracking all seen heading texts and dropping any unnumbered repetition of an already-seen numbered heading.
+
+The remaining passes handle figures, captions, and encoding.
+Bold-formatted figure caption lines produced by pymupdf4llm are converted to italic and placed directly below their image link; captions that appear before their image are swapped.
+OCR text blocks extracted from embedded figures and wrapped in marker lines are converted to Markdown blockquotes.
+Single non-word Unicode symbols wrapped in italic markers (such as \texttt{\_{}$\Rightarrow$\_{}}) have the markers stripped.
+OCR superscript artefacts of the form \texttt{\_{}EMC\_{}[2]} are replaced with the Unicode superscript character (\texttt{EMC\textsuperscript{2}}).
+LaTeX math delimiters in the \texttt{\textbackslash(...\textbackslash)} and \texttt{\textbackslash[...\textbackslash]} styles are normalised to the \texttt{\$...\$} and \texttt{\$\$...\$\$} forms used throughout the output.
 
 \subsection{Implementation Details}
-\begin{itemize}
-    \item Technology Stack
-    \item LM Studio Integration
-    \item Reproducibility Considerations
-\end{itemize}
+
+The system is implemented in Python and depends on four external libraries.
+PyMuPDF \cite{pymupdf} (version 1.27) provides the core PDF interface: page analysis, text extraction, image rendering, and table detection.
+pymupdf4llm \cite{pymupdf4llm} (version 1.27, matching PyMuPDF) wraps it to produce Markdown output directly from the text layer.
+The \texttt{requests} library handles all HTTP communication with LM Studio.
+\texttt{langdetect} identifies the primary language of each page's extracted text so the correct language hint can be appended to the system prompt.
+No training or fine-tuning is required. The system runs entirely with pre-trained models loaded through LM Studio \cite{lmstudio}.
+
+Two models are loaded in LM Studio for the experiment, as described in Section~4.4.
+Qwen~3.5~9B handles text pages under the text strategy and under the adaptive strategy when it routes to the text path.
+Qwen2.5-VL~7B, a vision-language model, handles all visual pages under the image-only, hybrid, and adaptive vision paths.
+Both models are served through LM Studio's local HTTP server, which exposes an OpenAI-compatible \texttt{/v1/chat/completions} endpoint.
+The server URL and model name are passed as parameters to every strategy function, so switching to a different model or server requires no code changes.
+
+Reproducibility is ensured at three levels.
+First, all experiments use temperature 0.0, which makes the LLM output deterministic for the same input.
+Second, the library versions are pinned in the requirements file, so the extraction and rendering behaviour is identical across runs.
+Third, every LLM call is routed through the injectable \texttt{call\_llm} parameter, which means the full pipeline can be exercised in tests using a fake implementation that returns fixed strings, without any dependency on a running LM Studio instance.
+The evaluation framework stores all results as JSON and generates reports from that file, so results can be re-analysed without re-running the experiment.
 
 
 % ================================================================
@@ -1139,6 +1241,10 @@ the body text size and promote larger spans to Markdown heading levels H1--H3.
 \end{itemize}
 
 \subsection{Practical Implications}
+
+% TODO: mention that FORMULA pages currently use a general vision LLM, but a
+% dedicated math OCR tool (e.g. pix2tex) could replace the LLM for those pages,
+% reducing cost without sacrificing quality. This is a concrete future optimization.
 
 \subsection{Comparison with Related Work}
 
@@ -1208,10 +1314,10 @@ Available at: \url{https://www.markdownguide.org}
 % ---------------------------------------------------------------
 
 \bibitem{subramani2020}
-Subramani, N., Matton, A., Greaves, M., \& Lam, A. (2020).
+Subramani, N., Matton, A., Greaves, M., \& Lam, A. (2022).
 A survey of deep learning approaches for OCR and document understanding.
-\textit{arXiv preprint arXiv:2011.13534}.
-\url{https://arxiv.org/abs/2011.13534}
+\textit{ACM Computing Surveys}, 54(6), Article 124.
+\url{https://doi.org/10.1145/3495521}
 
 \bibitem{zhu2022}
 Zhu, W., Sokhandan, N., Yang, G., Martin, S., \& Sathyanarayana, S. (2022).
@@ -1224,64 +1330,60 @@ Ingemarsson, P., \& Persson, D. (2024).
 PDF Parsing, Unveiling the Most Efficient Method.
 Engineering Degree Project, Linnaeus University.
 
-\bibitem{parsing2024}
-Zhang, Q., et al. (2024).
-Document parsing unveiled: Techniques, challenges, and prospects for structured
-information extraction.
-\textit{arXiv preprint arXiv:2410.21169}.
-\url{https://arxiv.org/abs/2410.21169}
-
-\bibitem{gotocr2024}
-Wei, H., Liu, C., Chen, J., Wang, J., Kong, L., Xu, Y., Ge, Z., Zhao, L.,
-Sun, J., Peng, Y., Han, C., \& Zhang, X. (2024).
-General OCR Theory: Towards OCR-2.0 via a unified end-to-end model.
-\textit{arXiv preprint arXiv:2409.01704}.
-\url{https://arxiv.org/abs/2409.01704}
+\bibitem{meuschke2023}
+Meuschke, N., Jagdale, A., Spinde, T., Mitrović, J., \& Gipp, B. (2023).
+A benchmark of PDF information extraction tools using a multi-task and
+multi-domain evaluation framework for academic documents.
+In \textit{Proceedings of the 18th International Conference on Information
+(iConference 2023)}, LNCS vol.\ 13972. Springer.
+\url{https://doi.org/10.1007/978-3-031-28032-0_31}
 
 \bibitem{wukong2024}
-Xie, X., Yan, H., Yin, L., Liu, Y., Ding, J., Liao, M., Liu, Y., Chen, W., \& Bai, X. (2024).
+Xie, X., Yan, H., Yin, L., Liu, Y., Ding, J., Liao, M., Liu, Y., Chen, W., \& Bai, X. (2026).
 PDF-WuKong: A large multimodal model for efficient long PDF reading with
 end-to-end sparse sampling.
-\textit{International Journal of Computer Vision} (accepted 2026).
-\url{https://arxiv.org/abs/2410.05970}
+\textit{International Journal of Computer Vision}, 134, 1--20.
+\url{https://doi.org/10.1007/s11263-025-02384-5}
 
-\bibitem{parsebench2026}
-Zhang, B., et al. (2026).
-ParseBench: A document parsing benchmark for AI agents.
-\textit{arXiv preprint arXiv:2604.08538}.
-\url{https://arxiv.org/abs/2604.08538}
+\bibitem{omnidocbench2025}
+Ouyang, L., Qu, Y., Zhou, H., Zhu, J., Zhang, R., Lin, Q., Wang, B., Zhao, Z.,
+Jiang, M., Zhao, X., Shi, J., Wu, F., Chu, P., Liu, M., Li, Z., Xu, C.,
+Zhang, B., Shi, B., \& He, C. (2025).
+OmniDocBench: Benchmarking diverse PDF document parsing with comprehensive
+annotations.
+In \textit{Proceedings of the IEEE/CVF Conference on Computer Vision and
+Pattern Recognition (CVPR 2025)}.
 
 % -- Section 3.3: LLM-based Document Understanding --
 
 \bibitem{blecher2023}
 Blecher, L., Cucurull, G., Scialom, T., \& Stojnic, R. (2023).
 Nougat: Neural Optical Understanding for Academic Documents.
-\textit{arXiv preprint arXiv:2308.13418}.
-\url{https://arxiv.org/abs/2308.13418}
+In \textit{Proceedings of the 2023 Conference on Empirical Methods in Natural
+Language Processing (EMNLP 2023)}, pp.\ 3337--3349. ACL.
+\url{https://aclanthology.org/2023.emnlp-main.199}
 
-\bibitem{adhikari2024}
-Adhikari, N.S., \& Agarwal, S. (2024).
-A comparative study of PDF parsing tools across diverse document categories.
-\textit{arXiv preprint arXiv:2410.09871}.
-\url{https://arxiv.org/abs/2410.09871}
+\bibitem{mineru_software}
+OpenDataLab (2024).
+\textit{MinerU: An open-source solution for precise document content extraction}
+[Software].
+Available at: \url{https://github.com/opendatalab/MinerU}
 
-\bibitem{wang2024}
-Wang, B., et al. (2024).
-MinerU: An open-source solution for precise document content extraction.
-\textit{arXiv preprint arXiv:2409.18839}.
-\url{https://arxiv.org/abs/2409.18839}
-
-\bibitem{cassel2025}
+\bibitem{duan2025}
 Duan, C. (2025).
 Accelerating end-to-end PDF to Markdown conversion through assisted generation.
-\textit{arXiv preprint arXiv:2512.18122}.
-\url{https://arxiv.org/abs/2512.18122}
+In \textit{Proceedings of the 30th International Conference on Applications
+of Natural Language to Information Systems (NLDB 2025)},
+\textit{Lecture Notes in Computer Science}, vol.\ 15836, pp.\ 34--48.
+Springer Nature Switzerland.
+\url{https://doi.org/10.1007/978-3-031-97141-9_3}
 
-\bibitem{ding2025}
-Ding, Y., Han, S.C., Lee, J., \& Hovy, E. (2025).
+\bibitem{ding2026}
+Ding, Y., Han, S.C., Lee, J., \& Hovy, E.H. (2026).
 Deep learning based visually rich document content understanding: A survey.
-\textit{arXiv preprint arXiv:2408.01287}.
-\url{https://arxiv.org/abs/2408.01287}
+\textit{Artificial Intelligence Review}, 59(4), Article 114.
+Springer Nature.
+\url{https://doi.org/10.1007/s10462-025-11477-3}
 
 % -- Section 3.4: Evaluation Methods --
 
@@ -1294,19 +1396,21 @@ Computational Linguistics (ACL 2002)}, pp.\ 311--318. ACL.
 \bibitem{zhong2020}
 Zhong, X., ShafieiBavani, E., \& Jimeno Yepes, A. (2020).
 Image-based table recognition: Data, model, and evaluation.
-\textit{arXiv preprint arXiv:1911.10683}.
-\url{https://arxiv.org/abs/1911.10683}
+In \textit{Proceedings of the 16th European Conference on Computer Vision
+(ECCV 2020)}, LNCS vol.\ 12366, pp.\ 564--580. Springer.
+\url{https://doi.org/10.1007/978-3-030-58589-1_34}
 
 % ---------------------------------------------------------------
 % Chapter 4: Methodology
 % ---------------------------------------------------------------
 
 \bibitem{khan2024}
-Khan, A.A., et al. (2024).
+Khan, A.A., Hasan, M.T., Kemell, K.K., Rasku, J., \& Abrahamsson, P. (2024).
 Developing retrieval augmented generation (RAG) based LLM systems from PDFs:
 An experience report.
-\textit{arXiv preprint arXiv:2410.15944}.
-\url{https://arxiv.org/abs/2410.15944}
+In \textit{Proceedings of the 28th International Conference on Evaluation and
+Assessment in Software Engineering (EASE 2024)}, pp.\ 136--145. ACM.
+\url{https://doi.org/10.1145/3661167.3661187}
 
 \bibitem{pfitzmann2022}
 Pfitzmann, B., Auer, C., Dolfi, M., Nassar, A.S., \& Staar, P. (2022).
@@ -1314,6 +1418,25 @@ DocLayNet: A large human-annotated dataset for document-layout analysis.
 In \textit{Proceedings of the 28th ACM SIGKDD Conference on Knowledge
 Discovery and Data Mining (KDD 2022)}, pp.\ 3743--3751. ACM.
 \url{https://doi.org/10.1145/3534678.3539043}
+
+% ---------------------------------------------------------------
+% Chapter 5: System Design and Implementation
+% ---------------------------------------------------------------
+
+\bibitem{pymupdf}
+Artifex Software, Inc. (2024).
+\textit{PyMuPDF: Python bindings for MuPDF} [Software].
+Available at: \url{https://pymupdf.readthedocs.io}
+
+\bibitem{pymupdf4llm}
+Artifex Software, Inc. (2024).
+\textit{pymupdf4llm: PDF to Markdown conversion for LLM ingestion} [Software].
+Available at: \url{https://github.com/pymupdf/RAG}
+
+\bibitem{lmstudio}
+LM Studio (2024).
+\textit{LM Studio: Run large language models locally} [Software].
+Available at: \url{https://lmstudio.ai}
 
 \end{thebibliography}
 
