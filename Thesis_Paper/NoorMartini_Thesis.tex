@@ -330,18 +330,16 @@ unnecessary LLM calls on plain-text pages.
 % ----------------------------------------------------------------
 
 This thesis works only with PDF as the input format. The system is tested
-primarily on German and English academic documents, across four document
-categories: academic papers, administrative forms, presentation slides, and
-scanned archival documents. The system architecture is compatible with any
-LLM backend that supports a vision API, but all experiments are conducted
-locally using LM Studio, so there is no cloud dependency and results are
-fully reproducible.
+on bachelor and master thesis documents in German and English. The system
+architecture is compatible with any LLM backend that supports a vision API,
+but all experiments are conducted locally using LM Studio, so there is no
+cloud dependency and results are fully reproducible.
 
-The system detects the document language using the \texttt{langdetect}
-library and adjusts LLM prompts to prevent the model from translating
-content. No language-specific training or fine-tuning is applied, and the
-evaluation metrics are language-agnostic. The main experimental results and
-qualitative analysis are based on a German-language test document.
+The system detects the document language from the first page using the
+\texttt{langdetect} library and adjusts LLM prompts to prevent the model
+from translating content. If the page text is too short for reliable
+detection, the system defaults to English. No language-specific training or
+fine-tuning is applied, and the evaluation metrics are language-agnostic.
 
 The following are out of scope: real-time or streaming document processing,
 input formats other than PDF (e.g., DOCX, HTML, PPTX), fine-tuning or
@@ -358,10 +356,10 @@ architecture could support it through prompt changes.
 This thesis makes the following contributions.
 
 \textbf{Per-page content classifier.} Each PDF page is classified into one
-of five types (TEXT, IMAGE, FORMULA, MIXED, or EMPTY) using structural
+of six types (TEXT, IMAGE, FORMULA, TABLE, MIXED, or EMPTY) using structural
 signals from PyMuPDF: embedded image count, vector path density, presence of
-mathematical Unicode symbols, and character count. No LLM is used at this
-stage, so classification is fast and deterministic.
+mathematical Unicode symbols, table detection, and character count. No LLM
+is used at this stage, so classification is fast and deterministic.
 
 \textbf{Font-size-based heading detection.} Heading levels are inferred from
 font sizes. The system computes a character-weighted tally of font sizes on
@@ -1048,8 +1046,8 @@ This chapter describes the architecture of the developed system and the implemen
 
 \subsection{Architecture Overview}
 
-The system takes a PDF file as input and produces one Markdown string per page as output.
-It consists of four modules that run in sequence: a page content classifier, a PDF processing module, an LLM integration layer, and a post-processing pipeline.
+The system takes a PDF file as input and produces one combined Markdown document as output.
+It consists of four modules: a page content classifier, a PDF processing module, an LLM integration layer, and a post-processing pipeline.
 Each module is implemented as a separate Python package and communicates through well-defined data structures.
 This keeps the components interchangeable and makes them testable without running the full pipeline.
 
@@ -1063,10 +1061,9 @@ All other page types are rendered as a base64-encoded PNG image and passed to a 
 The LLM receives a structured prompt suited to the detected content type and returns a Markdown string.
 EMPTY pages are skipped, returning a short placeholder without any processing.
 
-The LLM integration layer communicates with LM Studio \cite{lmstudio} over a local HTTP server that exposes an OpenAI-compatible API \cite{khan2024}.
-All LLM calls are routed through a single \texttt{call\_llm} function, which accepts the server URL, model name, message list, temperature, and token limit as parameters.
-Every strategy accepts this function as an injectable parameter.
-The post-processing pipeline then receives the raw LLM output and applies a fixed sequence of cleanup passes before producing the final Markdown.
+Pages are converted in parallel using a thread pool. The default concurrency is four workers, which overlaps the I/O wait time of LLM calls without overloading the LM Studio server. Each worker opens its own \texttt{fitz.Document} handle, because PyMuPDF document objects are not thread-safe. The results are collected in page order and joined into a single Markdown document, with a horizontal rule between each page. The LLM integration layer communicates with LM Studio \cite{lmstudio} over a local HTTP server that exposes an OpenAI-compatible API \cite{khan2024}. All LLM calls are routed through a single \texttt{call\_llm} function, which accepts the server URL, model name, message list, temperature, and token limit as parameters. Every strategy accepts this function as an injectable parameter, so tests can replace it with a fixed-response stub without touching the rest of the code.
+
+The post-processing pipeline receives the joined Markdown and applies a fixed sequence of cleanup passes before writing the final output file.
 
 \subsection{Page Content Classifier}
 
@@ -1103,19 +1100,24 @@ TEXT pages go through text extraction only. IMAGE, FORMULA, TABLE, and MIXED pag
 The hybrid strategy uses both pipelines on the same page.
 
 Text extraction is handled by pymupdf4llm \cite{pymupdf4llm}.
-For each TEXT page, the system calls \texttt{pymupdf4llm.to\_markdown()} with \texttt{page\_chunks=True}, which limits processing to that single page and returns the result as a dictionary containing the extracted Markdown.
-Any inline figures found on the page are written to a configurable output directory, and their paths are corrected to be relative to the output file rather than the current working directory.
-When multiple pages are extracted from the same document, the system can pass pre-extracted Markdown directly to avoid re-running the document-level font histogram on every call.
+The system calls \texttt{pymupdf4llm.to\_markdown()} once for the whole document with \texttt{page\_chunks=True}, which returns one result per page as a list.
+This matters for performance: pymupdf4llm runs a full document scan to identify header font sizes on every call, regardless of how many pages are requested.
+Calling it once per page would repeat that scan N times, making extraction quadratic in the number of pages.
+Calling it once and indexing into the result list keeps extraction linear.
+Any inline figures found on TEXT pages are written to a configurable output directory, and their paths are corrected to be relative to the output file.
 
 For the hybrid strategy, a second text extraction runs in parallel using a custom font-size-based extractor built on PyMuPDF \cite{pymupdf}.
 This extractor builds a character-weighted tally of all font sizes on the page to identify the body text size, defined as the most frequent size by character count.
 Each line's dominant font size is then compared to the body size as a ratio: lines at 1.8 times the body size or above are promoted to H1, 1.4 times to H2, and 1.15 times to H3.
 This produces a lightweight Markdown representation of the text layer that the LLM receives alongside the rendered image.
 
-Image rendering converts each page to a base64-encoded PNG using PyMuPDF's pixmap renderer at twice the native resolution, achieved with a \texttt{fitz.Matrix(2,~2)} scale factor.
+Image rendering converts each page to a base64-encoded PNG using PyMuPDF's pixmap renderer.
+The render resolution is 150 DPI, set via a \texttt{fitz.Matrix(150/72,~150/72)} scale factor, which is about twice the PDF native resolution of 72 DPI.
 The higher resolution preserves fine detail in tables, formulas, and diagrams, which improves LLM recognition accuracy.
 The encoded string is passed directly in the API request body as a data URI, so no temporary files are written to disk for vision pages.
+The render DPI is a configurable constant, so it can be raised for documents with very dense content or lowered to reduce memory use.
 Embedded figures can also be extracted separately using \texttt{extract\_page\_figures}, which saves each image to disk and returns relative Markdown paths that the LLM can reference in its output.
+The system also preserves the printed page label for each page using PyMuPDF's \texttt{get\_label()} method, which returns the label as it appears in the PDF (for example, ``iii'' for a Roman-numeral front-matter page rather than the 0-based index). These labels appear in the \texttt{<!{-}{-} Page iii -{-}>} comments that separate pages in the output file.
 
 \subsection{LLM Integration}
 
@@ -1155,11 +1157,16 @@ The first group of passes removes structural noise introduced by the PDF format.
 Running headers are repeated chapter or section titles that PDF places at the top of every page; pymupdf4llm extracts these as plain-text lines, which the pipeline detects using a regex pattern and removes from the first line of each page chunk.
 A second pass removes them again mid-document, where they appear as isolated paragraphs surrounded by blank lines.
 Lone page-number paragraphs consisting of one to three Arabic digits or Roman numerals are also stripped.
-Two further passes remove artefacts specific to LLM output: one strips decorative horizontal rules that appear directly after a heading (PDF underlines misread as Markdown separators), and another removes prompt instruction text that some models copy verbatim into their output.
+Several further passes remove artefacts specific to LLM output.
+One strips decorative horizontal rules that appear directly after a heading, which come from PDF underlines misread as Markdown separators.
+Another removes prompt instruction text that some models copy verbatim into their output.
+A third strips \texttt{```markdown} fences that some models place around their entire response: the fence is valid syntax for a code block but not for the top-level document.
+Table-of-contents pages also receive a dedicated pass that removes dot leaders, the sequences of dots or spaces used to connect section titles to page numbers in a printed layout, which have no meaning in Markdown.
 
 The second group targets heading quality.
 pymupdf4llm often collapses all headings to the same level (\texttt{\#\#}), so the pipeline re-assigns levels based on section-number patterns: a line matching \texttt{1.1.1 Title} becomes \texttt{\#\#\#}, a line matching \texttt{1.1 Title} becomes \texttt{\#\#}, and a standalone chapter title becomes \texttt{\#}.
 A separate pass merges the cases where the section number and its title were emitted as two consecutive heading lines at the same level.
+A further pass handles cases where pymupdf4llm emits a bare section number with no title text, for example \texttt{\#\# 1.1} with nothing after it. The pipeline looks up the full section title in the raw PyMuPDF text for the same page and patches the heading, recovering titles that the layout extraction missed.
 Headings that are single words with no recognised structural keyword (such as a person's name promoted by bold font), headings whose entire content is italic, and headings that are really numbered source-code listing lines are all demoted to plain or list text.
 Title-page metadata lines promoted by bold styling are demoted to plain text by identifying everything before the first structural front-matter section (Erklärung, Abstract, Inhaltsverzeichnis).
 Duplicate headings produced by mid-document running headers are removed by tracking all seen heading texts and dropping any unnumbered repetition of an already-seen numbered heading.
