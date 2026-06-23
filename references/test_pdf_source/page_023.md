@@ -1,0 +1,36 @@
+5.3 Recursive Backwards Q-Learning
+Zur Umsetzung des RBQL müssen alle besuchten Zustände st mit der jeweiligen ausge-
+führten Aktion at und dem entsprechenden Folgezustand s(t + 1) gespeichert werden.
+Dies wird über ein Set „seen_steps“ realisiert. Außerdem müssen die gesammelten Be-
+lohnungen oder Bestrafungen der jeweiligen Zustände und Aktionen gespeichert werden,
+um jeden Zustand bewerten zu können. Dabei muss beachtet werden, dass die gleichen
+Zustände nicht doppelt bewertet werden.
+Bei Erreichen eines Terminalzustands, etwa durch das Verlassen des Spielfelds oder die
+Berührung des Schlägers durch den Ball, werden die zuvor besuchten Zustände rekursiv in
+umgekehrter Reihenfolge durchlaufen. Für jeden dieser Zustände wird der Q-Wert entspre-
+chend seiner Beteiligung am Erreichen des Endzustands aktualisiert. Um das zu erreichen,
+müssen für jeden Zustand s(t+1) die Zustände st aus „seen_steps“ herausgesucht werden,
+die s(t + 1) als Folgezustand haben. [8]
+Ein iteratives Durchsuchen aller Einträge in einer Liste zur Identifikation von Vorgänger-
+zuständen eines Folgezustands s(t+1) entspricht einer Laufzeit von O(n). Vor allem wenn
+das Set „seen_steps“ groß wird, dauert die Suche länger. Um das zu optimieren, werden
+die Schritte nicht nur in „seen_steps“ gespeichert, sondern noch in einem Dictionary „re-
+verse_steps“ gespeichert. Zu jedem im Spiel erreichten Zustand wird gespeichert, welche
+Vorgängerzustände zu dessen Entstehung geführt haben. Dadurch verbessert sich die Lauf-
+zeit erheblich.
+In dem zweidimensionalen Array „rewards“ werden alle Bewertungen gespeichert, die ein
+besuchter Zustand für eine der beiden Aktionen bekommen hat.
+Quellcode 5.5 zeigt die Update-Funktion des RBQL-Agenten. Die Funktion nimmt als
+Eingabeparameter den Terminalzustand „final_state“ und benutzt die globalen Variablen
+Q, gamma und reverse_steps. Von dem Terminalzustand aus werden alle Zustände gesucht,
+über die man in diesen Endzustand gelangt und in einer Warteschlange „queue“ gespei-
+chert. Die Warteschlange wird der Reihenfolge nach abgearbeitet und zu jedem aktuellen
+Zustand werden die entsprechenden vorherigen Zustände herausgesucht. Diese Vorgänger-
+zustände werden wieder in der Warteschlange gespeichert. Dabei werden in der Variable
+„visited“, die Zustände gespeichert, die schon bewertet sind. Dadurch wird vermieden,
+dass ein Schritt mehrfach mit verschieden Bewertungen in der Variable „seen_steps“ ge-
+speichert wird. Eine Vermeidung von doppelt gespeicherten Schritten ist wichtig, da sonst
+ein längerer, eventuell nicht optimaler Schritt ausgewählt wird, als der kurze optimale Weg.
+Die Bewertung wird so lange durchgeführt, bis in der Warteschlange kein Zustand mehr
+ist, welcher noch nicht bewertet ist.
+17

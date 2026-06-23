@@ -1,0 +1,36 @@
+that uses only open-weight models, but this is just a side effect. Open-weight models were
+chosen because reinforcement learning requires trainable weights. The system also runs
+fully autonomously and does not provide a mechanism for human review between phases
+or steps.
+3.2 Failure Modes and Human-in-the-Loop Approaches
+Evaluations of these systems show similar failure modes regardless of the architecture. In
+a case study of four autonomous research attempts, three failed during implementation or
+evaluation before finishing a paper [8]. It identified multiple failure modes. Code slowly
+drifts from the original plan. Long pipelines lose coherence as context degrades. Success
+is declared despite errors, which the authors call overexcitement.
+A systematic evaluation of 28 papers produced by five AI scientist systems concluded that
+the primary bottleneck in automated research is not idea generation but execution and
+verification [36]. When verification is poor, errors from one stage become inputs for the
+next and propagate until the generated paper describes something that was never actually
+tested.
+This problem is measurable in systems that have been evaluated both with and without
+human oversight. CodeScientist [9] is an automated discovery system that treats ideation
+and experiment design as a genetic search over combinations of research articles and code
+blocks. When run fully autonomously without human review, the rate of valid discoveries
+dropped from 12% to 2%. Analysis of the failed runs showed that implementations did
+not match the reported methods. These errors were invisible to the system’s own review
+process but apparent to a human reader. The creators of data-to-paper similarly report that
+fully autonomous runs could handle simple research goals, but as complexity increased,
+human review became important for maintaining accuracy [1].
+Some of the reviewed systems responded to the described failure modes by integrating
+human oversight. The approaches can be grouped into gated systems, system-initiated
+review and interruptible systems.
+Gated systems stop the pipeline at specific points and require human approval before con-
+tinuing. Data-to-paper [1] was the first to implement this approach via an optional copilot
+mode. In copilot mode, the user can inspect, comment on and request revisions of the
+output of each step through a desktop application. As complexity of the research goal
+increases, the authors found that this level of oversight becomes critical when trying to
+produce error-free manuscripts. Agent Laboratory [3] implemented a similar concept and
+optionally lets the user provide feedback after the literature review, experimentation and
+report writing stages. In autonomous mode, papers scored 3.5–4.0 out of 10 in a NeurIPS-
+7

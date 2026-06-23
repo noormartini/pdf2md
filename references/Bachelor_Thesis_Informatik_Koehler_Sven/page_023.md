@@ -1,0 +1,35 @@
+powerful Support Vector Machine (SVM) [Cortes und Vapnik, 1995] which are very
+flexible due to the possibility of changeable kernels. K. Dashtipour and his col-
+leagues created a really great paper [Dashtipour u. a., 2016b] describing the use of
+SVMs with numerous combinations for multilingual sentiment approaches. The ex-
+perimental setup from K. Dashtipour influenced this work to include SVMs into our
+tests. NB and SVM are linear kernels which makes them really fast and robust even
+for small datasets. By this it is possible to run thousands of different pipelines within
+an acceptable time. Ensemble learning techniques, which uses multiple learning al-
+gorithms instances to obtain better accuracies. Zhou and Feng shortly described an
+deep forest approach as alternative to deep neural networks [Zhou und Feng]. There
+are lots of different traditional ways for sentiment classifications, some are mixed
+with traditional vectorizing methods and others are mixed with modern unsuper-
+vised feature extractions.
+Nowadays there are more and more deep learning approaches applied to the field
+of sentiment classification tasks. J. Hong and M. Fang reported a short and really
+nice paper in which they compared the usage of LSTMs and Deep recursive Neural
+Networks with features from T. Mikolovs and Q. Le’s [Mikolov u. a., 2013b], [Le
+und Mikolov, 2014] word and paragraph vectors. Y. Kim reports of the results using
+a CNN on top of pretrained word vectors for the task of sentiment analysis. He
+included some hyper parameter tuning techniques and modified the architecture a
+little to use static and non-static vectors [Kim, 2014]. This approach is very similar
+to the CNN tests done within this thesis.
+A. Radford and his colleagues works on the topic of generating new Reviews and
+discovered a sentiment neuron within their byte-level recurrent language model. In
+their approach they first trained a multiplicative Long Short Term Memory (LSTM)
+with 4096 units on a corpus of 82 million Amazon reviews to predict the next char-
+acter in a chunk of text. The training took one month on their NVIDIA Pascal GPUs.
+Next they turned the model into a sentiment classifier by taking a linear combination
+of these units, learning the weights of the combination via the available supervised
+data. While training the linear model with L1-regularization they noticed that this
+classifier uses only a few of the learned units. Later they realized there is one ’sen-
+timent neuron’ that’s highly predictive of the sentiment value. [Radford u. a., 2016]
+By fixing the value of this neuron they are able to create only positive or negative
+reviews.
+15

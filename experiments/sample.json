@@ -27,6 +27,6 @@
   "temperatures": [
     0.0
   ],
-  "max_pages": 10,
+  "max_pages": 30,
   "base_url": "http://localhost:1234/v1"
 }
