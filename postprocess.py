@@ -98,6 +98,45 @@ _STRUCTURAL_KEYWORDS: frozenset[str] = frozenset({
 # at the end of a cell.  Group 1 = the page number.
 _DOT_LEADER_RE = re.compile(r"\s*\.(?:\s*\.)+\s*(\d+)\s*$")
 
+# ── Front-matter table detection ─────────────────────────────────────────────
+
+# Table whose header cell is "Contents" or "Inhaltsverzeichnis" — either a
+# single-cell row (| Contents |) or with one empty trailing cell (| Inhaltsverzeichnis |  |).
+_TOC_CONTENTS_HEADER_RE = re.compile(
+    r"^\|\s*(Contents|Inhaltsverzeichnis)\s*\|(\s*\|)?\s*$", re.IGNORECASE
+)
+
+# TOC continuation table with Chapter/Section/Page column headers.
+_TOC_CHAPTER_HEADER_RE = re.compile(
+    r"^\|\s*(?:Kapitel|Chapter)\s*\|\s*(?:Abschnitt|Section)\s*\|\s*(?:Seite|Page)\s*\|\s*$",
+    re.IGNORECASE,
+)
+
+# Generic Markdown pipe-table separator row (only dashes, colons, spaces, pipes).
+_TABLE_SEPARATOR_RE = re.compile(r"^\|[\s\-:]+(?:\|[\s\-:]+)+\|$")
+
+# Single-header listing/figure tables that begin a front-matter list page.
+_LISTING_PAGE_HEADER_RE = re.compile(
+    r"^\|\s*(List of Figures|List of Tables|Listings)\s*\|\s*$", re.IGNORECASE
+)
+
+# Two-column "Table | Description" list-of-tables header (missing Page column).
+_TABLE_LIST_HEADER_2COL_RE = re.compile(
+    r"^\|\s*(?:Table|Tabelle)\s*\|\s*(?:Description|Beschreibung)\s*\|\s*$",
+    re.IGNORECASE,
+)
+
+# A pipe-table cell that consists entirely of dots — dot-leader debris from
+# the Listings page where each dot became a separate column.
+_DOTS_CELL_RE = re.compile(r"^\.+$")
+
+# Abbreviation inline pattern: one **ABBR** definition pair within a longer line.
+# Captures (abbreviation, definition) — definition ends before the next **ABBR**
+# or at end of string.
+_ABBR_INLINE_RE = re.compile(
+    r"\*\*([A-Z][A-Z0-9]{1,})\*\*\s+([^*]+?)(?=\s+\*\*[A-Z]|\s*$)"
+)
+
 # Matches a PDF running header (Kopfzeile) line — a plain-text repetition of the
 # chapter/section title that appears at the top of every PDF page.
 # Pattern: optional section number (e.g. "2" or "2.1"), a space, then a title
@@ -175,6 +214,229 @@ def _clean_toc_dot_leaders(md: str) -> str:
         if changed:
             line = "|" + "|".join(inner) + "|"
         result.append(line)
+    return "\n".join(result)
+
+
+def _toc_2col_entry(entry: str, page: str) -> str:
+    """Format a single 2-col TOC row as a nested list item."""
+    if re.match(r"^\d+\.\d+\.\d+\s", entry):
+        return f"    - {entry} {page}"
+    if re.match(r"^\d+\.\d+\s", entry):
+        return f"  - {entry} {page}"
+    return f"- **{entry}** {page}"
+
+
+def _toc_3col_entry(col1_raw: str, col2: str, col3: str) -> str:
+    """Format a single 3-col Chapter/Section/Page row as a nested list item."""
+    col1 = col1_raw.strip()
+    if col1:
+        if col1[0].isdigit():
+            return f"- **{col1} {col2}** {col3}"
+        # Front matter or appendix (e.g. "Bibliography", "Appendix A").
+        title = f"{col1} {col2}".strip() if col2 else col1
+        return f"- **{title}** {col3}"
+    # Empty chapter column — depth from leading whitespace in the raw cell.
+    n = len(col1_raw) - len(col1_raw.lstrip())
+    if n >= 5:
+        return f"    - {col2} {col3}"
+    return f"  - {col2} {col3}"
+
+
+def _convert_toc_table(md: str) -> str:
+    """Convert TOC pipe-tables to a nested Markdown list.
+
+    Handles two formats pymupdf4llm produces:
+    • 2-column ("| Contents |" header): rows are "| entry | page |".
+    • 3-column ("| Chapter | Section | Page |" header): rows encode depth
+      via the number of leading spaces in the Chapter cell.
+    """
+    lines = md.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].strip()
+
+        # ── 2-column TOC ─────────────────────────────────────────────────────
+        if _TOC_CONTENTS_HEADER_RE.match(stripped):
+            items: list[str] = []
+            i += 1
+            while i < len(lines):
+                if not lines[i].strip():
+                    i += 1
+                    continue
+                if not lines[i].strip().startswith("|"):
+                    break
+                row = lines[i].strip()
+                if _TABLE_SEPARATOR_RE.match(row):
+                    i += 1
+                    continue
+                cells = row.split("|")
+                if len(cells) >= 4:
+                    entry = cells[1].strip()
+                    page = cells[2].strip()
+                    if entry:
+                        items.append(_toc_2col_entry(entry, page))
+                i += 1
+            result.append("## Contents")
+            result.append("")
+            result.extend(items)
+            continue
+
+        # ── 3-column TOC continuation ─────────────────────────────────────────
+        if _TOC_CHAPTER_HEADER_RE.match(stripped):
+            items = []
+            i += 1
+            while i < len(lines):
+                if not lines[i].strip():
+                    i += 1
+                    continue
+                if not lines[i].strip().startswith("|"):
+                    break
+                row = lines[i]
+                if _TABLE_SEPARATOR_RE.match(row.strip()):
+                    i += 1
+                    continue
+                cells = row.split("|")
+                if len(cells) >= 5:
+                    col1_raw = cells[1]
+                    col2 = cells[2].strip()
+                    col3 = cells[3].strip()
+                    if col2 or col1_raw.strip():
+                        items.append(_toc_3col_entry(col1_raw, col2, col3))
+                i += 1
+            result.extend(items)
+            continue
+
+        result.append(lines[i])
+        i += 1
+
+    return "\n".join(result)
+
+
+def _convert_abbreviations(md: str) -> str:
+    """Convert an inline bold abbreviation list to a two-column pipe table.
+
+    pymupdf4llm renders List of Abbreviations pages with all entries on one
+    line:  **AI** artificial intelligence **API** application...
+
+    Detects ≥3 such pairs and emits a proper Markdown table instead.
+    """
+    lines = md.split("\n")
+    result: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("**") and "**" in stripped[2:]:
+            pairs = _ABBR_INLINE_RE.findall(stripped)
+            if len(pairs) >= 3:
+                result.append("| Abbreviation | Definition |")
+                result.append("|---|---|")
+                for abbr, defn in pairs:
+                    result.append(f"| {abbr} | {defn.strip()} |")
+                continue
+        result.append(line)
+    return "\n".join(result)
+
+
+def _split_num_desc(entry: str) -> tuple[str, str]:
+    """Split 'N.N Description text' into ('N.N', 'Description text')."""
+    m = re.match(r"^(\d+\.\d+(?:\.\d+)?)\s+(.+)$", entry)
+    if m:
+        return m.group(1), m.group(2)
+    return "", entry
+
+
+def _fix_listing_table(md: str) -> str:
+    """Convert single-header figure/listing tables to clean 3-column tables.
+
+    pymupdf4llm renders List of Figures, List of Tables, and Listings pages
+    with a single-cell heading row and 2-column data rows where the item
+    number and description are merged.  The Listings page also has dot-leader
+    debris where each dot became a separate column.
+
+    Both formats are normalised to:
+        ## List of Figures
+        | Figure | Description | Page |
+        |---|---|---|
+        | 1.1 | Six-phase research pipeline | 2 |
+    """
+    lines = md.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        m = _LISTING_PAGE_HEADER_RE.match(lines[i].strip())
+        if m:
+            section = m.group(1)
+            num_col = "Figure" if "Figure" in section else ("Table" if "Table" in section else "Listing")
+            rows: list[str] = []
+            i += 1
+            while i < len(lines):
+                if not lines[i].strip():
+                    i += 1
+                    continue
+                if not lines[i].strip().startswith("|"):
+                    break
+                row = lines[i].strip()
+                if _TABLE_SEPARATOR_RE.match(row):
+                    i += 1
+                    continue
+                cells = row.split("|")
+                inner = [c.strip() for c in cells[1:-1]]
+                non_dot = [c for c in inner if c and not _DOTS_CELL_RE.match(c)]
+                if not non_dot:
+                    i += 1
+                    continue
+                entry = non_dot[0]
+                # Last non-dot cell is the page number if it is a short
+                # alphanumeric token distinct from the entry text.
+                page = ""
+                if len(non_dot) > 1:
+                    last = non_dot[-1]
+                    if re.match(r"^[a-zA-Z0-9]+$", last) and last != entry:
+                        page = last
+                num, desc = _split_num_desc(entry)
+                rows.append(f"| {num} | {desc} | {page} |")
+                i += 1
+            result.append(f"## {section}")
+            result.append("")
+            result.append(f"| {num_col} | Description | Page |")
+            result.append("|---|---|---|")
+            result.extend(rows)
+            continue
+        result.append(lines[i])
+        i += 1
+    return "\n".join(result)
+
+
+def _fix_table_list_header(md: str) -> str:
+    """Fix a 'Table | Description' header that is missing the Page column.
+
+    The List of Tables page is sometimes extracted with a 2-column header
+    while data rows already carry an (empty) third column for page numbers.
+    This corrects the header and adds a '## List of Tables' heading when
+    none precedes the table.
+    """
+    lines = md.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        if _TABLE_LIST_HEADER_2COL_RE.match(lines[i].strip()):
+            last_content = next(
+                (result[j] for j in range(len(result) - 1, -1, -1) if result[j].strip()),
+                "",
+            )
+            if not last_content.startswith("##"):
+                result.append("## List of Tables")
+                result.append("")
+            result.append("| Table | Description | Page |")
+            i += 1
+            if i < len(lines) and _TABLE_SEPARATOR_RE.match(lines[i].strip()):
+                result.append("|---|---|---|")
+                i += 1
+            else:
+                result.append("|---|---|---|")
+            continue
+        result.append(lines[i])
+        i += 1
     return "\n".join(result)
 
 
@@ -493,6 +755,10 @@ def clean_page(md: str, raw_page_text: str = "") -> str:
 
     md = _strip_running_headers(md)
     md = _clean_toc_dot_leaders(md)
+    md = _convert_toc_table(md)
+    md = _fix_listing_table(md)
+    md = _fix_table_list_header(md)
+    md = _convert_abbreviations(md)
     md = _unwrap_symbol_italics(md)
     md = _fix_ocr_superscripts(md)
     md = _format_figure_captions(md)

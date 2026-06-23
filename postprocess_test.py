@@ -3,11 +3,15 @@ from postprocess import (
     postprocess_markdown,
     _clean_toc_dot_leaders,
     _clean_picture_text_blocks,
+    _convert_abbreviations,
+    _convert_toc_table,
     _demote_code_listing_headings,
     _demote_italic_headings,
     _demote_outline_chapter_refs,
     _demote_title_page_headings,
     _demote_unlabeled_single_word_headings,
+    _fix_listing_table,
+    _fix_table_list_header,
     _format_figure_captions,
     _fix_ocr_superscripts,
     _merge_kapitel_headings,
@@ -326,8 +330,7 @@ def test_clean_toc_dot_leaders_leaves_normal_tables_unchanged():
     assert _clean_toc_dot_leaders(md) == md
 
 
-def test_clean_page_preserves_toc_table_format():
-    # TOC tables should remain as tables, not be converted to text.
+def test_clean_page_converts_toc_table_to_nested_list():
     md = (
         "| Inhaltsverzeichnis |  |\n"
         "| --- | --- |\n"
@@ -335,8 +338,122 @@ def test_clean_page_preserves_toc_table_format():
         "| 2 Grundlagen | 3 |\n"
     )
     result = clean_page(md)
-    assert "|" in result
-    assert "1 Einleitung" in result
+    assert "## Contents" in result
+    assert "**1 Einleitung** 1" in result
+    assert "**2 Grundlagen** 3" in result
+    assert "| --- | --- |" not in result
+
+
+def test_convert_toc_table_two_col_nesting():
+    md = (
+        "| Contents |\n"
+        "| --- | --- |\n"
+        "| List of Abbreviations | vii |\n"
+        "| 1 Introduction | 1 |\n"
+        "| 2 Foundations | 3 |\n"
+        "| 2.1 Background | 4 |\n"
+        "| 2.1.1 Details | 5 |\n"
+    )
+    result = _convert_toc_table(md)
+    assert "## Contents" in result
+    assert "- **List of Abbreviations** vii" in result
+    assert "- **1 Introduction** 1" in result
+    assert "- **2 Foundations** 3" in result
+    assert "  - 2.1 Background 4" in result
+    assert "    - 2.1.1 Details 5" in result
+    assert "|" not in result
+
+
+def test_convert_toc_table_three_col_depth():
+    md = (
+        "| Chapter | Section | Page |\n"
+        "|---|---|---|\n"
+        "| 6 | Evaluation | 46 |\n"
+        "|   | Methodology | 46 |\n"
+        "|     | Setup | 47 |\n"
+        "| 7 | Discussion | 61 |\n"
+        "| Bibliography | | xi |\n"
+    )
+    result = _convert_toc_table(md)
+    assert "- **6 Evaluation** 46" in result
+    assert "  - Methodology 46" in result
+    assert "    - Setup 47" in result
+    assert "- **7 Discussion** 61" in result
+    assert "- **Bibliography** xi" in result
+    assert "|" not in result
+
+
+def test_convert_abbreviations_inline_to_table():
+    md = (
+        "**AI** artificial intelligence "
+        "**API** application programming interface "
+        "**CLI** command line interface "
+        "**DOI** digital object identifier"
+    )
+    result = _convert_abbreviations(md)
+    assert "| Abbreviation | Definition |" in result
+    assert "| AI | artificial intelligence |" in result
+    assert "| API | application programming interface |" in result
+    assert "**AI**" not in result
+
+
+def test_convert_abbreviations_leaves_normal_bold_alone():
+    md = "**Bold text** that is not an abbreviation list."
+    assert _convert_abbreviations(md) == md
+
+
+def test_fix_listing_table_figures():
+    md = (
+        "| List of Figures |\n"
+        "| --- | --- |\n"
+        "| 1.1 Six-phase research pipeline | 2 |\n"
+        "| 4.1 High-level system architecture | 13 |\n"
+    )
+    result = _fix_listing_table(md)
+    assert "## List of Figures" in result
+    assert "| Figure | Description | Page |" in result
+    assert "| 1.1 | Six-phase research pipeline | 2 |" in result
+    assert "| 4.1 | High-level system architecture | 13 |" in result
+    assert "| --- | --- |" not in result
+
+
+def test_fix_listing_table_with_dot_debris():
+    md = (
+        "| Listings |\n"
+        "| --- | --- |\n"
+        "\n"
+        "| 4.1 Paper specification template | ... | ... | ... |\n"
+        "| 5.1 Hypothesis response schema | ... | ... |\n"
+    )
+    result = _fix_listing_table(md)
+    assert "## Listings" in result
+    assert "| Listing | Description | Page |" in result
+    assert "| 4.1 | Paper specification template |" in result
+    assert "| 5.1 | Hypothesis response schema |" in result
+
+
+def test_fix_table_list_header_adds_heading_and_page_column():
+    md = (
+        "| Table | Description |\n"
+        "|---|---|\n"
+        "| 3.1 | Comparison of systems |  |\n"
+    )
+    result = _fix_table_list_header(md)
+    assert "## List of Tables" in result
+    assert "| Table | Description | Page |" in result
+    assert "|---|---|---|" in result
+    assert "| 3.1 | Comparison of systems |  |" in result
+
+
+def test_fix_table_list_header_no_duplicate_heading():
+    md = (
+        "## List of Tables\n\n"
+        "| Table | Description |\n"
+        "|---|---|\n"
+        "| 3.1 | Comparison |  |\n"
+    )
+    result = _fix_table_list_header(md)
+    assert result.count("## List of Tables") == 1
 
 
 def test_recover_bare_number_headings_patches_missing_title():
