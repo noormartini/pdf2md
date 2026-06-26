@@ -116,9 +116,18 @@ _TOC_CHAPTER_HEADER_RE = re.compile(
 _TABLE_SEPARATOR_RE = re.compile(r"^\|[\s\-:]+(?:\|[\s\-:]+)+\|$")
 
 # Single-header listing/figure tables that begin a front-matter list page.
+# Matches both the 1-column form "| List of Figures |" and the 2-column VLM
+# form "| List of Figures |  |".
 _LISTING_PAGE_HEADER_RE = re.compile(
-    r"^\|\s*(List of Figures|List of Tables|Listings)\s*\|\s*$", re.IGNORECASE
+    r"^\|\s*(List of Figures|List of Tables|Listings)\s*\|(?:\s*\|)?\s*$", re.IGNORECASE
 )
+
+# Matches a figure-number token like "1.1" or "4.10".
+_FIG_NUM_RE = re.compile(r"^(\d+\.\d+)\s*(.*)", re.DOTALL)
+# Matches a plain integer page number.
+_PAGE_NUM_ONLY_RE = re.compile(r"^\d+$")
+# Matches a line that is entirely dots/spaces (dot-leader continuation line).
+_DOT_LEADER_LINE_RE = re.compile(r"^[\s.]+$")
 
 # Two-column "Table | Description" list-of-tables header (missing Page column).
 _TABLE_LIST_HEADER_2COL_RE = re.compile(
@@ -343,6 +352,159 @@ def _split_num_desc(entry: str) -> tuple[str, str]:
     if m:
         return m.group(1), m.group(2)
     return "", entry
+
+
+def _parse_lof_entries(raw_text: str) -> list[tuple[str, str, str]]:
+    """Parse (figure_num, description, page) triples from raw fitz page text.
+
+    Handles two layouts emitted by fitz for List of Figures pages:
+    • Separate lines:  "1.1\\nSix-phase pipeline . . .\\n2"
+    • Combined line:   "4.10 Experimentation flow . . .\\n31"
+      (sometimes with a trailing dot-leader line before the page number)
+    """
+    lines = [ln.strip() for ln in raw_text.split("\n")]
+
+    # Find the "List of Figures" header line.
+    start = None
+    for idx, ln in enumerate(lines):
+        if re.match(r"^list of figures$", ln, re.IGNORECASE):
+            start = idx + 1
+            break
+    if start is None:
+        return []
+
+    entries: list[tuple[str, str, str]] = []
+    i = start
+    while i < len(lines):
+        ln = lines[i]
+        if not ln or re.match(r"^[ivxlc]+$", ln, re.IGNORECASE):
+            i += 1
+            continue
+
+        m = _FIG_NUM_RE.match(ln)
+        if not m:
+            break  # left the List of Figures block
+
+        num = m.group(1)
+        rest = m.group(2).strip()
+
+        if rest:
+            # Number and description on the same fitz line.
+            desc = re.sub(r"\s*\.+\s*", " ", rest).strip().rstrip(".")
+            # Peek: next non-empty line may be a dot-leader continuation or page.
+            j = i + 1
+            while j < len(lines) and not lines[j]:
+                j += 1
+            page = ""
+            if j < len(lines):
+                if _PAGE_NUM_ONLY_RE.match(lines[j]):
+                    page = lines[j]
+                    i = j + 1
+                elif _DOT_LEADER_LINE_RE.match(lines[j]):
+                    # Skip the dot-leader continuation and grab the page.
+                    k = j + 1
+                    while k < len(lines) and not lines[k]:
+                        k += 1
+                    if k < len(lines) and _PAGE_NUM_ONLY_RE.match(lines[k]):
+                        page = lines[k]
+                        i = k + 1
+                    else:
+                        i = k
+                else:
+                    i = j
+            else:
+                i = j
+        else:
+            # Number alone on its own fitz line.
+            j = i + 1
+            while j < len(lines) and not lines[j]:
+                j += 1
+            if j >= len(lines):
+                break
+            desc_raw = lines[j]
+            desc = re.sub(r"\s*\.+\s*", " ", desc_raw).strip().rstrip(".")
+            k = j + 1
+            while k < len(lines) and not lines[k]:
+                k += 1
+            page = ""
+            if k < len(lines):
+                if _PAGE_NUM_ONLY_RE.match(lines[k]):
+                    page = lines[k]
+                    i = k + 1
+                elif _DOT_LEADER_LINE_RE.match(lines[k]):
+                    # Dot-leader continuation after description — skip it.
+                    m2 = k + 1
+                    while m2 < len(lines) and not lines[m2]:
+                        m2 += 1
+                    if m2 < len(lines) and _PAGE_NUM_ONLY_RE.match(lines[m2]):
+                        page = lines[m2]
+                        i = m2 + 1
+                    else:
+                        i = m2
+                else:
+                    i = k
+            else:
+                i = k
+
+        entries.append((num, desc, page))
+
+    return entries
+
+
+def _fix_lof_numbers(md: str, raw_page_text: str = "") -> str:
+    """Rebuild a List of Figures table to include the figure numbers.
+
+    VLMs often produce a 2-column table (description | page) with the figure
+    number column missing.  This pass detects that and rebuilds the section as
+    a proper 3-column table using the figure numbers parsed from raw fitz text.
+    """
+    if not raw_page_text or "List of Figures" not in raw_page_text:
+        return md
+
+    entries = _parse_lof_entries(raw_page_text)
+    if not entries:
+        return md
+
+    lines = md.split("\n")
+    result: list[str] = []
+    i = 0
+    while i < len(lines):
+        stripped = lines[i].strip()
+        is_lof = re.match(r"^\|\s*List of Figures\s*\|", stripped, re.IGNORECASE) or re.match(
+            r"^#{1,3}\s*List of Figures\s*$", stripped, re.IGNORECASE
+        )
+        if is_lof:
+            # Consume the rest of the section (table rows and blank separators).
+            i += 1
+            while i < len(lines):
+                s = lines[i].strip()
+                if not s:
+                    # Blank line — stop unless the next non-blank is still a table row.
+                    j = i + 1
+                    while j < len(lines) and not lines[j].strip():
+                        j += 1
+                    if j < len(lines) and lines[j].strip().startswith("|"):
+                        i = j
+                        continue
+                    break
+                if s.startswith("|"):
+                    i += 1
+                    continue
+                break
+
+            # Emit the rebuilt 3-column table.
+            result.append("## List of Figures")
+            result.append("")
+            result.append("| Figure | Description | Page |")
+            result.append("|---|---|---|")
+            for fig_num, desc, page in entries:
+                result.append(f"| {fig_num} | {desc} | {page} |")
+            continue
+
+        result.append(lines[i])
+        i += 1
+
+    return "\n".join(result)
 
 
 def _fix_listing_table(md: str) -> str:
@@ -756,6 +918,7 @@ def clean_page(md: str, raw_page_text: str = "") -> str:
     md = _strip_running_headers(md)
     md = _clean_toc_dot_leaders(md)
     md = _convert_toc_table(md)
+    md = _fix_lof_numbers(md, raw_page_text)
     md = _fix_listing_table(md)
     md = _fix_table_list_header(md)
     md = _convert_abbreviations(md)

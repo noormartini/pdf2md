@@ -1,40 +1,5 @@
-user’s approval. If the output contains errors, the user can improve it in multiple ways.
-The first is to edit the artifact manually. The second is to trigger a regeneration, which
-re-executes the phase with the same inputs. A less obvious option is to modify the data
-the phase depends on. Since each phase uses the output from previous phases as context,
-regenerating the artifact with unchanged inputs might produce a similar result again. For
-the first phase, this means updating the paper specification and optionally the style guide-
-lines, code or datasets. For all later phases, the user can turn back to a previous phase,
-adjust its output, and return to regenerate the current phase.
-This is the core loop of this HITL system. A phase runs, the user reviews the result, and
-the next phase only starts when the user chooses to proceed.
-Review generated
-artifact
-Trigger phase
-Trigger regeneration
-Execute phase
-[else]
-[satisfied with artifact]
-Edit manually
-[manual fix]
-System
-[else]
-[else]
-[else]
-[continues]
-[artifact already
-generated]
-User
-Proceed to next or
-previous screen
-Human-in-the-Loop Interaction Flow
-Figure 4.2: An activity diagram showing how the user and system interact. The activity diagram is di-
-vided into User and System swimlanes. The initial action depends on whether the artifact
-already exists ([artifact already generated]). If it was not generated yet, the user
-starts the process (Trigger phase) by opening its corresponding screen, and the system
-runs the phase (Execute phase). Both paths merge at the review stage. Requesting a
-completely new output (Trigger regeneration) loops back to the review stage. Alterna-
-tively, the user can fix the artifact themselves (Edit manually). Once satisfied with the
-result, the user can either continue (Proceed to next or previous screen) or stop the
-process.
-16
+user's approval. If the output contains errors, the user can improve it in multiple ways. The first is to edit the artifact manually. The second is to trigger a regeneration, which re-executes the phase with the same inputs. A less obvious option is to modify the data the phase depends on. Since each phase uses the output from previous phases as context, regenerating the artifact with unchanged inputs might produce a similar result again. For the first phase, this means updating the paper specification and optionally the style guidelines, code or datasets. For all later phases, the user can turn back to a previous phase, adjust its output, and return to regenerate the current phase.
+
+This is the core loop of this HITL system. A phase runs, the user reviews the result, and the next phase only starts when the user chooses to proceed.
+
+**Figure 4.2**: An activity diagram showing how the user and system interact. The activity diagram is divided into User and System swimlanes. The initial action depends on whether the artifact already exists ([artifact already generated]). If it was not generated yet, the user starts the process (Trigger phase) by opening its corresponding screen, and the system runs the phase (Execute phase). Both paths merge at the review stage. Requesting a completely new output (Trigger regeneration) loops back to the review stage. Alternatively, the user can fix the artifact themselves (Edit manually). Once satisfied with the result, the user can either continue (Proceed to next or previous screen) or stop the process.

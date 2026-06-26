@@ -8,4 +8,4 @@ Dies wird am Anwendungsfall eines Ping-Pong-Spiels getestet. Dabei soll ein neur
 
 Die Algorithmen RBQL, Experience Replay Q-Learning und das klassische Q-Learning werden zunächst ohne neuronale Netze zum Trainieren des Ping-Pong-Agenten eingesetzt und die Ergebnisse analysiert. Anschließend soll noch gezeigt werden, wie effizient ein einfaches neuronales Netz mit dem RBQL trainiert werden kann und das Ergebnis mit dem verbreiteten Experience Replay Q-Learning verglichen werden. Daraus sollen dann Schlüsse gezogen werden, ob RBQL das Training neuronaler Netze verbessern kann.
 
-> Kann das Training von neuronalen Netzen in deterministischen Umgebungen durch RBQL effizienter gestaltet werden als mit dem bisher verbreiteten Experience Replay Q-Learning?
+Kann das Training von neuronalen Netzen in deterministischen Umgebungen durch RBQL effizienter gestaltet werden als mit dem bisher verbreiteten Experience Replay Q-Learning?

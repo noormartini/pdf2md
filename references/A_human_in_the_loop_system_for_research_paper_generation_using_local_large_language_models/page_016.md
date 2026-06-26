@@ -1,38 +1,15 @@
-ments and checks novelty via Semantic Scholar, and then implements changes across four
-parallel branches and improves them until they outperform the baseline.
-AI-Researcher [30] takes multiple reference papers as input and implements the research
-process using specialized agents. A knowledge acquisition agent searches for papers and
-repositories, a resource analyst translates concepts into mathematical formulas and code,
-and an idea generator proposes ideas through a divergent-convergent framework. A code
-agent then implements the selected idea with review from an advisor agent, and a writer
-agent produces the final manuscript.
-freephdlabor [31] is also a multi-agent framework, but with a star-shaped architecture. In
-this system, a manager agent coordinates other agents for tasks like ideation and writing,
-and decides the next action based on real-time findings instead of following a predeter-
-mined pipeline. Agents communicate through a shared workspace with reference-based
-messaging to reduce information loss when passing tasks between agents.
-EvoScientist [32] is another multi-agent framework built around three agents. It uses a
-researcher agent for idea generation, an engineer agent for implementation and an evolu-
-tion manager agent that saves findings into persistent memory. An ideation memory saves
-promising and failed research directions, and an experimentation memory contains effec-
-tive data processing and training strategies. This design is meant to allow the system to
-learn from its previous runs.
-Other systems treat the research process as an optimization problem. Double-Loop Multi-
-Agent Collaboration (DLMA) [33] does this via two concurrent loops. In the leader loop,
-professor agents evolve a pool of research proposals by simulating structured meetings with
-an evolutionary selection mechanism that ranks proposals via an LLM review panel. In
-the follower loop, doctoral student agents implement the selected proposal and collaborate
-to gather context and to maintain consistency across steps.
-DeepScientist [34] also treats the research process as an optimization problem. It frames
-discovery as Bayesian optimization over a persistent findings memory. It is capable of
-running month-long campaigns that generate thousands of ideas to find a small number of
-validated results.
-Human-in-the-Loop Economic Research (HLER) [35] is specifically designed for empiri-
-cal economics and social sciences. It coordinates seven agents for data auditing, profiling,
-hypothesis generation, data retrieval, econometric analysis, paper writing and automated
-review with checkpoints at hypothesis selection and publication approval.
-CycleResearcher [10] is special in the sense that it only uses open-weight local LLMs. It
-fine-tunes two open-weight LLMs via reinforcement learning for research and writing, and
-for simulated peer review. Once the models are trained, they run locally without any cloud
-application programming interfaces (APIs). CycleResearcher is the only reviewed system
-6
+and checks novelty via Semantic Scholar, and then implements changes across four parallel branches and improves them until they outperform the baseline.
+
+AI-Researcher [30] takes multiple reference papers as input and implements the research process using specialized agents. A knowledge acquisition agent searches for papers and repositories, a resource analyst translates concepts into mathematical formulas and code, and an idea generator proposes ideas through a divergent-convergent framework. A code agent then implements the selected idea with review from an advisor agent, and a writer agent produces the final manuscript.
+
+freephdlabor [31] is also a multi-agent framework, but with a star-shaped architecture. In this system, a manager agent coordinates other agents for tasks like ideation and writing, and decides the next action based on real-time findings instead of following a predetermined pipeline. Agents communicate through a shared workspace with reference-based messaging to reduce information loss when passing tasks between agents.
+
+EvoScientist [32] is another multi-agent framework built around three agents. It uses a researcher agent for idea generation, an engineer agent for implementation and an evolution manager agent that saves findings into persistent memory. An ideation memory saves promising and failed research directions, and an experimentation memory contains effective data processing and training strategies. This design is meant to allow the system to learn from its previous runs.
+
+Other systems treat the research process as an optimization problem. Double-Loop Multi-Agent Collaboration (DLMA) [33] does this via two concurrent loops. In the leader loop, professor agents evolve a pool of research proposals by simulating structured meetings with an evolutionary selection mechanism that ranks proposals via an LLM review panel. In the follower loop, doctoral student agents implement the selected proposal and collaborate to gather context and to maintain consistency across steps.
+
+DeepScientist [34] also treats the research process as an optimization problem. It frames discovery as Bayesian optimization over a persistent findings memory. It is capable of running month-long campaigns that generate thousands of ideas to find a small number of validated results.
+
+Human-in-the-Loop Economic Research (HLER) [35] is specifically designed for empirical economics and social sciences. It coordinates seven agents for data auditing, profiling, hypothesis generation, data retrieval, econometric analysis, paper writing and automated review with checkpoints at hypothesis selection and publication approval.
+
+CycleResearcher [10] is special in the sense that it only uses open-weight local LLMs. It fine-tunes two open-weight LLMs via reinforcement learning for research and writing, and for simulated peer review. Once the models are trained, they run locally without any cloud application programming interfaces (APIs). CycleResearcher is the only reviewed system

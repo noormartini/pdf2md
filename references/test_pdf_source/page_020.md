@@ -1,12 +1,3 @@
-durch das neuronale Netz geschätzten Q-Wert. [6] Der Wert von ε wird im Laufe des Trai-
-nings schrittweise reduziert, um anfänglich eine breite Exploration und später eine stärkere
-Ausnutzung des Gelernten zu ermöglichen.
-Herausforderungen
-Ein zentrales Problem beim Training besteht darin, dass die Q-Werte,
-insbesondere zu Beginn des Lernprozesses, noch instabil sein können. Das neuronale Netz
-kann dadurch fehlerhafte Zielwerte lernen, was wiederum die Q-Funktion negativ beein-
-flussen kann. Dieses Problem wird durch ein schrittweises Absenken von ε sowie durch
-eine Begrenzung der Lernrate beim Training des Netzes abgemildert. Dennoch bleibt das
-gleichzeitige Optimieren von Q-Funktion und Netzparametern ein sensibler Teil des Ver-
-fahrens.
-14
+durch das neuronale Netz geschätzten Q-Wert. [6] Der Wert von ε wird im Laufe des Trainings schrittweise reduziert, um anfänglich eine breite Exploration und später eine stärkere Ausnutzung des Gelernten zu ermöglichen.
+
+**Herausforderungen** Ein zentrales Problem beim Training besteht darin, dass die Q-Werte, insbesondere zu Beginn des Lernprozesses, noch instabil sein können. Das neuronale Netz kann dadurch fehlerhafte Zielwerte lernen, was wiederum die Q-Funktion negativ beeinflussen kann. Dieses Problem wird durch ein schrittweises Absenken von ε sowie durch eine Begrenzung der Lernrate beim Training des Netzes abgemildert. Dennoch bleibt das gleichzeitige Optimieren von Q-Funktion und Netzparametern ein sensibler Teil des Verfahrens.

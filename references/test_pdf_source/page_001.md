@@ -1,18 +1,18 @@
 # Recursive Backwards Q-Learning
-## am Beispiel eines Ping-Pong-Spiels
+# am Beispiel eines Ping-Pong-Spiels
 
-Stephan Halder
+## Stephan Halder
 
-Bachelor-Thesis
+## Bachelor-Thesis
 zur Erlangung des akademischen Grades Bachelor of Science (B.Sc.)
-Studiengang Informatik
+## Studiengang Informatik
 
-Fakultät für Informatik
-Technische Hochschule Mannheim
+## Fakultät für Informatik
+## Technische Hochschule Mannheim
 
-14.08.2025
+## 14.08.2025
 
-Betreuer
+## Betreuer
 
 Prof. Dr. Jörn Fischer, Technische Hochschule Mannheim
 Prof. Dr. Thomas Ihme, Technische Hochschule Mannheim

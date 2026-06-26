@@ -1,31 +1,10 @@
 # Chapter 1
 ## Introduction
-Systems that automate the scientific research process, including searching literature, gen-
-erating hypotheses, running experiments and writing manuscripts, are no longer just con-
-cepts. Systems like data-to-paper [1], The AI Scientist [2] or Agent Laboratory [3] have
-demonstrated that large language model (LLM)-based pipelines can produce complete re-
-search papers. Yet, all reviewed systems except one rely on proprietary cloud services,
-which means that requests cost money and user data is sent to third parties. This limits
-accessibility for researchers without large budgets, creates a dependency on providers who
-can change pricing or terms at any time, and raises privacy concerns.
-Open-weight models offer a compelling alternative and are gaining popularity, with the
-most popular models having been downloaded millions of times.1 These models can be
-downloaded and run locally by end users via software like LM Studio [4].
-However, LLMs, regardless of type, hallucinate. They generate confident-sounding but
-factually wrong content [5], particularly when they lack access to relevant source mate-
-rial [6]. In automated research systems, this leads to errors like fabricated or wrongly
-attributed citations, or invented implementation details and experiment results [2, 3, 7].
-Additionally, uncaught errors in early phases propagate and affect later phases [8]. In
-systems evaluated both with and without human oversight, adding review consistently im-
-proved output quality [1, 3, 9]. Many of the existing systems run fully autonomously, and
-the only reviewed system designed for local execution also does not provide a mechanism
+Systems that automate the scientific research process, including searching literature, generating hypotheses, running experiments and writing manuscripts, are no longer just concepts. Systems like data-to-paper [1], The AI Scientist [2] or Agent Laboratory [3] have demonstrated that large language model (LLM)-based pipelines can produce complete research papers. Yet, all reviewed systems except one rely on proprietary cloud services, which means that requests cost money and user data is sent to third parties. This limits accessibility for researchers without large budgets, creates a dependency on providers who can change pricing or terms at any time, and raises privacy concerns.
+Open-weight models offer a compelling alternative and are gaining popularity, with the most popular models having been downloaded millions of times.1 These models can be downloaded and run locally by end users via software like LM Studio [4].
+However, LLMs, regardless of type, hallucinate. They generate confident-sounding but factually wrong content [5], particularly when they lack access to relevant source material [6]. In automated research systems, this leads to errors like fabricated or wrongly attributed citations, or invented implementation details and experiment results [2, 3, 7].
+Additionally, uncaught errors in early phases propagate and affect later phases [8]. In systems evaluated both with and without human oversight, adding review consistently improved output quality [1, 3, 9]. Many of the existing systems run fully autonomously, and the only reviewed system designed for local execution also does not provide a mechanism
 for human review between phases [10].
-None of the reviewed systems combine fully local inference using general-purpose models
-with a mechanism for human oversight.
-This thesis introduces an automated research paper generator that runs entirely on local
-open-weight LLMs with a human-in-the-loop (HITL) strategy. It takes a research topic
-as input and produces a compiled research paper with generated experiments, figures and
-citations grounded in retrieved literature. As shown in Figure 1.1, the system divides the
-research process into six phases: context analysis, literature search, hypothesis generation,
-1https://huggingface.co/models?pipeline_tag=text-generation&sort=downloads
-1
+None of the reviewed systems combine fully local inference using general-purpose models with a mechanism for human oversight.
+This thesis introduces an automated research paper generator that runs entirely on local open-weight LLMs with a human-in-the-loop (HITL) strategy. It takes a research topic
+as input and produces a compiled research paper with generated experiments, figures and citations grounded in retrieved literature. As shown in Figure 1.1, the system divides the research process into six phases: context analysis, literature search, hypothesis generation,

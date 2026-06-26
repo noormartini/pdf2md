@@ -1,4 +1,4 @@
-## List of Tables
+# List of Tables
 
 | Table | Description | Page |
 |---|---|---|

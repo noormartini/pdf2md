@@ -7,7 +7,7 @@
 
 for the acquisition of the academic degree Bachelor of Science (B.Sc.) 
 
-Course of Studies: Computer Science 
+## Course of Studies: Computer Science 
 
 ## Department of Computer Science
 

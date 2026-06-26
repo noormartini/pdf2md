@@ -1,4 +1,4 @@
-## Erklärung / _Declaration_
+# Erklärung / _Declaration_
 
 Hiermit erkläre ich, dass ich die vorliegende Arbeit selbstständig verfasst und keine anderen als die angegebenen Quellen und Hilfsmittel benutzt habe. 
 

@@ -1,4 +1,4 @@
-## Inhaltsverzeichnis
+# Inhaltsverzeichnis
 
 1. Einleitung — 1
    - 1.1 Motivation und Hintergrund — 1

@@ -1,4 +1,4 @@
-## Listings
+# Listings
 
 | Listing | Description | Page |
 |---|---|---|

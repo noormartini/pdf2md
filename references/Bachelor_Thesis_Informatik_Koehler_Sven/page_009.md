@@ -1,6 +1,8 @@
-# 1 Introduction
+# Chapter 1
 
-## 1.1 Motivation - Is it just a wish?
+## Introduction
+
+### 1.1 Motivation - Is it just a wish?
 
 **Busy-Reader:** ’Can you please summarize this document for me, I would like to read a conclusion and whether others liked it.’ 
 

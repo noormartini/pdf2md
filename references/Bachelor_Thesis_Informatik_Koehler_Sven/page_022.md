@@ -1,35 +1,11 @@
-3.2 Sentiment analysis
-Sentiment analysis systems can be classified into phrase or lexicon based approaches,
-unsupervised corpus- based and supervised corpus-based approaches. The last field
-again is separated into traditional and deep learning based techniques. All fields
-have their individual use cases, advantages and disadvantages.
-Phrase based is a technique where one determines first whether an phrase is neutral
-or polar. Afterwards the polarity of the polar expression is evaluated with the help
-of sentiment related dictionaries. In these lexicons, entries are tagged with their out
-of context polarity. Some dictionaries label their word and phrases binary others are
-divided in fine labels or represents the sentiment with floating points. One of the
-largest binary labelled lexicons is the WordStat sentiment Dictionary mentioned by
-[Loughran und McDonald, 2011]. Bing Liu distributes a sentiment lexicon which
-includes mis-spellings, morphological variants, slang and social-media mark-up
-[Liu, 2012]. SentiWordNet is a lexical resource that assigns WordNet synsets to
-three categories: positive, negative and neutral, using numerical scores ranging
-from 0.0 to 1.0 to indicate the category of this word. [Baccianella u. a., 2010] In
-the current time there are several sentiment related lexicons public available with
-lots of papers applying these for the task of sentiment analysis.
-Unsupervised approaches to sentiment classification can solve the problem of do-
-main dependency and reduce the need for annotated training data. Turney applied a
-specific unsupervised learning technique. In this paper, the semantic orientation of
-a phrase is calculated as the mutual information between the given phrase and the
-word “excellent” minus the mutual information between the given phrase and the
-word “poor”.[Turney, 2002] Zagibalov and Carrol described a method of automatic
-seed word selection for unsupervised sentiment classification of product reviews in
-Chinese. [Zagibalov u. a., 2008] Rothfels and Tibshirani applied this unsupervised
-method to German movie reviews. The intuition behind their approach is that “posi-
-tive sentiment seeds” can be extracted from text on the basis of occurring frequently
-after negation, but more frequently without negation. A “positive sentiment seed”
-is defined as a sequence of characters. [Rothfels und Tibshirani, 2010]
-The majority of practical machine learning uses supervised training methods. They
-can be split into traditional and deep learning approaches.
-Some of the traditional approaches are the probabilistic based Naive Bayes (NB)
-classifiers which are often used as baseline [Pang und Lee, 2005], the still extremely
-14
+### 3.2 Sentiment analysis
+
+Sentiment analysis systems can be classified into phrase or lexicon based approaches, unsupervised corpus-based and supervised corpus-based approaches. The last field again is separated into traditional and deep learning based techniques. All fields have their individual use cases, advantages and disadvantages.
+
+Phrase based is a technique where one determines first whether an phrase is neutral or polar. Afterwards the polarity of the polar expression is evaluated with the help of sentiment related dictionaries. In these lexicons, entries are tagged with their out of context polarity. Some dictionaries label their word and phrases binary others are divided in fine labels or represents the sentiment with floating points. One of the largest binary labelled lexicons is the WordStat sentiment Dictionary mentioned by [Loughran und McDonald, 2011]. Bing Liu distributes a sentiment lexicon which includes mis-spellings, morphological variants, slang and social-media mark-up [Liu, 2012]. SentiWordNet is a lexical resource that assigns WordNet synsets to three categories: positive, negative and neutral, using numerical scores ranging from 0.0 to 1.0 to indicate the category of this word. [Baccianella u. a., 2010] In the current time there are several sentiment related lexicons public available with lots of papers applying these for the task of sentiment analysis.
+
+Unsupervised approaches to sentiment classification can solve the problem of domain dependency and reduce the need for annotated training data. Turney applied a specific unsupervised learning technique. In this paper, the semantic orientation of a phrase is calculated as the mutual information between the given phrase and the word "excellent" minus the mutual information between the given phrase and the word "poor". [Turney, 2002] Zagibalov and Carrol described a method of automatic seed word selection for unsupervised sentiment classification of product reviews in Chinese. [Zagibalov u. a., 2008] Rothfels and Tibshirani applied this unsupervised method to German movie reviews. The intuition behind their approach is that "positive sentiment seeds" can be extracted from text on the basis of occurring frequently after negation, but more frequently without negation. A "positive sentiment seed" is defined as a sequence of characters. [Rothfels und Tibshirani, 2010]
+
+The majority of practical machine learning uses supervised training methods. They can be split into traditional and deep learning approaches.
+
+Some of the traditional approaches are the probabilistic based Naive Bayes (NB) classifiers which are often used as baseline [Pang und Lee, 2005], the still extremely

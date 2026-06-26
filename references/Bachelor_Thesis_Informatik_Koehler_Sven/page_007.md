@@ -1,4 +1,4 @@
-## Contents
+# Contents
 
 - **1 Introduction** 1
   - 1.1 Motivation - Is it just a wish? 1

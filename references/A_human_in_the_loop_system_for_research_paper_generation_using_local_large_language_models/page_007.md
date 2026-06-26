@@ -1,4 +1,4 @@
-## List of Abbreviations
+# List of Abbreviations
 
 | Abbreviation | Definition |
 |---|---|

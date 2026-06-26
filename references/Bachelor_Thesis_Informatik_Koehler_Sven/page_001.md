@@ -8,7 +8,7 @@ for the acquisition of the academic degree Bachelor of Science (B.Sc.)
 
 ## Course of Studies: Computer Science
 
-Department of Computer Science University of Applied Sciences Mannheim 
+## Department of Computer Science University of Applied Sciences Mannheim 
 
 ## 31.08.2017
 

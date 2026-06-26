@@ -1,5 +1,3 @@
-## Inhaltsverzeichnis
-
    - 6.4 Ergebnisse des Trainings mittels RBQL in einer nicht deterministischen Umgebung — 32
    - 6.5 Ergebnisse des Trainings des neuronalen Netzes mit RBQL — 32
      - 6.5.1 Aktivierungsfunktionen: Rectified Linear Unit (ReLU) vs. Leaky ReLU — 36
