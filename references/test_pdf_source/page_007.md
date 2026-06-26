@@ -1,8 +1,6 @@
-# Kapitel 1
+# Kapitel 1: Einleitung
 
-## Einleitung
-
-### 1.1 Motivation und Hintergrund
+## 1.1 Motivation und Hintergrund
 
 Neuronale Netze gewinnen in der heutigen Zeit immer mehr an Relevanz. Es gibt vielfältige Einsatzmöglichkeiten. Sie werden zum Beispiel in der Bilderkennung, bei Sprachmodellen oder bei der Schrifterkennung eingesetzt. [1] [2]
 

@@ -1,10 +1,8 @@
-# Chapter 4
-
-## Base and definition of sentiment analysis
+# Chapter 4: Base and definition of sentiment analysis
 
 This chapter describes the machine learning basics used for this thesis. Furthermore it explains the main steps within a sentiment analysis task.
 
-### 4.1 Derivation of Sentiment Analysis (SA)
+## 4.1 Derivation of Sentiment Analysis (SA)
 
 There are different problems which can be solved by machine learning algorithms. This subsection places the sentiment analysis into the huge field of machine learning.
 

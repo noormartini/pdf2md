@@ -2,7 +2,7 @@ Aktion mit dem höchsten Q-Wert ausgewählt. Die Aktion mit dem höchsten Q-Wert
 
 Jeder der untersuchten Q-Learning Agenten besitzt eine eigene Update-Funktion zur Aktualisierung der Q-Werte.
 
-### 5.1 Experience Replay
+## 5.1 Experience Replay
 
 Der Quellcode für das Experience Replay stammt aus dem oben genannten Buch [8, S. 283–285]. Quellcode 5.3 zeigt die Funktion zum Aktualisieren der Q-Werte unter Zuhilfenahme von Experience Replay. Dabei werden zuerst die Replay-Buffer befüllt und anschließend die Q-Werte von X zufälligen Zuständen aus dem Replay Buffer aktualisiert. X ist dabei die sogenannte Batch Size. Das Betrachten bereits gemachter Erfahrungen reduziert die Anzahl der Episoden, bis der Agent das Spiel gelernt hat.
 
@@ -23,7 +23,7 @@ def updateQ(reward, state, action, nextState):
 
 **Quellcode 5.3**: Methode updateQ bei Q-Learning mit Experience Replay [8, S. 283]
 
-### 5.2 Q-Learning
+## 5.2 Q-Learning
 
 Beim Q-Learning wird die Q-Funktion, wie in Gleichung (2.2) zu sehen, nach jeder Episode aktualisiert. Dies ist in Quellcode 5.4 in Python umgesetzt. Dabei wird die Erfahrung, die über die Runde gemacht wird, allerdings nicht betrachtet und nur der letzte Q-Wert aktualisiert. Dadurch benötigt Q-Learning ohne Experience Replay deutlich länger, um eine optimierte Q-Funktion zu approximieren.
 

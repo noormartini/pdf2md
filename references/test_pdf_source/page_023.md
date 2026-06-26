@@ -1,4 +1,4 @@
-### 5.3 Recursive Backwards Q-Learning
+## 5.3 Recursive Backwards Q-Learning
 
 Zur Umsetzung des RBQL müssen alle besuchten Zustände st mit der jeweiligen ausgeführten Aktion at und dem entsprechenden Folgezustand s(t + 1) gespeichert werden. Dies wird über ein Set „seen_steps" realisiert. Außerdem müssen die gesammelten Belohnungen oder Bestrafungen der jeweiligen Zustände und Aktionen gespeichert werden, um jeden Zustand bewerten zu können. Dabei muss beachtet werden, dass die gleichen Zustände nicht doppelt bewertet werden.
 

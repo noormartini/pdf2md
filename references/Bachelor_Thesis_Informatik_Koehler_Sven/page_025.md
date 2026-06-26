@@ -1,6 +1,6 @@
 This approach performs morphological analysis at character level. They show that networks do not require the knowledge of words or semantic and syntactic structure of a language [Zhang u. a., 2015] [Cao und Rei, 2016].
 
-### 3.4 Hyper-parameter tuning for machine learning
+## 3.4 Hyper-parameter tuning for machine learning
 
 Hyper-parameter tuning means in the field of machine learning means to find the best working machine learning pipeline by optimizing all indirectly learned parameters within the estimator.
 

@@ -6,7 +6,7 @@ Die aufgezeigten Ergebnisse zeigen deutlich, dass bei einer 10 x 10 großen Gitt
 
 Dies zeigt schon deutlich das Potential, welches im RBQL Agenten steckt. In dieser Abschlussarbeit soll deswegen der RBQL Algorithmus nun auf ein anderes Szenario angewandt werden und auch mit dem bisher sehr verbreiteten Experience Replay Q-Learning verglichen werden. Des Weiteren soll in dieser Arbeit untersucht werden, ob sich mit dem RBQL Agent ein neuronales Netz effektiv trainieren lässt.
 
-### 3.4 Einsatz neuronaler Q-Learning-Verfahren in realen Anwendungen
+## 3.4 Einsatz neuronaler Q-Learning-Verfahren in realen Anwendungen
 
 Auch wenn in dieser Arbeit vor allem tabellarische und einfach neuronale Umsetzungen des Q-Learning-Verfahrens betrachtet werden, existieren in der aktuellen Forschung verschiedene Ansätze, die komplexere Architekturen in realen Szenarien erproben. Besonders hervorzuheben ist dabei der Bereich des autonomen Fahrens. Kiran u. a. geben in ihrer umfangreichen Übersichtsarbeit „Deep Reinforcement Learning for Autonomous Driving: A Survey" [16] einen systematischen Überblick darüber, wie Verstärkungslernen mit tiefen neuronalen Netzen zur Entscheidungsfindung autonomer Agenten eingesetzt wird.
 

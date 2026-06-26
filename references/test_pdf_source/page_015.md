@@ -4,7 +4,7 @@ Somit bildet die Arbeit von Lin (1992) einen entscheidenden historischen Meilens
 
 Darum soll auch in dieser Abschlussarbeit untersucht werden, wie effektiv Experience Replay gegenüber RBQL ist.
 
-### 3.3 Recursive Backwards Q-Learning
+## 3.3 Recursive Backwards Q-Learning
 
 Das Paper Recursive Backwards Q-Learning in Deterministic Environments beschreibt die Idee des RBQL. In diesem Paper wird bemängelt, dass Q-Learning Agenten häufig verfügbare Informationen ignorieren und es mehrere Episoden dauert, bis ein Fehler zum Ausgangszustand zurück propagiert ist, selbst wenn der Agent dem „optimalen Pfad" folgt. Es schlägt als Verbesserung den RBQL Agenten vor, welcher nach Erreichen eines Endzustandes rekursiv die bereits erkundeten Zustände bewertet. Das Paper gibt als Lernfunktion Gleichung 3.1 an. Dadurch hänge der Q-Wert nur noch von der Belohnung und dem besten Nachbarn ab. [4]
 

@@ -11,7 +11,7 @@ During the first prototypes the decision was made to compare different SA approa
 
 Focused on the goal definition the question comes up: "Do deep learning approaches outperform statistical methods in the task of sentiment analysis and which method does perform the best?"
 
-### 2.2 Dataset research
+## 2.2 Dataset research
 
 For the SA research done in this thesis labelled data sets were needed. This section describes the used datasets and explains the decision process for this datasets. At first the department asked to search for German or maybe multilingual, labelled, commercially available datasets. This leads to the question which document types are available online, sentiment related and big enough to avoid over-fitting. Most papers about sentiment analysis uses Twitter feeds, product reviews, movie reviews or sentiment related dictionaries as data source.
 

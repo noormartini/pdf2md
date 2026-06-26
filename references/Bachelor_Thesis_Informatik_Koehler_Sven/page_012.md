@@ -1,4 +1,4 @@
-### 1.3 Surrounding
+## 1.3 Surrounding
 
 This investigation is part of the bachelor thesis. The research, implementation and written part should be done within three months. The bachelor thesis is part of the computer science studies at the University of Applied Sciences Mannheim.
 

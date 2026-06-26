@@ -1,6 +1,6 @@
 könnten solche Sprachmodelle mit RBQL trainiert werden, wodurch das Training optimiert werden könnte.
 
-### 1.2 Zielsetzung der Arbeit
+## 1.2 Zielsetzung der Arbeit
 
 Diese Arbeit, welche im Rahmen einer Abschlussarbeit des Bachelorstudiengangs Informatik an der Technischen Hochschule Mannheim entstanden ist, beschäftigt sich damit, ob in deterministischen Umgebungen mit dem RBQL neuronale Netzwerke effizient trainiert werden können.
 

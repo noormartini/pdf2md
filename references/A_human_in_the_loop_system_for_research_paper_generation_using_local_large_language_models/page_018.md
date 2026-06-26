@@ -6,6 +6,6 @@ The copilot mode raised the scores to 4.38. HLER [35] integrates two human decis
 
 Gated systems are the only one of the three categories that guarantee intermediate output is reviewed, since execution cannot continue without approval at each gate.
 
-### 3.3 Research Gap
+## 3.3 Research Gap
 
 Table 3.1 compares the reviewed systems including the one introduced in this thesis. None of the reviewed systems combines local LLM inference with phase-gated human oversight. Of the twelve reviewed systems, only CycleResearcher is built around local models, but it provides neither a HITL mode nor a graphical interface. The AI Scientist supports open-weight models such as LLaMA and DeepSeek, but only through cloud APIs (OpenRouter, DeepSeek API), which has the same cost and privacy concerns as proprietary models. data-to-paper [1] provides per-step human review through a desktop application but depends on cloud APIs for inference and requires annotated data as its starting point. Agent Laboratory offers optional human feedback via its copilot mode at three checkpoints, but gates are not used by default and the system depends on cloud APIs. The remaining HITL systems all depend on cloud APIs for inference as well.

@@ -9,7 +9,7 @@ def getState(x_ball, y_ball, vx_ball, vy_ball, x_racket):
 
 **Quellcode 5.10**: Für nicht deterministische Umgebung angepasste getState Funktion
 
-### 5.7 Integration des neuronalen Netzwerks
+## 5.7 Integration des neuronalen Netzwerks
 
 Zur Umsetzung des neuronalen Netzes wird eine Klasse angelegt, mit der ein einfaches neuronales Netz mit Eingabeschicht, versteckter Schicht und Ausgabeschicht erzeugt werden kann. Quellcode 5.11 zeigt den Konstruktor zur Erstellung des neuronalen Netzes. Die benötigten Eingabeparameter sind dabei die Größe der Eingabeschicht, die Größe der versteckten Sicht und die Größe der Ausgabeschicht. Die Gewichte und Biases werden zufällig zwischen -1 und 1 initialisiert.
 

@@ -1,6 +1,6 @@
 that uses only open-weight models, but this is just a side effect. Open-weight models were chosen because reinforcement learning requires trainable weights. The system also runs fully autonomously and does not provide a mechanism for human review between phases or steps.
 
-### 3.2 Failure Modes and Human-in-the-Loop Approaches
+## 3.2 Failure Modes and Human-in-the-Loop Approaches
 
 Evaluations of these systems show similar failure modes regardless of the architecture. In a case study of four autonomous research attempts, three failed during implementation or evaluation before finishing a paper [8]. It identified multiple failure modes. Code slowly drifts from the original plan. Long pipelines lose coherence as context degrades. Success is declared despite errors, which the authors call overexcitement.
 

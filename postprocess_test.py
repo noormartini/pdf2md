@@ -704,7 +704,7 @@ def test_merge_kapitel_headings_basic():
     md = "## Kapitel 1\n\n## Einleitung\n\n## 1.1 Background\n"
     result = _merge_kapitel_headings(md)
     assert "## Kapitel 1" not in result
-    assert "# 1 Einleitung" in result
+    assert "# Kapitel 1: Einleitung" in result
     assert "## 1.1 Background" in result
 
 
@@ -714,8 +714,8 @@ def test_merge_kapitel_headings_multiple_chapters():
         "## Kapitel 2\n\n## Background\n\nText.\n"
     )
     result = _merge_kapitel_headings(md)
-    assert "# 1 Introduction" in result
-    assert "# 2 Background" in result
+    assert "# Kapitel 1: Introduction" in result
+    assert "# Kapitel 2: Background" in result
     assert "## Kapitel" not in result
 
 
@@ -730,7 +730,7 @@ def test_merge_kapitel_headings_english_chapter():
     md = "## Chapter 1\n\n## Introduction\n\n## 1.1 Background\n"
     result = _merge_kapitel_headings(md)
     assert "## Chapter 1" not in result
-    assert "# 1 Introduction" in result
+    assert "# Chapter 1: Introduction" in result
     assert "## 1.1 Background" in result
 
 
@@ -740,17 +740,16 @@ def test_merge_kapitel_headings_english_multiple():
         "## Chapter 2\n\n## Foundations\n\nText.\n"
     )
     result = _merge_kapitel_headings(md)
-    assert "# 1 Introduction" in result
-    assert "# 2 Foundations" in result
+    assert "# Chapter 1: Introduction" in result
+    assert "# Chapter 2: Foundations" in result
     assert "## Chapter" not in result
 
 
 def test_postprocess_markdown_merges_kapitel_headings():
     md = "## **Kapitel 2**\n\n## **Grundlagen**\n\n## **2.1 Basics**\n"
     result = postprocess_markdown(md)
-    assert "# 2 Grundlagen" in result
+    assert "# Kapitel 2: Grundlagen" in result
     assert "## 2.1 Basics" in result
-    assert "Kapitel" not in result
 
 
 # ── _demote_italic_headings ───────────────────────────────────────────────────

@@ -12,7 +12,7 @@ Non-Functional Requirements define the quality attributes of the system, rather 
 
 Constraints define the technical boundaries of the project [43]. C1 restricts the implementation to a technology that was selected to run on consumer-grade hardware and is described in the following section.
 
-### 4.2 System Architecture
+## 4.2 System Architecture
 
 The system architecture combines local open-weight models with a phase-gated pipeline. LLMs are treated as interchangeable components, so the system does not depend on a specific model. The architecture splits the research process into smaller, isolated phases. Each phase reads its inputs from files, executes LLM calls, and writes the results to files. This avoids one single long conversation, which would worsen LLM performance over many turns [21]. As shown in Figure 4.1, the system is divided into four main logical blocks: the frontend, the backend, project data, and external services.
 

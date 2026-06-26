@@ -1,6 +1,4 @@
-# Chapter 2
-
-## Foundations**
+# Chapter 2: Foundations
 
 This chapter provides a high-level overview of the core concepts needed to understand the system design presented in Chapter 4. It covers LLMs, embedding models, retrieval-augmented generation (RAG) and the HITL paradigm. The explanations focus on what is relevant to this work and do not aim to be exhaustive.
 

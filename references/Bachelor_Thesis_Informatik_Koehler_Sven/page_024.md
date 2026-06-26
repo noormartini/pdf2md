@@ -1,4 +1,4 @@
-### 3.3 Vectorization of text
+## 3.3 Vectorization of text
 
 In the area of text analysing the raw data, a sequence of symbols cannot be fed directly to the algorithms themselves as most of them expect numerical feature vectors with a fixed size rather than the raw text documents with variable length. Vectorizing is the general process of turning a collection of text documents into numerical feature vectors [Pedregosa u. a., 2011]. This area can be split into traditional techniques and deep learning techniques.
 

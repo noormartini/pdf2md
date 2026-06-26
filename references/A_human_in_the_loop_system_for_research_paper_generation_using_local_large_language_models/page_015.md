@@ -1,10 +1,8 @@
-# Chapter 3
-
-## Related Work**
+# Chapter 3: Related Work
 
 Since 2024, a growing number of LLM-based systems have attempted to automate the scientific research process [28]. This chapter provides an overview of these systems with a focus on three aspects relevant to this thesis: the degree of human involvement, the execution environment (cloud versus local) and the user interface.
 
-### 3.1 Automated Research Systems
+## 3.1 Automated Research Systems
 
 data-to-paper [1], released in April 2024, was the first system to generate full research manuscripts automatically. Based on user-provided annotated datasets and metadata about them, it combines interacting LLM agents with programmatic information tracing and produces backward-traceable manuscripts where every numeric value links directly to the code that generated it. It supports both a fully autonomous mode and a copilot mode for human review after each step, though it requires annotated datasets as input and depends on cloud-hosted LLMs.
 

@@ -17,7 +17,7 @@ def rbql_update(final_state):
 
 **Quellcode 5.5**: Methode rbql_update
 
-### 5.4 Vergrößerung des Zustandraums
+## 5.4 Vergrößerung des Zustandraums
 
 Um den Agenten das Lernen zu erschweren und so die Unterschiede zwischen den Agenten besser hervorzuheben, wird der Zustandsraum vergrößert. Dies wird durch eine Vergrößerung des Spielfeldes umgesetzt. So hat sich der Zustandsraum von 7.488 Zuständen auf 59.904 Zustände erweitert, was die Komplexität des Lernprozesses deutlich erhöht. Quellcode 5.6 zeigt dies. Es macht einen erheblichen Unterschied, da die Q-Funktion nun für deutlich mehr Zustände approximiert werden muss.
 
@@ -38,6 +38,6 @@ def getState(x_ball, y_ball, vx_ball, vy_ball, x_racket):
 
 **Quellcode 5.7**: Methode getState nach Verdopplung der Spielfeldgröße
 
-### 5.5 Mögliche Optimierung des RBQL
+## 5.5 Mögliche Optimierung des RBQL
 
 Beim RBQL werden beim Erreichen eines Endzustands standardmäßig alle Zustände, die zu dem aktuellen Endzustand führen, bewertet. Dabei wird nicht beachtet, ob ein Zustand

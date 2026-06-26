@@ -6,6 +6,6 @@ in the experiment phase may lead the user to return to the hypothesis screen and
 
 4. **External Services** — The system uses two types of external services. LM Studio handles all LLM inference. It runs open-weight models locally and makes them available through a local API. The literature phase uses three public APIs. Semantic Scholar is used to search for relevant papers and their metadata [45]. Unpaywall is a database of legal open-access academic papers [46]. If Semantic Scholar does not provide a portable document format (PDF) link to a paper, the system queries Unpaywall to find a link to an open-access copy. arXiv is an open-access repository for preprints [47]. It is used as a second fallback if a PDF link also could not be found on Unpaywall. This separation keeps the user's data private, but still provides access to external literature.
 
-### 4.3 Human-in-the-Loop Strategy
+## 4.3 Human-in-the-Loop Strategy
 
 The system's HITL strategy pauses the pipeline after each phase so the user can review and correct the output before the next phase starts. This section covers the motivation behind

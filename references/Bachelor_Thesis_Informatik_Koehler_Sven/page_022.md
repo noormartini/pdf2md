@@ -1,4 +1,4 @@
-### 3.2 Sentiment analysis
+## 3.2 Sentiment analysis
 
 Sentiment analysis systems can be classified into phrase or lexicon based approaches, unsupervised corpus-based and supervised corpus-based approaches. The last field again is separated into traditional and deep learning based techniques. All fields have their individual use cases, advantages and disadvantages.
 

@@ -1,6 +1,6 @@
 es sein, zu zeigen, dass ein neuronales Netz mit RBQL trainiert werden kann. Außerdem soll verglichen werden, wie effektiv das mit RBQL trainierte Netz im Vergleich zu einem mit Experience Replay trainierten Netz abschneidet.
 
-### 4.3 Trainieren des neuronalen Netzwerks mit RBQL
+## 4.3 Trainieren des neuronalen Netzwerks mit RBQL
 
 Das Training des neuronalen Netzes erfolgt mithilfe des RBQL-Algorithmus. Dabei übernimmt das neuronale Netz die Funktion der klassischen tabellarischen Q-Funktion. Es erhält die Zustandsinformationen als Eingabe und gibt für jede mögliche Aktion einen geschätzten Q-Wert zurück.
 

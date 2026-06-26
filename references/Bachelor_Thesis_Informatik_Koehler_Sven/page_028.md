@@ -1,6 +1,6 @@
 The core of this work is about supervised binary classification and semi-Supervised clustering of text documents. Working with text in the field of computer science is often called natural language processing or NLP.
 
-#### 4.1.1 Natural Language Processing (NLP)
+### 4.1.1 Natural Language Processing (NLP)
 
 According to Copestack [2004] NLP can be defined as the automatic (or semi-automatic) processing of human language. The term 'NLP' is sometimes used rather more narrowly than that. Often excluding information retrieval and sometimes even excluding machine translation. NLP is sometimes compared with 'computational linguistics'. Nowadays, alternative terms are often preferred, like 'Language Technology' or 'Language Engineering'.
 
@@ -15,7 +15,7 @@ Some of the typical NLP-tasks are:
 
 This document will further concentrate on the subtask document classification.
 
-#### 4.1.2 Document classification
+### 4.1.2 Document classification
 
 1964 the fabulist Jorg Luis Borges imagined classifying animals into:
 

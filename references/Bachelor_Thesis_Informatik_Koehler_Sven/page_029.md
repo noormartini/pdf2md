@@ -4,7 +4,7 @@ timent analysis, the extraction of sentiment. Which means extracting the positiv
 
 This thesis works with the sentiment expressed within movie reviews.
 
-#### 4.1.3 Sentiment Analysis
+### 4.1.3 Sentiment Analysis
 
 Nowadays there are several topics like big data, intelligent solutions and opinion mining relating to sentiment analysis. But why is Sentiment Analysis so important? All the topics mentioned above are important due to the growth of web content. The amount of online available data has been tripled within in the last ten years (Fig. 4.1).
 

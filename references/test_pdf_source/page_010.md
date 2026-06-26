@@ -6,7 +6,7 @@ Die Bewertungsfunktion $Q$ wird in der Regel mit zufälligen Werten oder mit nul
 
 $$Q_t \leftarrow Q_t + \alpha \left( r_t + \gamma \cdot \max_{a_{t+1}}(Q_{t+1}) - Q_t \right) \tag{2.2}$$
 
-### 2.3 Neuronale Netze
+## 2.3 Neuronale Netze
 
 Neuronale Netzwerke im Bereich des maschinellen Lernen basieren auf biologischen Neuronen, wie sie auch in unserem Körper vorkommen. Neuronen sind über Synapsen miteinander verbunden. Erreichen die Eingangsimpulse eines Neurons einen Schwellwert, wird das Neuron aktiviert. Diese Verhaltensweise wird durch ein künstliches Neuron simuliert. Die Aktivität eines Neurons wird durch die Summe der gewichteten Eingänge beschrieben. Die Summe der gewichteten Eingänge wird durch Gleichung (2.3) beschrieben. [8]
 

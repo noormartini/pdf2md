@@ -1,10 +1,8 @@
-# Chapter 3
-
-## Related work
+# Chapter 3: Related work
 
 This section splits the related work into related areas. The following part gives an overview of the current scientific state within this areas.
 
-### 3.1 Text classification
+## 3.1 Text classification
 
 Automatic document classification means assigning a document to one ore more classes. This field consists of two sub-areas: Content based and request based. This thesis is related to the field of supervised, content based document classification.
 

@@ -1,5 +1,4 @@
-# Chapter 1
-## Introduction
+# Chapter 1: Introduction
 Systems that automate the scientific research process, including searching literature, generating hypotheses, running experiments and writing manuscripts, are no longer just concepts. Systems like data-to-paper [1], The AI Scientist [2] or Agent Laboratory [3] have demonstrated that large language model (LLM)-based pipelines can produce complete research papers. Yet, all reviewed systems except one rely on proprietary cloud services, which means that requests cost money and user data is sent to third parties. This limits accessibility for researchers without large budgets, creates a dependency on providers who can change pricing or terms at any time, and raises privacy concerns.
 Open-weight models offer a compelling alternative and are gaining popularity, with the most popular models having been downloaded millions of times.1 These models can be downloaded and run locally by end users via software like LM Studio [4].
 However, LLMs, regardless of type, hallucinate. They generate confident-sounding but factually wrong content [5], particularly when they lack access to relevant source material [6]. In automated research systems, this leads to errors like fabricated or wrongly attributed citations, or invented implementation details and experiment results [2, 3, 7].

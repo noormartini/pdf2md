@@ -1,4 +1,4 @@
-### 1.2 Outline of this document
+## 1.2 Outline of this document
 
 This section grants a short outline for this document. This document describes the path and outcome of a sentiment classification research. The document is split into seven chapters.
 

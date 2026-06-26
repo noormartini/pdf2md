@@ -948,7 +948,8 @@ _FRONT_MATTER_SECTIONS: frozenset[str] = frozenset({
     "danksagung", "acknowledgements", "acknowledgments",
 })
 
-_KAPITEL_RE = re.compile(r"^##\s+(?:Kapitel|Chapter)\s+(\d+)\s*$", re.IGNORECASE)
+_KAPITEL_RE = re.compile(r"^##\s+((?:Kapitel|Chapter))\s+(\d+)\s*$", re.IGNORECASE)
+_CHAPTER_H1_RE = re.compile(r"^#\s+((?:Kapitel|Chapter))\s+(\d+)\s*$", re.IGNORECASE)
 
 # Heading whose entire content is a single italic span — almost always a
 # styled subtitle or repeated title, not a real section heading.
@@ -1065,30 +1066,52 @@ def _demote_title_page_headings(md: str) -> str:
 def _merge_kapitel_headings(md: str) -> str:
     """Merge chapter-separator headings with the chapter title.
 
-    PDF chapter cover pages produce two consecutive headings:
-        ## Kapitel 1        ## Chapter 1
-        ## Einleitung       ## Introduction
-    These should become a single top-level heading:
-        # 1 Einleitung      # 1 Introduction
+    Handles two forms produced by the pipeline:
+
+    H2 form (pymupdf4llm before normalize_heading_levels):
+        ## Kapitel 1  +  ## Einleitung  →  # Kapitel 1: Einleitung
+
+    H1 form (after normalize_heading_levels assigns depth=1 to Chapter lines):
+        # Chapter 2  +  ## Execution plan  →  # Chapter 2: Execution plan
+
+    The chapter word ("Chapter"/"Kapitel") and number are preserved so the
+    output reads naturally as a single top-level section title.
     """
     lines = md.split("\n")
     result: list[str] = []
     i = 0
     while i < len(lines):
-        m = _KAPITEL_RE.match(lines[i])
-        if m:
-            chapter_num = m.group(1)
-            # Find the next non-blank line.
+        # Match H1 form first (post-normalisation).
+        m1 = _CHAPTER_H1_RE.match(lines[i])
+        if m1:
+            chapter_word, chapter_num = m1.group(1), m1.group(2)
             j = i + 1
             while j < len(lines) and not lines[j].strip():
                 j += 1
             if j < len(lines):
-                m2 = re.match(r"^#{1,6}\s+(.+)$", lines[j])
+                m2 = re.match(r"^##\s+(.+)$", lines[j])
                 if m2:
-                    result.append(f"# {chapter_num} {m2.group(1).strip()}")
+                    title = re.sub(r"\*+$", "", m2.group(1)).strip()
+                    result.append(f"# {chapter_word} {chapter_num}: {title}")
                     i = j + 1
                     continue
-            # No following heading — just drop the Kapitel line.
+            result.append(lines[i])
+            i += 1
+            continue
+        # Match H2 form (legacy / fallback).
+        m2 = _KAPITEL_RE.match(lines[i])
+        if m2:
+            chapter_word, chapter_num = m2.group(1), m2.group(2)
+            j = i + 1
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines):
+                m3 = re.match(r"^#{1,6}\s+(.+)$", lines[j])
+                if m3:
+                    title = re.sub(r"\*+$", "", m3.group(1)).strip()
+                    result.append(f"# {chapter_word} {chapter_num}: {title}")
+                    i = j + 1
+                    continue
             i += 1
             continue
         result.append(lines[i])

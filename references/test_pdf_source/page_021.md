@@ -1,6 +1,4 @@
-# Kapitel 5
-
-## Implementierung
+# Kapitel 5: Implementierung
 
 Die Q-Learning Agenten werden in der Programmiersprache Python implementiert. Als Vorlage für das Ping-Pong Spiel wird das Beispiel aus Maschinelles Lernen für Dummies®: Maschinelles Lernen richtig verstehen : GPT-Sprachmodell, Deep Learning, neuronales Q-Learning - alles selbst programmieren : viele Code-Beispiele zu allen behandelten Themen genommen. [8, S. 283–285] Der in diesem Buch bereits umgesetzte Experience Replay Q-Learning Agent wird später auch benutzt, um die Lernergebnisse mit den anderen Algorithmen zu vergleichen.
 

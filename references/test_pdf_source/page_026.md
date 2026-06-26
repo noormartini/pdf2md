@@ -30,6 +30,6 @@ def rbql_update(final_state):
 
 **Quellcode 5.8**: Optimierte RBQL update Methode
 
-### 5.6 RBQL in einer nicht deterministischen Umgebung
+## 5.6 RBQL in einer nicht deterministischen Umgebung
 
 In dem Paper Recursive Backwards Q-Learning in Deterministic Environments wird als mögliche Richtung für weiterführende Forschung vorgeschlagen, zu untersuchen, wie RBQL in einer teils nicht-deterministischen Umgebung lernt. Dies soll hier nun betrachtet werden. Dazu wird in dem Ping-Pong Spiel mit einer kleiner Wahrscheinlichkeit die Geschwindigkeit des Balles in X- und Y-Richtung verändert. Die Geschwindigkeit kann da-
