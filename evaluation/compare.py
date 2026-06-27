@@ -193,19 +193,27 @@ def _done_key(pdf_path: str, page_number: int, strategy: str, model: str,
 
 
 def load_existing_results(output_path: str) -> tuple[list[EvaluationResult], set[tuple]]:
-    """Load previously saved results and build a completed-key set for resume."""
+    """Load previously saved results and build a completed-key set for resume.
+
+    Only successful results (no error) count as done — failed pages are retried.
+    """
     if not os.path.exists(output_path):
         return [], set()
     try:
         with open(output_path) as f:
             data = json.load(f)
         results = [EvaluationResult(**r) for r in data]
+        # Keep all results in memory but only mark error-free ones as done
         done = {
             _done_key(r.pdf_path, r.page_number, r.strategy, r.model,
                       r.prompt_variant, r.temperature)
             for r in results
+            if not r.error
         }
-        print(f"Resuming: {len(results)} results already saved, {len(done)} combinations done.")
+        errors = sum(1 for r in results if r.error)
+        print(f"Resuming: {len(results)} results loaded, {len(done)} successful, {errors} will be retried.")
+        # Remove error results so they get re-run and replaced
+        results = [r for r in results if not r.error]
         return results, done
     except Exception:
         return [], set()
