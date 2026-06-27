@@ -2,6 +2,7 @@
 
 import json
 import os
+import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Callable, Optional
@@ -30,8 +31,6 @@ class ExperimentConfig:
     temperatures: list[float]
     max_pages: Optional[int] = None
     base_url: str = "http://localhost:1234/v1"
-    # Maps each PDF path to its document category label (e.g. "academic", "forms").
-    # Populated from entries like {"path": "...", "category": "..."} in the config.
     pdf_categories: dict[str, str] = None
 
     def __post_init__(self):
@@ -71,14 +70,7 @@ def load_experiment_config(config_path: str) -> ExperimentConfig:
 
 
 def load_reference(reference_dir: str, page_number: int, pdf_path: str = "") -> Optional[str]:
-    """Load reference markdown for a specific page of a specific PDF.
-
-    References are stored in per-PDF subdirectories:
-        references/<pdf-stem>/page_001.md
-
-    A flat fallback (references/page_001.md) is also checked for backward
-    compatibility with older single-PDF setups.
-    """
+    """Load reference markdown for a specific page of a specific PDF."""
     candidates: list[Path] = []
 
     if pdf_path:
@@ -88,7 +80,6 @@ def load_reference(reference_dir: str, page_number: int, pdf_path: str = "") -> 
             Path(reference_dir) / pdf_stem / f"page_{page_number}.md",
         ]
 
-    # Flat fallback
     candidates += [
         Path(reference_dir) / f"page_{page_number:03d}.md",
         Path(reference_dir) / f"page_{page_number}.md",
@@ -115,11 +106,7 @@ def run_strategy(
     page_type: Optional[PageType] = None,
     figures_dir: str = "output/figures",
 ) -> tuple[Optional[ConversionResult], Optional[str]]:
-    """Run a conversion strategy and return (result, error).
-
-    On success, `result` carries `markdown`, `timing_ms`, and `token_usage`.
-    On failure, `result` is None and `error` holds the exception message.
-    """
+    """Run a conversion strategy and return (result, error)."""
     try:
         match strategy:
             case "text":
@@ -181,12 +168,51 @@ def run_strategy(
         return None, str(e)
 
 
-def prepare_pages(config: ExperimentConfig, pdf_path: str) -> tuple[list[str], list[str]]:
-    """Extract text and rendered page images for a single PDF.
+def run_strategy_with_retry(
+    *args,
+    max_retries: int = 3,
+    retry_delay: float = 5.0,
+    **kwargs,
+) -> tuple[ConversionResult | None, str | None]:
+    """Call run_strategy with automatic retry on transient errors (e.g. timeouts)."""
+    last_error: str | None = None
+    for attempt in range(1, max_retries + 1):
+        result, error = run_strategy(*args, **kwargs)
+        if error is None:
+            return result, None
+        last_error = error
+        if attempt < max_retries:
+            print(f"  ↻ Retry {attempt}/{max_retries - 1} after error: {error[:80]}")
+            time.sleep(retry_delay)
+    return None, last_error
 
-    Resolves `max_pages=None` to the document's total page count so that
-    downstream extractors (which require an int) get a concrete value.
-    """
+
+def _done_key(pdf_path: str, page_number: int, strategy: str, model: str,
+               prompt_variant: str, temperature: float) -> tuple:
+    return (pdf_path, page_number, strategy, model, prompt_variant, temperature)
+
+
+def load_existing_results(output_path: str) -> tuple[list[EvaluationResult], set[tuple]]:
+    """Load previously saved results and build a completed-key set for resume."""
+    if not os.path.exists(output_path):
+        return [], set()
+    try:
+        with open(output_path) as f:
+            data = json.load(f)
+        results = [EvaluationResult(**r) for r in data]
+        done = {
+            _done_key(r.pdf_path, r.page_number, r.strategy, r.model,
+                      r.prompt_variant, r.temperature)
+            for r in results
+        }
+        print(f"Resuming: {len(results)} results already saved, {len(done)} combinations done.")
+        return results, done
+    except Exception:
+        return [], set()
+
+
+def prepare_pages(config: ExperimentConfig, pdf_path: str) -> tuple[list[str], list[str]]:
+    """Extract text and rendered page images for a single PDF."""
     if config.max_pages is None:
         with fitz.open(pdf_path) as doc:
             max_pages = len(doc)
@@ -208,25 +234,32 @@ def run_combinations(
     config: ExperimentConfig,
     pdf_path: str,
     max_tokens: int = 4096,
-    runner: Callable = run_strategy,
+    runner: Callable = run_strategy_with_retry,
     category: Optional[str] = None,
+    all_results: list[EvaluationResult] = None,
+    done_keys: set[tuple] = None,
+    output_path: str = "",
 ) -> list[EvaluationResult]:
     """Loop over every (strategy, model, prompt, temperature, page) combination.
 
-    `runner` is injectable so tests can swap in a fake without touching the
-    network. It must match `run_strategy`'s signature.
+    Skips combinations already present in `done_keys` and saves incrementally
+    to `output_path` after each completed page so the run can be resumed if
+    interrupted.
     """
-    results: list[EvaluationResult] = []
+    if all_results is None:
+        all_results = []
+    if done_keys is None:
+        done_keys = set()
+
+    new_results: list[EvaluationResult] = []
     num_pages = len(pages)
 
-    # Pre-analyse pages for the adaptive strategy (needs fitz.Page objects)
     page_analyses = None
     if "adaptive" in config.strategies:
         print("Pre-analysing pages for adaptive strategy...")
         doc = fitz.open(pdf_path)
         limit = config.max_pages if config.max_pages else len(doc)
         page_analyses = [analyze_page(doc[i]) for i in range(min(limit, len(doc)))]
-        # Also build aligned image list for adaptive (render_page_as_base64 per page)
         adaptive_images = [render_page_as_base64(doc[i]) for i in range(min(limit, len(doc)))]
         doc.close()
         print(f"  Page types: {[a.page_type.value for a in page_analyses]}\n")
@@ -247,6 +280,13 @@ def run_combinations(
                     for page_idx in range(num_pages):
                         current += 1
                         page_num = page_idx + 1
+                        key = _done_key(pdf_path, page_num, strategy, model,
+                                        prompt_variant, temperature)
+
+                        if key in done_keys:
+                            print(f"[{current}/{total_combinations}] "
+                                  f"Page {page_num} | {strategy} | skipped (already done)")
+                            continue
 
                         print(f"[{current}/{total_combinations}] "
                               f"Page {page_num} | {strategy} | {model} | "
@@ -259,7 +299,6 @@ def run_combinations(
 
                         page_text = pages[page_idx]
 
-                        # Adaptive uses its own aligned image list; others use standard extraction
                         if strategy == "adaptive" and page_analyses is not None:
                             page_image = adaptive_images[page_idx] if page_idx < len(adaptive_images) else None
                             page_type = page_analyses[page_idx].page_type if page_idx < len(page_analyses) else None
@@ -304,13 +343,22 @@ def run_combinations(
                             error=error,
                             category=category,
                             llm_calls=llm_calls,
+                            pdf_path=pdf_path,
                         )
-                        results.append(eval_result)
+                        new_results.append(eval_result)
+                        all_results.append(eval_result)
+                        done_keys.add(key)
+                        if output_path:
+                            save_results(all_results, output_path)
 
-    return results
+    return new_results
 
 
-def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[EvaluationResult]:
+def run_experiment(
+    config: ExperimentConfig,
+    max_tokens: int = 4096,
+    output_path: str = "",
+) -> list[EvaluationResult]:
     """Run a full experiment across all combinations defined in the config."""
     print(f"\n{'='*60}")
     print(f"Experiment: {config.name}")
@@ -323,17 +371,21 @@ def run_experiment(config: ExperimentConfig, max_tokens: int = 4096) -> list[Eva
     print(f"Temperatures: {config.temperatures}")
     print(f"{'='*60}\n")
 
-    all_results: list[EvaluationResult] = []
+    all_results, done_keys = load_existing_results(output_path)
+
     for pdf_path in config.input_pdfs:
         category = config.pdf_categories.get(pdf_path)
         print(f"--- PDF: {pdf_path} (category: {category or 'unset'}) ---")
         pages, images = prepare_pages(config, pdf_path)
         print(f"Processing {len(pages)} pages\n")
-        results = run_combinations(
+        run_combinations(
             pages, images, config, pdf_path,
-            max_tokens=max_tokens, category=category,
+            max_tokens=max_tokens,
+            category=category,
+            all_results=all_results,
+            done_keys=done_keys,
+            output_path=output_path,
         )
-        all_results.extend(results)
     return all_results
 
 
@@ -348,8 +400,6 @@ def save_results(results: list[EvaluationResult], output_path: str) -> None:
     with open(output_path, "w") as f:
         json.dump(serializable, f, indent=2)
 
-    print(f"\nResults saved to {output_path}")
-
 
 def run_experiment_from_config(
     config_path: str,
@@ -358,8 +408,9 @@ def run_experiment_from_config(
 ) -> list[EvaluationResult]:
     """Load experiment config from JSON, run experiment, and save results."""
     config = load_experiment_config(config_path)
-    results = run_experiment(config, max_tokens=max_tokens)
+    results = run_experiment(config, max_tokens=max_tokens, output_path=output_path)
     save_results(results, output_path)
+    print(f"\nResults saved to {output_path}")
 
     summary = aggregate_results(results)
     print("\n" + "="*60)

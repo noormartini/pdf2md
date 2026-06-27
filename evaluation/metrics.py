@@ -29,6 +29,7 @@ class EvaluationResult:
     error: Optional[str] = None
     category: Optional[str] = None
     llm_calls: int = 0
+    pdf_path: str = ""
 
 
 def text_similarity(reference: str, candidate: str) -> float:
@@ -237,6 +238,7 @@ def evaluate_conversion(
     error: Optional[str] = None,
     category: Optional[str] = None,
     llm_calls: int = 0,
+    pdf_path: str = "",
 ) -> EvaluationResult:
     """
     Evaluate a single conversion against a reference.
@@ -264,6 +266,7 @@ def evaluate_conversion(
             error=error,
             category=category,
             llm_calls=llm_calls,
+            pdf_path=pdf_path,
         )
 
     metrics = {
@@ -286,6 +289,7 @@ def evaluate_conversion(
         timing_ms=timing_ms,
         token_usage=token_usage,
         category=category,
+        pdf_path=pdf_path,
         llm_calls=llm_calls,
     )
 
