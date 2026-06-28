@@ -17,7 +17,7 @@ def test_text_strategy_returns_conversion_result():
         )
     assert isinstance(result, ConversionResult)
     assert result.timing_ms >= 0
-    assert result.token_usage is None
+    assert result.token_usage == 0
 
 
 def test_text_strategy_returns_markdown_from_pymupdf4llm():
@@ -51,7 +51,7 @@ def test_text_strategy_returns_empty_string_when_no_chunks():
             temperature=0.0, max_tokens=10,
         )
     assert result.markdown == ""
-    assert result.token_usage is None
+    assert result.token_usage == 0
 
 
 def test_llm_call_is_used_when_provided():
@@ -82,7 +82,7 @@ def test_no_llm_call_returns_raw_pymupdf4llm_output():
             temperature=0.0, max_tokens=10,
         )
     assert result.markdown == "# Hello\n\nSome paragraph."
-    assert result.token_usage is None
+    assert result.token_usage == 0
 
 
 def test_pre_extracted_markdown_skips_pymupdf4llm_call():
@@ -97,7 +97,7 @@ def test_pre_extracted_markdown_skips_pymupdf4llm_call():
         )
     mock.assert_not_called()
     assert result.markdown == "# Pre-extracted\n\nbody"
-    assert result.token_usage is None
+    assert result.token_usage == 0
 
 
 def test_pre_extracted_markdown_still_runs_llm_when_provided():
