@@ -1349,10 +1349,44 @@ because it additionally sends the extracted text alongside the image,
 increasing the input payload on every request. This extra cost does not
 translate into a consistent accuracy improvement.
 
+Token usage tells the same story from a different angle.
+Table~\ref{tab:tokens} shows the total tokens consumed across all 90 pages
+and the average per LLM call.
+
+\begin{table}[h!]
+\centering
+\caption{Token usage per strategy across 90 pages}
+\label{tab:tokens}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Strategy} & \textbf{LLM calls} & \textbf{Avg tokens / call} & \textbf{Total tokens} \\
+\midrule
+Text-only  & 0  & ---     & 0       \\
+Adaptive   & 23 & 3{,}986 & 91{,}678  \\
+Image-only & 90 & 3{,}516 & 316{,}440 \\
+Hybrid     & 90 & 3{,}970 & 357{,}300 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The per-call token cost is similar for all three VLM strategies, ranging
+from 3{,}516 to 3{,}986 tokens per call. The difference is in how many
+calls are made. Image-only and hybrid call the LLM on every one of the
+90 pages. Adaptive calls it on only 23 pages — the pages the classifier
+identified as IMAGE, FORMULA, TABLE, or MIXED. The other 67 pages are
+TEXT pages that go through pymupdf4llm with no LLM call at all.
+This reduces total token consumption by 71\% compared to image-only and
+74\% compared to hybrid. Hybrid consumes the most tokens of any strategy
+because it sends both the rendered page image and the extracted text in
+every request, which increases the input length on every call.
+
 These results confirm hypothesis H3: the adaptive system is significantly
-cheaper than image-only or hybrid while maintaining comparable or better
-accuracy. The efficiency gain is most relevant for large documents, where
-the cost difference between strategies grows with page count.
+cheaper than image-only or hybrid in both processing time and token usage,
+while maintaining comparable or better accuracy. The efficiency gain grows
+with document length — a 300-page document would consume roughly
+$300 \times 3{,}986 \approx 1.2$\,million tokens with image-only but only
+around $80{,}000$ with adaptive, assuming a similar content distribution.
 
 % ----------------------------------------------------------------
 \subsection{Per-Page Analysis and Consistency (RQ5)}
