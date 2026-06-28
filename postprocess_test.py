@@ -4,6 +4,7 @@ from postprocess import (
     _clean_toc_dot_leaders,
     _clean_picture_text_blocks,
     _convert_abbreviations,
+    _convert_greek_italic_math,
     _convert_toc_table,
     _demote_code_listing_headings,
     _demote_italic_headings,
@@ -115,6 +116,58 @@ def test_clean_page_unwraps_arrow_sub_bullets():
     result = clean_page(md)
     assert "⇒" in result
     assert "_⇒_" not in result
+
+
+# ── _convert_greek_italic_math ────────────────────────────────────────────────
+
+def test_greek_italic_single_letter():
+    assert _convert_greek_italic_math("_φ_") == "$\\varphi$"
+
+
+def test_greek_italic_with_subscript():
+    assert _convert_greek_italic_math("_φj_") == "$\\varphi_j$"
+
+
+def test_greek_italic_long_subscript():
+    assert _convert_greek_italic_math("_φjk_") == "$\\varphi_{jk}$"
+
+
+def test_greek_italic_uppercase():
+    assert _convert_greek_italic_math("_Δt_") == "$\\Delta_t$"
+
+
+def test_greek_italic_inline_formula():
+    line = "lineare Funktion: _oj_ = _F_ ( _φj_ ) = _φ_ (2.6)"
+    result = _convert_greek_italic_math(line)
+    assert "$\\varphi_j$" in result
+    assert "$\\varphi$" in result
+    assert "_oj_" in result   # no Greek, left alone
+    assert "_F_" in result    # no Greek, left alone
+
+
+def test_greek_italic_leaves_plain_italic():
+    assert _convert_greek_italic_math("_hello_") == "_hello_"
+    assert _convert_greek_italic_math("_result_") == "_result_"
+
+
+def test_greek_italic_skips_code_block():
+    md = "```python\n_φ_ = value\n```"
+    assert _convert_greek_italic_math(md) == md
+
+
+def test_greek_italic_multiple_in_line():
+    line = "where _α_ and _β_ are parameters"
+    result = _convert_greek_italic_math(line)
+    assert "$\\alpha$" in result
+    assert "$\\beta$" in result
+
+
+def test_greek_italic_sigma():
+    assert _convert_greek_italic_math("_σ_") == "$\\sigma$"
+
+
+def test_greek_italic_omega():
+    assert _convert_greek_italic_math("_ω_") == "$\\omega$"
 
 
 def test_strip_running_headers_chapter():

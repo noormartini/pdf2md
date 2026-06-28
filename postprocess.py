@@ -40,6 +40,28 @@ _CAPTION_BEFORE_IMAGE_RE = re.compile(
 # The underscore form is the most common; the ** form also appears occasionally.
 _SYMBOL_ITALIC_RE = re.compile(r"\*{1,2}([^\w\s*_])\*{1,2}|_{1,2}([^\w\s*_])_{1,2}")
 
+# Greek letter → LaTeX command mapping.
+# pymupdf4llm renders math variables that use a Greek font as italic Markdown
+# spans (e.g. `_φ_`, `_φj_`).  Greek letters are never intentionally italic
+# in academic prose, so these can be converted safely to inline LaTeX.
+_GREEK_TO_LATEX: dict[str, str] = {
+    "α": r"\alpha",    "β": r"\beta",      "γ": r"\gamma",   "δ": r"\delta",
+    "ε": r"\varepsilon","ζ": r"\zeta",     "η": r"\eta",     "θ": r"\theta",
+    "ι": r"\iota",     "κ": r"\kappa",     "λ": r"\lambda",  "μ": r"\mu",
+    "ν": r"\nu",       "ξ": r"\xi",        "π": r"\pi",      "ρ": r"\rho",
+    "σ": r"\sigma",    "τ": r"\tau",       "υ": r"\upsilon", "φ": r"\varphi",
+    "χ": r"\chi",      "ψ": r"\psi",       "ω": r"\omega",
+    "Γ": r"\Gamma",    "Δ": r"\Delta",     "Θ": r"\Theta",   "Λ": r"\Lambda",
+    "Ξ": r"\Xi",       "Π": r"\Pi",        "Σ": r"\Sigma",   "Υ": r"\Upsilon",
+    "Φ": r"\Phi",      "Ψ": r"\Psi",       "Ω": r"\Omega",
+}
+_GREEK_CHARS: frozenset[str] = frozenset(_GREEK_TO_LATEX)
+
+# Matches a Markdown italic span containing only letters and digits.
+# Only fired when the span contains at least one Greek character (checked inside
+# the replacement function).  Skipped inside fenced code blocks.
+_GREEK_ITALIC_RE = re.compile(r"_([A-Za-zΑ-ω\d]+)_")
+
 # Matches OCR superscript artifacts where an all-caps abbreviation followed by a
 # superscript digit was extracted as italic text + bracket citation, e.g.:
 #   _EMC_[2]  →  EMC²
@@ -688,6 +710,55 @@ def _unwrap_symbol_italics(md: str) -> str:
     return _SYMBOL_ITALIC_RE.sub(lambda m: m.group(1) or m.group(2), md)
 
 
+def _convert_greek_italic_math(md: str) -> str:
+    """Convert italic Greek letter spans to inline LaTeX.
+
+    pymupdf4llm renders math variables that use a Greek italic font as
+    Markdown italic spans, e.g. ``_φj_`` or ``_Δt_``.  Greek letters never
+    appear as intentional italic prose, so these can be converted to
+    ``$\\varphi_j$`` / ``$\\Delta_t$`` safely.
+
+    Single trailing Latin letter(s) or digit(s) after the Greek prefix are
+    treated as subscripts: ``_φj_`` → ``$\\varphi_j$``.
+    Content without any Greek character is left unchanged so that ordinary
+    italic words like ``_result_`` are not affected.
+
+    The pass is skipped inside fenced code blocks.
+    """
+    def _to_latex(m: re.Match) -> str:
+        content = m.group(1)
+        if not any(c in _GREEK_CHARS for c in content):
+            return m.group(0)
+
+        greek_part = ""
+        subscript = ""
+        entered_subscript = False
+        for c in content:
+            if c in _GREEK_CHARS and not entered_subscript:
+                greek_part += _GREEK_TO_LATEX[c]
+            else:
+                entered_subscript = True
+                subscript += c
+
+        if not subscript:
+            return f"${greek_part}$"
+        if len(subscript) == 1:
+            return f"${greek_part}_{subscript}$"
+        return f"${greek_part}_{{{subscript}}}$"
+
+    lines = md.split("\n")
+    result: list[str] = []
+    in_code = False
+    for line in lines:
+        if line.startswith("```"):
+            in_code = not in_code
+        if in_code:
+            result.append(line)
+        else:
+            result.append(_GREEK_ITALIC_RE.sub(_to_latex, line))
+    return "\n".join(result)
+
+
 def _fix_ocr_superscripts(md: str) -> str:
     """Fix OCR artefacts where superscript digits were extracted as bracketed refs.
 
@@ -923,6 +994,7 @@ def clean_page(md: str, raw_page_text: str = "") -> str:
     md = _fix_table_list_header(md)
     md = _convert_abbreviations(md)
     md = _unwrap_symbol_italics(md)
+    md = _convert_greek_italic_math(md)
     md = _fix_ocr_superscripts(md)
     md = _format_figure_captions(md)
     md = _reorder_captions_after_images(md)
