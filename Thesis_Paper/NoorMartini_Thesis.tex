@@ -1204,12 +1204,44 @@ The evaluation framework stores all results as JSON and generates reports from t
 \section{Results and Evaluation}
 % ================================================================
 
-This chapter presents the results of the experiment described in Chapter~4.
-All four strategies were applied to 90 pages across three thesis documents,
-producing 360 evaluated page conversions with zero errors.
-Results are reported per strategy across seven metrics and one efficiency
-measure. Each subsection connects the findings to the relevant research
-question.
+% ----------------------------------------------------------------
+\subsection{Experiment Setup}
+% ----------------------------------------------------------------
+
+The experiment evaluates four extraction strategies against a
+hand-written ground truth. The ground truth consists of 90 Markdown
+files — 30 per thesis document — written manually by the thesis author.
+Each file was produced by reading one page of the original PDF and
+writing the Markdown that a correct conversion should produce.
+Headings were assigned the correct depth from the document's numbering
+hierarchy, code blocks were wrapped in fenced code blocks with the
+appropriate language tag, tables were reconstructed in pipe-table
+syntax, and formulas were written in LaTeX notation.
+Writing these files by hand was necessary to ensure an honest ground
+truth: an automatically generated reference would contain the same
+errors as the system under evaluation, making the comparison circular.
+
+The three documents in the corpus are a German computer science
+bachelor thesis on neural networks (referred to here as the neural
+networks thesis), a German bachelor thesis on sentiment analysis
+(the sentiment analysis thesis), and an English-language bachelor
+thesis describing a human-in-the-loop system for research paper
+generation (the HITL thesis). Together they cover different writing
+styles, content densities, and proportions of code, formula, and
+table content, which makes the per-page results more representative
+than a single document would allow.
+
+Each of the four strategies — text-only, image-only, hybrid, and
+adaptive — was applied to every page of every document. This produced
+$4 \times 3 \times 30 = 360$ evaluated conversions with zero errors.
+For each conversion, the pipeline output was compared to the
+corresponding reference file using the seven metrics described in
+Section~4.3: text similarity, heading structure, list structure,
+table structure, code block score, paragraph structure, and word
+overlap. Processing time was also recorded per page.
+Results are reported as mean scores per strategy across the full
+90-page corpus. Each subsection connects the findings to the relevant
+research question.
 
 % ----------------------------------------------------------------
 \subsection{Overall Strategy Performance (RQ1, RQ2)}
