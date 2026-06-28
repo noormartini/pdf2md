@@ -1065,6 +1065,15 @@ Pages are converted in parallel using a thread pool. The default concurrency is 
 
 The post-processing pipeline receives the joined Markdown and applies a fixed sequence of cleanup passes before writing the final output file.
 
+Figure~\ref{fig:architecture} shows the complete processing pipeline.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{images/architecture.png}
+    \caption{System architecture: from PDF input to Markdown output}
+    \label{fig:architecture}
+\end{figure}
+
 \subsection{Page Content Classifier}
 
 The classifier extracts four structural signals from each page using PyMuPDF \cite{pymupdf}: the number of embedded images, the number of vector drawing paths, the total character count of the text layer, and the number of detected tables.

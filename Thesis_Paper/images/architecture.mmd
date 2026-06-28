@@ -1,0 +1,37 @@
+flowchart TD
+    A([PDF File]) --> LOAD[Load Document]
+
+    LOAD --> BULK["Bulk Text Extraction\npymupdf4llm — all pages at once"]
+    LOAD --> LANG["Language Detection\nGerman · English · other"]
+    LOAD --> CLASS["Page Classifier\nfont size · image area · vector paths · table detection"]
+
+    BULK --> PG
+    CLASS --> PG
+    LANG --> PV
+
+    subgraph POOL["ThreadPoolExecutor — 4 parallel workers"]
+        PG{Page Type?}
+        PG -->|TEXT| PT["Pre-extracted text\nno LLM call"]
+        PG -->|"IMAGE · FORMULA\nTABLE · MIXED"| PV["Render page as PNG\ntyped prompt + language hint\n→ Qwen2.5-VL-7B via LM Studio"]
+        PG -->|EMPTY| PE[Placeholder]
+    end
+
+    PT --> COL[Collect page outputs in order]
+    PV --> COL
+    PE --> COL
+
+    subgraph POST["Postprocessing Pipeline — sequential passes"]
+        direction LR
+        PP1["Heading\nnormalisation"] --> PP2["TOC · LOF\nconversion"] --> PP3["Figure\ncaptions"] --> PP4["Greek\n→ LaTeX"] --> PP5["Running\nheader removal"] --> PP6["Abbreviation\ntables"]
+    end
+
+    COL --> POST
+    POST --> OUT(["Markdown Output\nsingle .md file"])
+
+    style A fill:#f0f0f0,stroke:#555
+    style LOAD fill:#f0f0f0,stroke:#555
+    style OUT fill:#f0f0f0,stroke:#555
+    style POOL fill:#fef9c3,stroke:#ca8a04
+    style PG fill:#dbeafe,stroke:#2563eb
+    style PV fill:#fce7f3,stroke:#db2777
+    style POST fill:#dcfce7,stroke:#16a34a
