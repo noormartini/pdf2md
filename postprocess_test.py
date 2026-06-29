@@ -11,12 +11,15 @@ from postprocess import (
     _demote_outline_chapter_refs,
     _demote_title_page_headings,
     _demote_unlabeled_single_word_headings,
+    _fix_bold_listing_headings,
+    _fix_bold_space_before_colon,
     _fix_listing_table,
     _fix_table_list_header,
     _format_figure_captions,
     _fix_ocr_superscripts,
     _merge_kapitel_headings,
     _normalise_latex_delimiters,
+    _promote_declaration_heading,
     _reorder_captions_after_images,
     _recover_bare_number_headings,
     _strip_bibliography_dash,
@@ -884,17 +887,17 @@ def test_clean_picture_text_blocks_removes_markers():
     assert "End of picture text" not in result
 
 
-def test_clean_picture_text_blocks_preserves_content_as_blockquote():
+def test_clean_picture_text_blocks_drops_content():
     md = f"{_PTB_START}\nPhase One<br>\nPhase Two<br>\n{_PTB_END}\n"
     result = _clean_picture_text_blocks(md)
-    assert "> Phase One" in result
-    assert "> Phase Two" in result
+    assert "Phase One" not in result
+    assert "Phase Two" not in result
 
 
-def test_clean_picture_text_blocks_converts_br_to_newlines():
+def test_clean_picture_text_blocks_drops_br_tags():
     md = f"{_PTB_START}\nA<br>B<br>C<br>\n{_PTB_END}\n"
     result = _clean_picture_text_blocks(md)
-    assert "<br>" not in result
+    assert result.strip() == ""
 
 
 def test_clean_picture_text_blocks_leaves_normal_content_alone():
@@ -910,7 +913,7 @@ def test_postprocess_markdown_cleans_picture_text_block():
     )
     result = postprocess_markdown(md)
     assert "Start of picture text" not in result
-    assert "> Diagram label" in result
+    assert "Diagram label" not in result
     assert "**Figure 1:** Caption." in result
 
 
@@ -1002,3 +1005,85 @@ def test_strip_mid_doc_running_headers_keeps_non_isolated_front_matter():
     # Embedded in a sentence — not a running header.
     md = "See the Inhaltsverzeichnis for details.\n"
     assert _strip_mid_doc_running_headers(md) == md
+
+
+def test_fix_bold_space_before_colon_removes_space():
+    md = "**Schmitt, Steven :** Some text"
+    assert _fix_bold_space_before_colon(md) == "**Schmitt, Steven:** Some text"
+
+
+def test_fix_bold_space_before_colon_leaves_normal_bold():
+    md = "**Bold text** and more."
+    assert _fix_bold_space_before_colon(md) == md
+
+
+def test_fix_bold_listing_headings_converts_listings():
+    md = "**Listings**\n\n| Listing | Description | Page |\n"
+    result = _fix_bold_listing_headings(md)
+    assert result.startswith("## Listings")
+
+
+def test_fix_bold_listing_headings_converts_list_of_figures():
+    md = "Some text\n\n**List of Figures**\n\n| Figure | Caption | Page |\n"
+    result = _fix_bold_listing_headings(md)
+    assert "## List of Figures" in result
+
+
+def test_fix_bold_listing_headings_leaves_bold_in_sentence():
+    md = "The **List of Figures** is on page ix."
+    assert _fix_bold_listing_headings(md) == md
+
+
+def test_foundations_keyword_not_demoted():
+    md = "## Foundations\n\nSome text."
+    result = clean_page(md)
+    assert "## Foundations" in result
+
+
+def test_implementation_keyword_not_demoted():
+    md = "## Implementation\n\nSome text."
+    result = clean_page(md)
+    assert "## Implementation" in result
+
+
+# ── _promote_declaration_heading ──────────────────────────────────────────────
+
+def test_promote_declaration_heading_erklarung_slash_declaration():
+    md = "Erklärung / Declaration\n\nI hereby declare..."
+    result = _promote_declaration_heading(md)
+    assert result.startswith("## Erklärung / Declaration")
+
+
+def test_promote_declaration_heading_erklarung_only():
+    md = "Erklärung\n\nHiermit erkläre ich..."
+    result = _promote_declaration_heading(md)
+    assert result.startswith("## Erklärung")
+
+
+def test_promote_declaration_heading_leaves_existing_heading():
+    md = "## Erklärung / Declaration\n\nBody text."
+    assert _promote_declaration_heading(md) == md
+
+
+def test_promote_declaration_heading_leaves_inline_occurrence():
+    md = "See the Erklärung / Declaration section for details."
+    assert _promote_declaration_heading(md) == md
+
+
+# ── _strip_bibliography_dash (trailing dash) ──────────────────────────────────
+
+def test_strip_bibliography_dash_strips_trailing_dash():
+    md = "A Human-in-the-Loop System / Steven Schmitt. –\n"
+    result = _strip_bibliography_dash(md)
+    assert result == "A Human-in-the-Loop System / Steven Schmitt.\n"
+
+
+def test_strip_bibliography_dash_strips_trailing_emdash_variant():
+    md = "Ein System / Max Mustermann. —\n"
+    result = _strip_bibliography_dash(md)
+    assert result == "Ein System / Max Mustermann.\n"
+
+
+def test_strip_bibliography_dash_leaves_mid_sentence_dash():
+    md = "The system — which is local — runs offline.\n"
+    assert _strip_bibliography_dash(md) == md

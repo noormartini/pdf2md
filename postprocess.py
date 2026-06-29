@@ -110,10 +110,13 @@ _STRUCTURAL_KEYWORDS: frozenset[str] = frozenset({
     "contents", "overview", "background", "motivation", "evaluation",
     "results", "discussion", "methodology", "outlook", "preface",
     "contributions", "foreword", "erklärung", "surrounding",
+    "foundations", "implementation", "requirements", "architecture",
+    "design", "approach", "experiments", "analysis", "related",
     # German
     "einleitung", "zusammenfassung", "schluss", "literatur", "anhang",
     "vorwort", "danksagung", "inhaltsverzeichnis", "hintergrund",
     "bewertung", "ergebnis", "ausblick", "fazit", "abstrakt",
+    "grundlagen", "implementierung", "anforderungen", "entwurf",
 })
 
 # Matches dot-leader patterns in TOC table cells, e.g. " . . . . . . . . 32 "
@@ -166,6 +169,22 @@ _DOTS_CELL_RE = re.compile(r"^\.+$")
 # or at end of string.
 _ABBR_INLINE_RE = re.compile(
     r"\*\*([A-Z][A-Z0-9]{1,})\*\*\s+([^*]+?)(?=\s+\*\*[A-Z]|\s*$)"
+)
+
+# Bold label with a space before the colon, e.g. **Schmitt, Steven :** → **Schmitt, Steven:**
+_BOLD_SPACE_COLON_RE = re.compile(r"\*\*([^*]+?)\s+:\*\*")
+
+# Standalone declaration heading line — the VLM sometimes outputs this as plain text.
+_DECLARATION_LINE_RE = re.compile(
+    r"^(Erklärung(?:\s*/\s*Declaration)?|Declaration)\s*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+# Bold front-matter section title that should be a heading, e.g. **Listings** or
+# **List of Figures** when it appears as a standalone line (the VLM sometimes outputs
+# these as bold text rather than pipe-table headers).
+_BOLD_LISTING_TITLE_RE = re.compile(
+    r"^\*\*(List of Figures|List of Tables|Listings)\*\*\s*$", re.IGNORECASE | re.MULTILINE
 )
 
 # Matches a PDF running header (Kopfzeile) line — a plain-text repetition of the
@@ -698,6 +717,37 @@ def _strip_running_headers(md: str) -> str:
     return "\n".join(lines)
 
 
+def _fix_bold_space_before_colon(md: str) -> str:
+    """Remove the space before the colon in bold author/label lines.
+
+    PDFs sometimes store citation labels as 'Schmitt, Steven :' with a space
+    before the colon.  pymupdf4llm preserves it, producing **Schmitt, Steven :**
+    which looks wrong in Markdown.  This normalises them to **Schmitt, Steven:**.
+    """
+    return _BOLD_SPACE_COLON_RE.sub(r"**\1:**", md)
+
+
+def _fix_bold_listing_headings(md: str) -> str:
+    """Convert bold front-matter section titles to proper Markdown headings.
+
+    The VLM sometimes outputs 'List of Figures', 'List of Tables' or 'Listings'
+    as **bold text** on a standalone line instead of as a pipe-table header row.
+    This converts those to ## headings so the section is formatted consistently.
+    """
+    return _BOLD_LISTING_TITLE_RE.sub(lambda m: f"## {m.group(1)}", md)
+
+
+def _promote_declaration_heading(md: str) -> str:
+    """Promote a standalone 'Erklärung / Declaration' line to a ## heading.
+
+    The declaration page is classified as MIXED (it contains a signature image),
+    so it goes to the VLM.  The VLM sometimes outputs the page title as plain
+    text instead of a heading.  This converts the standalone line to ## so the
+    section appears correctly in the document hierarchy.
+    """
+    return _DECLARATION_LINE_RE.sub(lambda m: f"## {m.group(1)}", md)
+
+
 def _unwrap_symbol_italics(md: str) -> str:
     """Strip italic/bold markers wrapping a single non-word Unicode symbol.
 
@@ -986,6 +1036,9 @@ def clean_page(md: str, raw_page_text: str = "") -> str:
     # PDF decorative underlines extracted as artifacts, not intentional separators.
     md = re.sub(r"(^#{1,6} .+\n)\n*([ \t]*(-{3,}|\*{3,}|_{3,})[ \t]*\n)", r"\1\n", md, flags=re.MULTILINE)
 
+    md = _fix_bold_space_before_colon(md)
+    md = _fix_bold_listing_headings(md)
+    md = _promote_declaration_heading(md)
     md = _strip_running_headers(md)
     md = _clean_toc_dot_leaders(md)
     md = _convert_toc_table(md)
@@ -1067,25 +1120,17 @@ def _demote_code_listing_headings(md: str) -> str:
 
 
 def _clean_picture_text_blocks(md: str) -> str:
-    """Replace picture-text block markers with a clean blockquote.
+    """Remove picture-text blocks produced by pymupdf4llm's Tesseract OCR pass.
 
-    pymupdf4llm wraps OCR text from embedded figures in noisy delimiter lines:
+    pymupdf4llm runs Tesseract on embedded figure images and wraps the result in:
         **----- Start of picture text -----**<br>
         Some text<br>More text<br>
         **----- End of picture text -----**<br>
-    The delimiters are stripped, <br> tags are converted to newlines, and the
-    remaining content is wrapped in a Markdown blockquote so it is visually
-    distinct from body text without losing the OCR information.
+    This OCR output is inaccurate (word-wrap artefacts, symbol misreads) and
+    redundant — the figure image itself is already included as a Markdown image
+    link one line above.  Dropping the block avoids misleading noise.
     """
-    def _replace(m: re.Match) -> str:
-        content = m.group(1)
-        content = content.replace("<br>\n", "\n").replace("<br>", "\n")
-        lines = [line for line in content.splitlines() if line.strip()]
-        if not lines:
-            return ""
-        return "\n".join(f"> {line}" for line in lines)
-
-    return _PICTURE_TEXT_BLOCK_RE.sub(_replace, md)
+    return _PICTURE_TEXT_BLOCK_RE.sub("", md)
 
 
 def _demote_title_page_headings(md: str) -> str:
@@ -1265,23 +1310,35 @@ def _strip_duplicate_section_headers(md: str) -> str:
 
 
 def _strip_bibliography_dash(md: str) -> str:
-    """Remove em-dash artifacts at the start of bibliography paragraphs.
+    """Remove em-dash artifacts in bibliography paragraphs.
 
     In German academic PDFs, bibliography entries use the format:
         Author, Name:
         – Title / Author. – Publisher, Year.
 
-    The '–' is a typographic separator within the citation, but pymupdf4llm
-    places it at the start of the paragraph (the line-break falls right there).
-    This strips the leading '– ' or '— ' from any standalone paragraph that
-    directly follows a bold label line (the author name formatted as **Name :**).
+    The '–' is a typographic separator within the citation.  Two artefacts
+    appear depending on where the PDF line break falls:
+
+    1. Leading dash — pymupdf4llm places it at the start of the next paragraph:
+           **Schmitt, Steven:**
+           – Ein Human-in-the-Loop…
+       → stripped.
+
+    2. Trailing dash — the line-break falls after the authorship statement, so
+       the dash ends up at the end of the citation line:
+           … / Steven Schmitt. –
+       → stripped.
     """
-    return re.sub(
+    # Leading '– ' from paragraphs that follow a bold author label.
+    md = re.sub(
         r"(^\*\*[^\n]+\*\*\s*\n\n)([–—])\s+",
         r"\1",
         md,
         flags=re.MULTILINE,
     )
+    # Trailing ' –' or ' —' after a sentence-ending period.
+    md = re.sub(r"\.\s*[–—][ \t]*$", ".", md, flags=re.MULTILINE)
+    return md
 
 
 def _strip_mid_doc_page_numbers(md: str) -> str:

@@ -16,7 +16,10 @@
   ],
   "reference_dir": "references",
   "strategies": [
-    "adaptive"
+    "adaptive",
+    "text",
+    "image",
+    "hybrid"
   ],
   "models": [
     "qwen2.5-vl-7b-instruct-abliterated"

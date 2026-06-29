@@ -44,7 +44,7 @@ def _bulk_extract_markdown(pdf_path: str, num_pages: int, figures_dir: str) -> l
     return [chunk.get("text", "") for chunk in chunks]
 
 
-def _run_in_pool(indices: list[int], concurrency: int, worker) -> list[str]:
+def _run_in_pool(indices: list[int], concurrency: int, worker) -> list:
     """Run `worker(i)` for each i in `indices` concurrently and return results
     in input order.
 
@@ -77,6 +77,8 @@ def run(config: Config):
         page_labels = [_page_label(doc, i) for i in range(num_pages)]
 
     page_indices = list(range(num_pages))
+    total_tokens = 0
+    total_llm_calls = 0
 
     match (config.strategy):
         case "text":
@@ -84,8 +86,9 @@ def run(config: Config):
             # would re-scan the whole document for header font sizes).
             page_markdown = _bulk_extract_markdown(config.input, num_pages, figures_dir)
 
-            def _convert(i: int) -> str:
+            def _convert(i: int) -> tuple:
                 label = page_labels[i]
+                raw_text = ""
                 with fitz.open(config.input) as worker_doc:
                     raw_text = worker_doc[i].get_text("text")
                 print(f"Converting page {i+1}/{num_pages} (page {label}) to Markdown...")
@@ -99,12 +102,16 @@ def run(config: Config):
                     figures_dir=figures_dir,
                     pre_extracted_markdown=page_markdown[i] if i < len(page_markdown) else "",
                 )
-                return f"<!-- Page {label} -->\n\n{clean_page(result.markdown, raw_page_text=raw_text)}"
+                page_md = f"<!-- Page {label} -->\n\n{clean_page(result.markdown, raw_page_text=raw_text)}"
+                return page_md, result.token_usage, result.llm_calls
 
-            cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
+            raw_results = _run_in_pool(page_indices, config.concurrency, _convert)
+            cleaned_pages = [r[0] for r in raw_results]
+            total_tokens = sum(r[1] or 0 for r in raw_results)
+            total_llm_calls = sum(r[2] for r in raw_results)
 
         case "image":
-            def _convert(i: int) -> str:
+            def _convert(i: int) -> tuple:
                 label = page_labels[i]
                 with fitz.open(config.input) as worker_doc:
                     page = worker_doc[i]
@@ -122,16 +129,20 @@ def run(config: Config):
                     language=language,
                     llm_call=llm_call,
                 )
-                return f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
+                page_md = f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
+                return page_md, result.token_usage, result.llm_calls
 
-            cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
+            raw_results = _run_in_pool(page_indices, config.concurrency, _convert)
+            cleaned_pages = [r[0] for r in raw_results]
+            total_tokens = sum(r[1] or 0 for r in raw_results)
+            total_llm_calls = sum(r[2] for r in raw_results)
 
         case "hybrid":
             pages = extract_pages_from_pdf(config.input, max_pages=config.max_pages)
             if not pages:
                 raise ValueError("No text could be extracted from the PDF.")
 
-            def _convert(i: int) -> str:
+            def _convert(i: int) -> tuple:
                 label = page_labels[i]
                 with fitz.open(config.input) as worker_doc:
                     page = worker_doc[i]
@@ -151,9 +162,13 @@ def run(config: Config):
                     language=language,
                     llm_call=llm_call,
                 )
-                return f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
+                page_md = f"<!-- Page {label} -->\n\n{clean_page(result.markdown)}"
+                return page_md, result.token_usage, result.llm_calls
 
-            cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
+            raw_results = _run_in_pool(page_indices, config.concurrency, _convert)
+            cleaned_pages = [r[0] for r in raw_results]
+            total_tokens = sum(r[1] or 0 for r in raw_results)
+            total_llm_calls = sum(r[2] for r in raw_results)
 
         case "adaptive":
             # Bulk-extract once for any page that ends up classified as TEXT.
@@ -162,17 +177,19 @@ def run(config: Config):
             # one bulk call.
             page_markdown = _bulk_extract_markdown(config.input, num_pages, figures_dir)
 
-            def _convert(i: int) -> str:
+            def _convert(i: int) -> tuple:
                 label = page_labels[i]
+                raw_text = ""
                 with fitz.open(config.input) as worker_doc:
                     page = worker_doc[i]
                     raw_text = page.get_text("text")
                     analysis = analyze_page(page)
-                    print(
-                        f"Page {i+1}/{num_pages} (page {label}) → "
-                        f"{analysis.page_type.value} "
-                        f"(conf={analysis.confidence:.2f})..."
+                    strategy_label = (
+                        "text" if analysis.page_type == PageType.TEXT
+                        else "skip" if analysis.page_type == PageType.EMPTY
+                        else "image"
                     )
+                    print(f"Page {i+1}/{num_pages} (page {label}) → {strategy_label}...")
                     page_image = render_page_as_base64(page)
                     figure_refs = (
                         extract_page_figures(page, worker_doc, i, figures_dir)
@@ -194,9 +211,13 @@ def run(config: Config):
                     pre_extracted_markdown=page_markdown[i] if i < len(page_markdown) else None,
                     image_call=partial(image_strategy, llm_call=llm_call),
                 )
-                return f"<!-- Page {label} -->\n\n{clean_page(result.markdown, raw_page_text=raw_text)}"
+                page_md = f"<!-- Page {label} -->\n\n{clean_page(result.markdown, raw_page_text=raw_text)}"
+                return page_md, result.token_usage, result.llm_calls
 
-            cleaned_pages = _run_in_pool(page_indices, config.concurrency, _convert)
+            raw_results = _run_in_pool(page_indices, config.concurrency, _convert)
+            cleaned_pages = [r[0] for r in raw_results]
+            total_tokens = sum(r[1] or 0 for r in raw_results)
+            total_llm_calls = sum(r[2] for r in raw_results)
 
         case _:
             raise ValueError(f"Unknown strategy: {config.strategy}")
@@ -210,3 +231,8 @@ def run(config: Config):
         f.write(markdown)
 
     print(f"Done! Output saved as '{config.output}'.")
+    if total_llm_calls > 0:
+        avg = total_tokens // total_llm_calls
+        print(f"Token usage: {total_tokens:,} tokens ({total_llm_calls} LLM calls, avg {avg:,}/call)")
+    else:
+        print("Token usage: 0 (no LLM calls — text strategy)")

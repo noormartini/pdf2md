@@ -1549,6 +1549,18 @@ classifier in this system uses font-size ratios and image area
 heuristics, which is effective for thesis layouts but may need
 retraining for other document types.
 
+The classifier routes every page with a detected table to the vision LLM.
+This is a conservative choice.
+For complex tables --- merged cells, irregular column spans, or figures embedded
+in cells --- the VLM produces more accurate output than pymupdf4llm alone, because
+it reads the visual structure rather than the extracted character stream.
+For the simpler tables common in academic theses, however, pymupdf4llm extracts
+rows and columns directly and would produce equally correct Markdown at no
+inference cost.
+A refined classifier could add a complexity check and keep simple tables in the
+text path, reducing token usage and inference time without sacrificing quality
+on the majority of pages.
+
 Formula pages currently use the general-purpose Qwen2.5-VL-7B model.
 A dedicated formula recognition tool such as pix2tex could replace
 this path: it is faster, cheaper, and produces cleaner LaTeX output
@@ -1607,6 +1619,9 @@ and the version of pymupdf4llm, both of which are stable.
     \item Support for additional document types
     \item Integration with other tools and pipelines
     \item Exploration of newer LLM models
+    \item Refine the page classifier to distinguish simple tables from complex
+          ones, so that pages with clean row-column structure bypass the vision
+          LLM and use the faster text path instead
 \end{itemize}
 
 
