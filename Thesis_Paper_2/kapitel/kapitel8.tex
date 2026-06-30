@@ -1,0 +1,68 @@
+\chapter{Conclusion}
+
+\section{Summary of Findings}
+
+% To be completed after final results review.
+
+\section{Contributions and Impact}
+
+% To be completed.
+
+\section{Limitations of the Study}
+
+% To be completed.
+
+\section{Future Work}
+
+Heading level detection was the weakest metric across all four strategies,
+with no strategy exceeding 0.565.
+The current approach infers heading levels from font-size ratios for the
+text path and from visual appearance for the vision path.
+Neither method reliably assigns the correct depth when the document uses
+inconsistent font sizes or non-standard heading styles.
+A dedicated heading classifier trained on labelled thesis documents would
+likely improve this score more than any other single change.
+
+\begin{itemize}
+
+    \item \textbf{Table complexity classifier.}
+    The page classifier currently routes every page with a detected table
+    to the vision LLM.
+    A refinement that distinguishes simple row-column tables from complex
+    ones --- merged cells, irregular spans, embedded figures --- would
+    keep simple tables in the faster text path without sacrificing quality
+    on the pages where the VLM actually adds value.
+
+    \item \textbf{Dedicated formula recognition.}
+    Formula pages currently use the general-purpose Qwen2.5-VL-7B model.
+    A specialised tool such as pix2tex, which is trained exclusively on
+    mathematical notation, would produce cleaner LaTeX output and run
+    faster on formula-heavy pages.
+    The adaptive architecture supports this substitution without changes
+    to the rest of the pipeline.
+
+    \item \textbf{Larger and domain-specific models.}
+    All VLM results in this experiment use Qwen2.5-VL-7B.
+    A larger model or one fine-tuned on academic documents could reduce
+    the paraphrasing tendency that causes image-only and hybrid to score
+    poorly on paragraph and code block structure.
+    Retesting with a different model would show whether the strategy
+    rankings in Chapter~6 are model-dependent or consistent.
+
+    \item \textbf{Broader document corpus.}
+    The evaluation covers three German bachelor theses.
+    Testing on research papers, lecture slides, and scanned documents
+    would reveal whether the page classifier and postprocessing pipeline
+    generalise beyond the thesis format.
+    Scanned documents in particular would require OCR integration, which
+    the current system does not provide.
+
+    \item \textbf{Automated output comparison tool.}
+    Manual inspection of converted pages, as done when analysing the
+    HITL thesis output, is slow and error-prone.
+    A script that shows a per-page diff between converted output and
+    reference files, highlighting only pages below a similarity
+    threshold, would make iterative improvement of the postprocessing
+    pipeline significantly faster.
+
+\end{itemize}

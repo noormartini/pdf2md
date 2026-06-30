@@ -1,0 +1,214 @@
+\chapter{Related Work}
+
+This chapter reviews existing work in three areas that are directly relevant to
+this thesis: traditional PDF processing tools, modern document conversion
+systems, and LLM-based document understanding. Each section identifies what
+the existing work achieves and where the gaps are that this thesis addresses.
+
+\section{Traditional PDF Processing Tools}
+
+Traditional PDF processing tools fall into two categories: text-layer parsers
+that read content directly from the embedded glyph stream of a native PDF, and
+OCR-based tools that recover text by applying image recognition to rendered
+page images. Both are well-established, but they were built to extract text,
+not to reconstruct the semantic structure of a document. That is the core
+limitation both categories share.
+
+\subsection{Text-based Parsers}
+
+Text-layer parsers like PyMuPDF, pdfplumber, and pypdfium2 read character
+objects and their coordinates from a PDF's internal object stream, then
+reassemble them into reading order using heuristics. Each library works at a
+different level of detail. PyMuPDF gives direct access to character bounding
+boxes, font metadata, and color attributes, which makes it fast and useful as
+a preprocessing step. pdfplumber is built on PDFMiner and exposes bounding-box
+tables for words and characters, which helps with positional grouping for
+tabular data. pypdfium2 wraps the PDFium rendering engine (the same one
+used in Google Chrome) and produces high-fidelity rendering, but does
+little structural post-processing on its own.
+
+Meuschke et al.\ \autocite{meuschke2023} evaluated these tools across academic,
+legal, and technical documents. All three libraries performed well on simple
+single-column native PDFs with clean encodings, but accuracy dropped noticeably
+as document complexity increased, especially on documents that mixed content
+types such as embedded images, side-by-side tables, and footnotes. No single
+library came out on top across all categories: PyMuPDF handled text-dense
+documents fastest, while pdfplumber's coordinate data gave it an edge on
+documents that required positional grouping. Ingemarsson and Persson \autocite{ingemarsson2024} identified
+a hard limit: on pages where content exists only as rasterised images,
+text-layer parsers recover nothing, because there is no embedded text object
+to read. For mathematical expressions, Gao et al.\ \autocite{gao2011} show that
+sequential character extraction loses the spatial relationships between glyphs
+that make formulas meaningful. The output is character-correct, but the
+structure is gone.
+
+\subsection{OCR Solutions}
+
+OCR tools work differently: instead of reading a text layer, they apply image
+recognition to rendered page images. Smith \autocite{smith2007} describes the
+architecture of Tesseract, the most widely used open-source OCR engine. It
+runs a two-pass pipeline: the first pass uses adaptive thresholding and
+connected-component analysis to isolate character candidates, and the second
+pass applies a word-level language model to resolve ambiguous boundaries.
+Tesseract 4.0 added an LSTM-based recognition model that improved accuracy on
+degraded and stylised text while keeping the same two-stage structure.
+Subramani et al.\ \autocite{subramani2020} reviewed deep learning approaches to
+document understanding and placed classical engines like Tesseract in that
+broader context. Their conclusion is that single-pass OCR works well on clean,
+single-font documents but breaks down on complex layouts, mixed-script content,
+and low-resolution scans. This is what pushed the field toward layout-aware,
+multi-stage pipelines.
+
+Zhu et al.\ \autocite{zhu2022} developed DocBed, a multi-stage OCR pipeline built
+for documents with complex layouts. Rather than applying recognition to the
+full page at once, DocBed first runs a region segmentation model to separate
+text blocks, tables, and figures, then sends each region to a dedicated
+recogniser. This staged approach recovered significantly more structure than
+global OCR on layout-complex documents. But it also introduced a known failure
+mode: if the segmentation step makes a wrong decision, it passes incorrect
+bounding boxes to every recogniser that follows, and the resulting errors are
+hard to trace back to their source. This is not a problem unique to DocBed.
+It applies to any modular pipeline architecture \autocite{duan2025}.
+
+\subsection{Shared Limitations}
+
+Both text-layer parsers and OCR tools share a gap that Darvishy
+\autocite{darvishy2018} identified: no traditional tool can interpret or describe
+mathematical formulas or scientific graphs in PDFs. Text-layer parsers flatten
+formulas into character sequences with no spatial encoding. OCR tools recognise
+individual symbols but do not rebuild the two-dimensional structure that gives
+mathematical notation its meaning. Superscripts, subscripts, fraction bars,
+and summation bounds are all flattened out. For the academic and scientific documents
+this thesis targets, formulas and figures are not decorative. They carry
+the core content, so losing their structure is a real problem. The evidence
+from Meuschke et al.\ \autocite{meuschke2023}, Ingemarsson and Persson
+\autocite{ingemarsson2024}, and Subramani et al.\ \autocite{subramani2020} all point
+to the same conclusion: traditional tools work well within a narrow range of
+document types, but they are not sufficient for the diverse, structure-rich
+documents this thesis works with. This is what motivates the move toward
+learning-based and multimodal systems covered in the sections that follow.
+
+\section{Modern Document Conversion Tools}
+
+Modern conversion tools go beyond simple text extraction. Rather than reading the
+raw text layer, they first analyse the visual structure of each page. This approach
+is sometimes called pipeline-based document parsing: the page is decomposed into
+layout blocks, each classified as text, table, figure, or heading, and the blocks
+are then processed in reading order \autocite{whitington2012}. Scanned pages are detected
+automatically and routed to an OCR module, while digitally-born pages go through a
+text extraction path. Subramani et al.\ \autocite{subramani2020} survey these methods,
+distinguishing between modular pipeline systems and unified Vision-Language Model
+(VLM) approaches. Robust handling of complex layouts remains an open challenge
+for both.
+
+Commercial tools such as LlamaParse, Marker, and Mistral OCR follow this general
+architecture but add API layers and post-processing for downstream use cases.
+Ouyang et al.\ \autocite{omnidocbench2025} evaluated pipeline-based and end-to-end
+multimodal parsers across diverse real-world document layouts in OmniDocBench.
+No single parser performed consistently well across all document types. Gaps were
+largest for charts and degraded scanned pages. These results highlight how
+difficult it is to build one general-purpose tool for structurally diverse
+documents.
+
+Blecher et al.\ \autocite{blecher2023} introduced Nougat, a Visual Transformer
+trained on paired PDF-markup data that converts full academic document pages
+directly to Markdown. Nougat removes the need for a separate layout analysis
+or OCR stage by generating structured output end to end. It handles headings,
+equations, tables, and citations from a single model pass. Subramani et al.\
+\autocite{subramani2020} position this shift in a broader context: it represents
+the move from pipeline-based recognition to unified visual models that reason
+over the full page at once.
+
+For long, multimodal academic documents, Xie et al.\ \autocite{wukong2024} introduced
+PDF-WuKong, a multimodal large language model for question-answering over long
+PDFs. The system uses a sparse sampler that operates on both text and image
+representations, selecting only the paragraphs and diagrams most relevant to a
+given query. Evaluated on the PaperPDF dataset of 1.1 million QA pairs from
+English and Chinese academic papers, PDF-WuKong outperformed proprietary products
+by an average of 8.6\% on F1. This shows that efficient joint modelling of text
+and images is achievable for long documents, though the system targets retrieval
+and question-answering rather than full document conversion.
+
+Even so, key limitations remain. Meuschke et al.\ \autocite{meuschke2023} found
+that even modern parsing tools struggle with scientific and patent documents
+containing dense formulas and non-standard layouts.
+Darvishy \autocite{darvishy2018} notes that no existing tool provides mechanisms to
+interpret and describe mathematical formulas or scientific graphs in PDFs. This gap
+is one of the central motivations for the image-based extraction strategy in this
+thesis, where rendered page images are passed to a multimodal LLM that can reason
+about text and visual content together.
+
+\section{LLM-based Document Understanding}
+
+Before large language models, document understanding depended on chains of
+specialised tools. Subramani et al.\ \autocite{subramani2020} showed that even
+deep-learning OCR broke down on complex layouts, mixed scripts, and
+low-resolution pages. Vision-capable language models changed this: they read a
+rendered page image and produce structured output token by token through
+autoregressive generation, with no hand-coded layout rules in between.
+
+Blecher et al.\ \autocite{blecher2023} introduced Nougat (Neural Optical
+Understanding for Academic Documents), a Visual Transformer trained on paired
+PDF-markup data. It infers headings, equations, tables, and citations without a
+separate layout step. Meuschke et al.\ \autocite{meuschke2023} confirmed this
+pattern: structured-output tools outperformed all rule-based parsers on
+scientific documents. A single multimodal model can replace the multi-stage
+pipeline, at least for academic documents.
+
+OpenDataLab \autocite{mineru_software} released MinerU, an open-source dual-engine
+system that automatically detects whether each page is scanned or digitally born
+and routes it to a Vision-Language Model or a classical OCR path. It supports
+109 languages and outputs structured Markdown or JSON. Duan \autocite{duan2025}
+pushes the argument further:
+end-to-end decoder transformers outperform pipeline-based systems on accuracy
+because they never pass an incorrect intermediate result down a fixed processing
+chain.
+
+Ding et al.\ \autocite{ding2026} survey Visually Rich Document Content Understanding
+(VRD-CU), covering documents that combine text, layout, and visual elements.
+Models pretrained across all three modalities consistently outperform text-only
+approaches. Instruction-tuned LLM architectures now achieve cross-modal reasoning
+that earlier models could not. Persistent gaps remain: word-level representations
+miss document-level semantic structure, and multi-page documents with mixed
+content are still an open challenge.
+
+No current model covers all content types reliably. This gap motivates the
+image-based strategy in this thesis, where rendered page images are passed to a
+multimodal LLM and a postprocessing pipeline corrects structural failures in the
+output.
+
+\section{Evaluation Methods for Document Conversion}
+
+Evaluating document conversion is harder than evaluating plain text extraction.
+The output combines headings, paragraphs, tables, formulas, and figures, and each
+element type can fail in a different way. Early work used string-similarity
+metrics: BLEU score and edit distance (Levenshtein similarity) both compare
+extracted text against a reference string, character by character
+\autocite{papineni2002}. Meuschke et al.\ \autocite{meuschke2023} added local
+alignment as a third metric, which allows gaps between matched segments and
+catches word-order errors, such as merged columns or reversed reading order, that
+BLEU misses.
+
+All three metrics treat the full output as a flat sequence. A table with one
+column shifted receives a low Levenshtein score even when nearly all the content
+is correct. TEDS (Tree Edit Distance based Similarity) addresses this for tables:
+it compares the predicted tree structure against a reference and gives partial
+credit when individual cells are right even if the overall structure differs.
+Research in document parsing evaluation has shown that no single metric covers
+all content types, with layout analysis using mean Average Precision (mAP), text
+extraction using edit metrics, and table evaluation using TEDS
+\autocite{zhong2020, pfitzmann2022}.
+
+Aggregate text-similarity scores hide capability gaps. A parser may score well
+under BLEU or edit distance but have a misaligned table header or a dropped
+superscript that breaks any downstream process. Ouyang et al.\
+\autocite{omnidocbench2025} benchmarked diverse parsers across multiple content
+dimensions and found that no system performed well on all types, confirming
+that a single aggregate score cannot capture document parsing quality.
+
+For conversion to Markdown specifically, N-gram metrics carry an additional
+limitation: they ignore syntax. A heading marked with \texttt{\#} and the same
+text written as bold have near-identical character content but different semantic
+meaning in the rendered document. This is why the evaluation in Chapter~4 scores
+structural, content, and formatting dimensions separately rather than collapsing
+them into one number.

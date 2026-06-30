@@ -1,0 +1,177 @@
+\chapter{Methodology}
+
+This chapter describes the research design, dataset preparation, evaluation metrics, and experimental setup used to compare the four extraction strategies examined in this thesis.
+
+\section{Research Design}
+
+This thesis uses a comparative study to evaluate four PDF extraction strategies
+against a shared test corpus and scoring framework. The comparative approach is
+standard for PDF parsing research. Meuschke et al.\ \autocite{meuschke2023}
+applied it to benchmark PDF tools across multiple document domains. Ingemarsson
+and Persson \autocite{ingemarsson2024} used the same design to rank model families
+by accuracy and computational cost. Using a shared methodology means the results
+sit alongside that published work rather than in isolation.
+
+The four strategies are text-only, image-only, hybrid, and adaptive. The first
+three are fixed: every page goes through the same pathway regardless of content
+type. The adaptive system classifies each page first, then routes it to the
+appropriate extraction method. This is the only design that can skip the LLM
+entirely on plain-text pages. That is what RQ3 tests.
+
+The five research questions each target a different aspect of this comparison.
+RQ1 and RQ2 compare accuracy across all four strategies: RQ1 asks whether the
+adaptive system beats every fixed strategy, and RQ2 asks how the fixed
+strategies rank against each other across document categories. RQ3 covers
+efficiency: processing time, token usage, and LLM call count per strategy. RQ4
+drives the metric design in Section~\ref{sec:eval_metrics}. RQ5 checks whether the strategy
+rankings stay consistent across different thesis documents.
+
+Markdown is the target output format for all strategies. Unlike PDF or Word, it
+stores structure in plain text, requires no proprietary software to read, and
+works directly with LLM and RAG systems \autocite{cone2019, khan2024}.
+Table~\ref{tab:format_comparison} compares all three formats across eight
+properties.
+
+\begin{table}[h!]
+\centering
+\caption{Comparison of PDF, Word (.docx), and Markdown as document formats}
+\label{tab:format_comparison}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\textwidth}{lXXX}
+\toprule
+\textbf{Property} & \textbf{PDF} & \textbf{Word (.docx)} & \textbf{Markdown} \\
+\midrule
+Human readable (raw) & No & No & \textbf{Yes} \\
+Machine parseable & Difficult & Moderate & \textbf{Easy} \\
+Version control (Git) & Poor & Poor & \textbf{Excellent} \\
+Format portability & High & Low & \textbf{High} \\
+Preserves visual fidelity & Excellent & Good & Limited \\
+LLM/RAG compatibility & Poor & Moderate & \textbf{Excellent} \\
+Requires proprietary software & Partial & Yes & \textbf{No} \\
+Long-term archival stability & High & Moderate & \textbf{High} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Dataset and Ground Truth Preparation}
+
+The test corpus consists of bachelor and master thesis documents. This scope
+was chosen because academic theses are structurally demanding: they combine
+dense body text, mathematical formulas, multi-column layouts, citations, tables,
+and figures, often within the same document. They also represent the primary
+use case this system targets. Testing across multiple thesis documents rather
+than a single one allows RQ5 to check whether strategy rankings are stable
+across documents or vary by the specific content mix of each thesis.
+
+Documents were drawn from real sources rather than synthetic benchmarks.
+Meuschke et al.\ \autocite{meuschke2023} found that tool performance varies
+significantly by document structure, which is why the corpus was built to
+include theses with different content mixes and layouts. The documents are
+primarily in German, with a subset in English, reflecting the intended usage
+context. Each selected document contains at least one structurally challenging
+page: a formula-heavy section, a multi-column spread, or a table with complex
+cell structure. The final corpus consists of three thesis documents totalling 90 evaluated
+pages, 30 per document.
+
+Each test document has a corresponding reference Markdown file, created by
+hand. Each reference captures the full document structure: heading hierarchy,
+paragraph flow, table cells, list nesting, and code blocks where present.
+Pfitzmann et al.\ \autocite{pfitzmann2022} argue that human-created annotation is
+the only reliable baseline for evaluating document parsing tools, because
+automated references embed the same systematic errors as the tools being
+tested. Creating the reference by hand ensures that the evaluation measures
+real output quality rather than agreement between two imperfect automated
+systems.
+
+\section{Evaluation Metrics}
+\label{sec:eval_metrics}
+
+RQ4 asks how Markdown quality can be measured beyond BLEU and ROUGE.
+Section~3.4 showed that flat sequence metrics reward correct content in
+the wrong structure. The answer is to score each element type separately.
+Seven metrics are used, grouped into three categories: content accuracy,
+structural accuracy, and formatting accuracy.
+
+Two metrics measure how much text was preserved. Text similarity uses
+difflib's SequenceMatcher, which compares candidate and reference character
+by character and returns a ratio between 0 and 1. Word overlap computes
+the Jaccard similarity on the word sets of both outputs. Text similarity
+catches character-level noise such as OCR artefacts. Word overlap catches
+word-level omissions such as missing paragraphs.
+
+Three metrics target document structure. Heading structure score compares
+the candidate and reference heading counts at each level from H1 to H6,
+skipping levels that are absent in both. List structure score checks that
+bullet and numbered lists appear at the correct nesting level. Paragraph
+count score compares paragraph counts with a 20 per cent tolerance: a
+candidate within that range of the reference scores 1.0, with a linear
+penalty beyond it. A document can have high text similarity and still fail
+all three of these if the extractor collapses the heading hierarchy into
+plain text.
+
+Two metrics cover formatting elements. Table detection score checks for the
+presence and count of pipe tables. Code block score checks for fenced code
+blocks. Both are low-frequency elements, but a single missed table is a
+meaningful failure for any document that contains one. These metrics make
+that failure visible rather than diluted by high text similarity on the
+surrounding prose.
+
+TEDS (Tree Edit Distance based Similarity) offers finer-grained table
+evaluation by comparing cell-level tree structure \autocite{zhong2020}. It was
+considered but not used. The test corpus does not include tables complex
+enough to require cell-level scoring, and producing cell-level annotations
+by hand for a multi-document corpus carries a high annotation cost.
+Table detection score covers the relevant case for this evaluation.
+
+\section{Experimental Design}
+
+The experiment applies each of the four strategies to every document in
+the corpus at a fixed temperature of 0.0. Deterministic output is
+required here because the evaluation compares strategies on the same
+pages: any randomness introduced by higher temperatures would obscure
+whether differences in score come from the strategy or from sampling
+noise.
+
+One vision-language model is used across all VLM strategies:
+Qwen2.5-VL~7B, running locally through LM Studio. The text strategy
+does not use a model at all. It calls PyMuPDF directly through the
+pymupdf4llm library, which converts the PDF text layer to Markdown
+without invoking any LLM. All four strategies therefore run under
+identical hardware and model conditions, which keeps the comparison fair.
+
+Text-only extraction at temperature 0.0 is the baseline. It is the
+simplest possible extraction method: raw text from PyMuPDF with no
+image input and no LLM call. A strategy must outperform it on at least
+two metric categories to justify its additional computational cost.
+Processing time is recorded per page, providing the raw measurements
+for RQ3. Table~\ref{tab:strategy_comparison}
+summarises the expected strengths and weaknesses of each approach based on
+the literature \autocite{meuschke2023, whitington2012}.
+
+Results are reported as mean scores per document category across all pages
+in that category. Meuschke et al.\ \autocite{meuschke2023} used the same
+category-level reporting and found that tools which rank well on one
+document type often rank poorly on another. Category-level means make this
+pattern visible. A strategy that wins overall but fails on one specific
+category is a weaker result than one that performs consistently
+across all four.
+
+\begin{table}[h!]
+\centering
+\caption{Preliminary comparison of PDF extraction strategies}
+\label{tab:strategy_comparison}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\textwidth}{lXXXX}
+\toprule
+\textbf{Criterion} & \textbf{Text-only} & \textbf{Image-only} & \textbf{Hybrid} & \textbf{Adaptive} \\
+\midrule
+Works on scanned PDFs        & No      & Yes               & Yes          & Yes      \\
+Preserves reading order      & Partial & Yes (model-dep.)  & Yes          & Yes      \\
+Handles complex tables       & Poor    & Moderate          & Good         & Good     \\
+Handles mathematical formulas & Poor   & Good              & Good         & Good     \\
+Computational cost           & Low     & High              & \mbox{Medium-High}  & \mbox{Low-Medium} \\
+Structural fidelity          & Low     & Moderate          & High         & High     \\
+Dependency on LLM            & None    & Full              & Partial      & Selective \\
+\bottomrule
+\end{tabularx}
+\end{table}

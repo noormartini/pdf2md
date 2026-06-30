@@ -1,0 +1,144 @@
+\chapter{Discussion}
+
+\section{Interpretation of Results}
+
+The most unexpected finding is that text-only extraction outperforms
+all three vision-based strategies on five of seven metrics.
+Hypothesis H1 predicted that the adaptive system would outperform every
+fixed strategy. Hypothesis H4 predicted that hybrid would be a strong
+baseline. Neither held for this corpus.
+
+The explanation lies in the document type. Thesis documents consist
+largely of continuous prose. PyMuPDF extracts machine-typed text with
+near-perfect character accuracy. A vision-language model does not
+transcribe verbatim --- it paraphrases, reorders, and sometimes drops
+sentences when given a page image. On text-dominant content, exact
+transcription beats model-generated output every time.
+
+Hypothesis H2 is partially confirmed. Text-only does fail on formula
+and table content, as predicted. The code block score of 0.889 for
+text-only is high because the thesis documents contain structured code
+listings that pymupdf4llm extracts reliably. Image-only collapses on
+the same metric (0.250), which confirms that the VLM does not reproduce
+code blocks exactly. The model reads the code, understands it, and
+writes its own version --- which differs from the reference character by
+character. This is not a failure of vision capability; it is a
+paraphrasing tendency that makes VLMs unsuitable for verbatim
+transcription tasks.
+
+Hybrid performs worse than image-only on text similarity and heading
+structure, which hypothesis H4 did not anticipate. Providing both the
+page image and the extracted text does not help. The model receives
+conflicting signals --- the image shows one layout, the text extraction
+shows another --- and appears to weight the image, which introduces the
+same paraphrasing issues as image-only while also producing a lower
+heading count (0.348 versus 0.429). More input is not always better.
+Hypothesis H4 is rejected.
+
+Hypothesis H3 is confirmed. The adaptive system processes a page in
+20{,}790\,ms on average, compared to 64{,}696\,ms for image-only and
+68{,}009\,ms for hybrid. The speedup comes directly from the
+classifier: most thesis pages are classified as TEXT and handled by
+pymupdf4llm without any LLM call. The classifier adds a small fixed
+cost per page but avoids the dominant cost --- model inference --- on the
+majority of pages. The adaptive strategy is 3.1 times cheaper than
+image-only while matching or exceeding it on every metric except list
+structure and word overlap.
+
+\section{Comparison with Related Work}
+
+Meuschke et al.\ \autocite{meuschke2023} benchmarked ten PDF extraction
+tools across four document categories and found that no tool ranked
+first on all categories. This study reaches the same conclusion at the
+strategy level: no single strategy wins every page or every metric. The
+adaptive design is a direct response to this finding --- instead of
+choosing one strategy, it classifies each page and applies the most
+suitable method.
+
+Blecher et al.\ \autocite{blecher2023} introduced Nougat, a transformer
+model trained specifically on academic PDFs to produce LaTeX-formatted
+Markdown. Nougat achieves high accuracy on scientific papers with dense
+mathematics but requires a GPU and produces output that differs
+significantly from the input layout on non-formula pages. The approach
+in this thesis is complementary: it targets layout fidelity over LaTeX
+reconstruction and runs on consumer hardware with a general-purpose
+local model.
+
+Subramani et al.\ \autocite{subramani2020} surveyed document layout
+analysis methods and identified four recurring challenges: formula
+recognition, table extraction, figure captioning, and reading-order
+recovery. The results in Chapter~6 confirm that formulas and reading
+order are the hardest tasks for the text extraction path, while table
+extraction is where the adaptive routing adds the most value.
+OmniDocBench \autocite{omnidocbench2025} recently showed that multi-modal
+models outperform text-only parsers on layout-rich documents. This is
+consistent with the table structure result here (adaptive 0.956 versus
+text-only 0.922), but the advantage disappears on text-dominant pages.
+
+\section{Practical Implications}
+
+For thesis documents specifically, the text strategy is the best choice
+when speed matters and the document has no complex tables or formulas.
+It is 105 times faster than adaptive and scores higher on most metrics.
+For documents with unknown content distribution, the adaptive strategy
+is the safest choice: it matches text-only on text pages, improves on
+table pages, and avoids the code block collapse that image-only produces.
+
+The page classifier is the key component. Its accuracy directly
+determines how much of the efficiency gain is captured. A page
+incorrectly classified as IMAGE sends a text-dominant page through the
+VLM, wasting inference time and introducing paraphrasing errors. The
+classifier in this system uses font-size ratios and image area
+heuristics, which is effective for thesis layouts but may need
+retraining for other document types.
+
+The classifier routes every page with a detected table to the vision LLM.
+This is a conservative choice.
+For complex tables --- merged cells, irregular column spans, or figures embedded
+in cells --- the VLM produces more accurate output than pymupdf4llm alone, because
+it reads the visual structure rather than the extracted character stream.
+For the simpler tables common in academic theses, however, pymupdf4llm extracts
+rows and columns directly and would produce equally correct Markdown at no
+inference cost.
+A refined classifier could add a complexity check and keep simple tables in the
+text path, reducing token usage and inference time without sacrificing quality
+on the majority of pages.
+
+Formula pages currently use the general-purpose Qwen2.5-VL-7B model.
+A dedicated formula recognition tool such as pix2tex could replace
+this path: it is faster, cheaper, and produces cleaner LaTeX output
+for mathematical content. The adaptive
+architecture supports this substitution without changes to the rest of
+the pipeline --- a new handler for the \texttt{FORMULA} page type is
+all that is needed.
+
+\section{Threats to Validity}
+
+\textbf{Internal validity.} The reference files were written by the
+thesis author. A single annotator introduces subjectivity: different
+readers may format the same page differently, and the ground truth
+reflects one interpretation of what correct Markdown looks like. The
+seven metrics measure structural similarity to those reference files,
+not absolute correctness. Results would differ if the references were
+written by a different annotator.
+
+\textbf{Construct validity.} The metrics measure structural features
+(heading counts, list counts, code block counts) rather than semantic
+quality. A conversion that produces the right headings at the wrong
+levels would still score well on text similarity but fail in practice.
+The heading structure metric partially addresses this, but it counts
+headings rather than verifying their level assignments.
+
+\textbf{External validity.} The corpus contains three documents and
+90 pages. All documents are German-language bachelor or master theses.
+The strategy rankings may not hold for other document types (research
+papers, reports, legal documents), other languages, or thesis documents
+with a different content balance. A corpus with more formula-heavy or
+image-heavy documents would likely change the relative standing of the
+adaptive and text-only strategies.
+
+\textbf{Model dependency.} All VLM strategies in this experiment use
+Qwen2.5-VL-7B. A larger or differently trained model would produce
+different output and could change the strategy rankings. The text-only
+strategy has no such dependency: its output depends only on the PDF
+and the version of pymupdf4llm, both of which are stable.

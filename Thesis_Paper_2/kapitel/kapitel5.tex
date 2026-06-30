@@ -1,0 +1,167 @@
+\chapter{System Design and Implementation}
+
+This chapter describes the architecture of the developed system and the implementation of its core components: the page content classifier, the PDF processing module, the LLM integration layer, and the post-processing pipeline.
+
+\section{Architecture Overview}
+
+The system takes a PDF file as input and produces one combined Markdown document as output.
+It consists of four modules: a page content classifier, a PDF processing module, an LLM integration layer, and a post-processing pipeline.
+Each module is implemented as a separate Python package and communicates through well-defined data structures.
+This keeps the components interchangeable and makes them testable without running the full pipeline.
+
+Processing begins when a PDF is loaded by PyMuPDF \autocite{pymupdf}.
+For each page, the classifier analyses structural signals and assigns one of six content types: TEXT, IMAGE, FORMULA, TABLE, MIXED, or EMPTY.
+This classification determines which extraction path the page takes.
+The decision is made per page, so a single document can route different pages to different strategies.
+
+TEXT pages are handled entirely by pymupdf4llm \autocite{pymupdf4llm}, which extracts the text layer and converts it to Markdown without invoking the LLM.
+All other page types are rendered as a base64-encoded PNG image and passed to a vision-capable LLM.
+The LLM receives a structured prompt suited to the detected content type and returns a Markdown string.
+EMPTY pages are skipped, returning a short placeholder without any processing.
+
+Pages are converted in parallel using a thread pool. The default concurrency is four workers, which overlaps the I/O wait time of LLM calls without overloading the LM Studio server. Each worker opens its own \texttt{fitz.Document} handle, because PyMuPDF document objects are not thread-safe. The results are collected in page order and joined into a single Markdown document, with a horizontal rule between each page. The LLM integration layer communicates with LM Studio \autocite{lmstudio} over a local HTTP server that exposes an OpenAI-compatible API \autocite{khan2024}. All LLM calls are routed through a single \texttt{call\_llm} function, which accepts the server URL, model name, message list, temperature, and token limit as parameters. Every strategy accepts this function as an injectable parameter, so tests can replace it with a fixed-response stub without touching the rest of the code.
+
+The post-processing pipeline receives the joined Markdown and applies a fixed sequence of cleanup passes before writing the final output file.
+
+Figure~\ref{fig:architecture} shows the complete processing pipeline.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth]{architecture.png}
+    \caption{System architecture: from PDF input to Markdown output}
+    \label{fig:architecture}
+\end{figure}
+
+\section{Page Content Classifier}
+
+The classifier extracts four structural signals from each page using PyMuPDF \autocite{pymupdf}: the number of embedded images, the number of vector drawing paths, the total character count of the text layer, and the number of detected tables.
+No machine learning is used. The classification is entirely rule-based, which keeps it fast and predictable.
+
+Formula detection uses two independent checks.
+First, the classifier counts vector paths whose bounding box is smaller than 20 pixels in either dimension.
+More than 30 such short paths on a single page indicates the presence of rendered mathematical symbols, since PDF renders formula components as small vector segments.
+Second, the classifier scans the text layer for mathematical Unicode characters such as $\sum$, $\int$, and $\nabla$, as well as LaTeX-style sequences that OCR engines sometimes preserve.
+Either check alone is sufficient to flag the page as formula-containing.
+
+The classification follows a fixed priority order.
+A page with fewer than ten characters, no images, and fewer than five vector paths is classified as EMPTY.
+A page with formula signals but fewer than 50 characters is classified as FORMULA, since formula-only pages tend to have little surrounding text.
+A page with more than three embedded images is classified as IMAGE.
+A page where PyMuPDF's table finder detects at least one table is classified as TABLE.
+A page with any image or formula signal that did not match the earlier conditions is classified as MIXED.
+A page with 50 or more characters and no visual signals is classified as TEXT.
+Any remaining page falls back to MIXED with a lower confidence score of 0.5.
+
+Each classification carries a confidence score between 0.5 and 0.95.
+TEXT pages score the highest at 0.95. To reach that classification, a page must have at least 50 characters and no image, formula, or table signals. That is the hardest combination to satisfy by accident.
+EMPTY and IMAGE pages score 0.9. EMPTY requires fewer than ten characters, no images, and fewer than five vector paths, which is a very narrow condition. IMAGE requires more than three embedded images, which rarely appears on a text-heavy page.
+FORMULA and TABLE score 0.85 because both detectors can misfire. Vector paths above the threshold sometimes come from decorative page elements rather than formulas. PyMuPDF's table finder occasionally flags dense grid layouts that are not real tables.
+MIXED pages that reached the fallback score 0.5. No single signal was strong enough, so the classification carries little certainty.
+The score is stored in the \texttt{PageAnalysis} result but the current routing ignores it. A future version could use it to fall back to the hybrid strategy on low-confidence pages.
+
+\section{PDF Processing Module}
+
+The PDF processing module has two sub-pipelines: one that extracts the text layer and one that renders pages as images.
+Which pipeline runs depends on the page type assigned by the classifier.
+TEXT pages go through text extraction only. IMAGE, FORMULA, TABLE, and MIXED pages go through image rendering. EMPTY pages skip both.
+The hybrid strategy uses both pipelines on the same page.
+
+Text extraction is handled by pymupdf4llm \autocite{pymupdf4llm}.
+The system calls \texttt{pymupdf4llm.to\_markdown()} once for the whole document with \texttt{page\_chunks=True}, which returns one result per page as a list.
+This matters for performance: pymupdf4llm runs a full document scan to identify header font sizes on every call, regardless of how many pages are requested.
+Calling it once per page would repeat that scan $N$ times, making extraction quadratic in the number of pages.
+Calling it once and indexing into the result list keeps extraction linear.
+Any inline figures found on TEXT pages are written to a configurable output directory, and their paths are corrected to be relative to the output file.
+
+For the hybrid strategy, a second text extraction runs in parallel using a custom font-size-based extractor built on PyMuPDF \autocite{pymupdf}.
+This extractor builds a character-weighted tally of all font sizes on the page to identify the body text size, defined as the most frequent size by character count.
+Each line's dominant font size is then compared to the body size as a ratio: lines at 1.8 times the body size or above are promoted to H1, 1.4 times to H2, and 1.15 times to H3.
+This produces a lightweight Markdown representation of the text layer that the LLM receives alongside the rendered image.
+
+Image rendering converts each page to a base64-encoded PNG using PyMuPDF's pixmap renderer.
+The render resolution is 150 DPI, set via a \texttt{fitz.Matrix(150/72,~150/72)} scale factor, which is about twice the PDF native resolution of 72 DPI.
+The higher resolution preserves fine detail in tables, formulas, and diagrams, which improves LLM recognition accuracy.
+The encoded string is passed directly in the API request body as a data URI, so no temporary files are written to disk for vision pages.
+The render DPI is a configurable constant, so it can be raised for documents with very dense content or lowered to reduce memory use.
+Embedded figures can also be extracted separately using \texttt{extract\_page\_figures}, which saves each image to disk and returns relative Markdown paths that the LLM can reference in its output.
+The system also preserves the printed page label for each page using PyMuPDF's \texttt{get\_label()} method, which returns the label as it appears in the PDF (for example, ``iii'' for a Roman-numeral front-matter page rather than the 0-based index). These labels appear in the \texttt{<!{-}{-} Page iii -{-}>} comments that separate pages in the output file.
+
+\section{LLM Integration}
+
+The system uses five prompt variants, each written for a specific content type.
+The \textit{default} variant is a general-purpose prompt used by the text, image, and hybrid strategies when no specific variant is set.
+The \textit{text} variant is used for text-classified pages and instructs the model to assign heading levels strictly by numbering depth: a top-level chapter heading becomes \texttt{\#}, a section becomes \texttt{\#\#}, a subsection \texttt{\#\#\#}, and so on.
+The \textit{formula} variant instructs the model to transcribe all mathematical content as \LaTeX{} notation and to preserve subscripts, superscripts, and operators exactly without approximation.
+The \textit{table} variant focuses entirely on reconstructing pipe tables from the page image, with instructions to preserve all cell values and to approximate merged cells in flat Markdown.
+The \textit{diagram} variant asks the model to extract all visible text from figures and charts (titles, axis labels, legends) and to add a short description of what the diagram conveys.
+
+The message structure sent to the API differs by strategy.
+The text strategy sends a single user message containing the extracted text as a plain string, with no image content.
+The image strategy sends a multipart user message containing one or more base64-encoded images as \texttt{image\_url} content blocks; no text from the PDF is included.
+The hybrid strategy sends both: the extracted text is the first content block, followed by the image.
+All three strategies pass the selected system prompt in a system-role message before the user turn, using the OpenAI-compatible chat completions format (see Section~\ref{sec:background:llms}).
+
+When embedded figures have been extracted from the page in advance, a short text block is prepended to the user message listing them as Markdown image links.
+This instructs the model to include those links at the appropriate positions in its output rather than describing the figures with placeholder text.
+For non-English documents, a language-preservation note is appended to the system prompt by the \texttt{with\_language\_hint} function.
+The note names the document language and instructs the model to keep all text in the original language.
+This prevents the model from silently translating German or French content into English.
+
+The adaptive strategy routes each page type to a specific prompt variant.
+FORMULA pages use the \textit{formula} prompt, TABLE pages the \textit{table} prompt, IMAGE pages the \textit{diagram} prompt, and MIXED pages the general \textit{default} prompt.
+TEXT pages are handled differently: the system calls the text strategy with \texttt{llm\_call=None}, which returns the raw pymupdf4llm output without invoking the LLM at all.
+This saves the full round-trip cost on every plain-text page, which is the primary source of efficiency gain for the adaptive strategy on text-heavy documents.
+
+\section{Post-processing Pipeline}
+
+The raw output from pymupdf4llm and the LLM both contain predictable artefacts that must be removed before the Markdown is usable.
+The pipeline applies a fixed sequence of passes in two stages.
+The first stage runs per page via \texttt{clean\_page()}, before individual pages are joined into a document.
+The second stage runs on the full joined document via \texttt{postprocess\_markdown()}.
+Separating the two stages matters because some artefacts, such as duplicate running headers, only become visible once multiple pages are combined.
+
+The first group of passes removes structural noise introduced by the PDF format.
+Running headers are repeated chapter or section titles that PDF places at the top of every page; pymupdf4llm extracts these as plain-text lines, which the pipeline detects using a regex pattern and removes from the first line of each page chunk.
+A second pass removes them again mid-document, where they appear as isolated paragraphs surrounded by blank lines.
+Lone page-number paragraphs consisting of one to three Arabic digits or Roman numerals are also stripped.
+Several further passes remove artefacts specific to LLM output.
+One strips decorative horizontal rules that appear directly after a heading, which come from PDF underlines misread as Markdown separators.
+Another removes prompt instruction text that some models copy verbatim into their output.
+A third strips \texttt{```markdown} fences that some models place around their entire response: the fence is valid syntax for a code block but not for the top-level document.
+Table-of-contents pages also receive a dedicated pass that removes dot leaders, the sequences of dots or spaces used to connect section titles to page numbers in a printed layout, which have no meaning in Markdown.
+
+The second group targets heading quality.
+pymupdf4llm often collapses all headings to the same level (\texttt{\#\#}), so the pipeline re-assigns levels based on section-number patterns: a line matching \texttt{1.1.1 Title} becomes \texttt{\#\#\#}, a line matching \texttt{1.1 Title} becomes \texttt{\#\#}, and a standalone chapter title becomes \texttt{\#}.
+A separate pass merges the cases where the section number and its title were emitted as two consecutive heading lines at the same level.
+A further pass handles cases where pymupdf4llm emits a bare section number with no title text, for example \texttt{\#\# 1.1} with nothing after it. The pipeline looks up the full section title in the raw PyMuPDF text for the same page and patches the heading, recovering titles that the layout extraction missed.
+Headings that are single words with no recognised structural keyword (such as a person's name promoted by bold font), headings whose entire content is italic, and headings that are really numbered source-code listing lines are all demoted to plain or list text.
+Title-page metadata lines promoted by bold styling are demoted to plain text by identifying everything before the first structural front-matter section (Erkl\"{a}rung, Abstract, Inhaltsverzeichnis).
+Duplicate headings produced by mid-document running headers are removed by tracking all seen heading texts and dropping any unnumbered repetition of an already-seen numbered heading.
+
+The remaining passes handle figures, captions, and encoding.
+Bold-formatted figure caption lines produced by pymupdf4llm are converted to italic and placed directly below their image link; captions that appear before their image are swapped.
+OCR text blocks extracted from embedded figures and wrapped in marker lines are converted to Markdown blockquotes.
+Single non-word Unicode symbols wrapped in italic markers (such as \texttt{\_{}$\Rightarrow$\_{}}) have the markers stripped.
+OCR superscript artefacts of the form \texttt{\_{}EMC\_{}[2]} are replaced with the Unicode superscript character (\texttt{EMC\textsuperscript{2}}).
+LaTeX math delimiters in the \texttt{\textbackslash(...\textbackslash)} and \texttt{\textbackslash[...\textbackslash]} styles are normalised to the \texttt{\$...\$} and \texttt{\$\$...\$\$} forms used throughout the output.
+
+\section{Implementation Details}
+
+The system is implemented in Python and depends on four external libraries.
+PyMuPDF \autocite{pymupdf} (version 1.27) provides the core PDF interface: page analysis, text extraction, image rendering, and table detection.
+pymupdf4llm \autocite{pymupdf4llm} (version 1.27, matching PyMuPDF) wraps it to produce Markdown output directly from the text layer.
+The \texttt{requests} library handles all HTTP communication with LM Studio.
+\texttt{langdetect} identifies the primary language of each page's extracted text so the correct language hint can be appended to the system prompt.
+No training or fine-tuning is required. The system runs entirely with pre-trained models loaded through LM Studio \autocite{lmstudio}.
+
+Two models are loaded in LM Studio for the experiment, as described in Section~4.4.
+Qwen~3.5~9B handles text pages under the text strategy and under the adaptive strategy when it routes to the text path.
+Qwen2.5-VL~7B, a vision-language model, handles all visual pages under the image-only, hybrid, and adaptive vision paths.
+Both models are served through LM Studio's local HTTP server, which exposes an OpenAI-compatible \texttt{/v1/chat/completions} endpoint.
+The server URL and model name are passed as parameters to every strategy function, so switching to a different model or server requires no code changes.
+
+Reproducibility is ensured at three levels.
+First, all experiments use temperature 0.0, which makes the LLM output deterministic for the same input.
+Second, the library versions are pinned in the requirements file, so the extraction and rendering behaviour is identical across runs.
+Third, every LLM call is routed through the injectable \texttt{call\_llm} parameter, which means the full pipeline can be exercised in tests using a fake implementation that returns fixed strings, without any dependency on a running LM Studio instance.
+The evaluation framework stores all results as JSON and generates reports from that file, so results can be re-analysed without re-running the experiment.
