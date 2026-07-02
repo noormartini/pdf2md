@@ -178,13 +178,11 @@ use cases this thesis targets. It is human-readable without a renderer,
 compatible with Git for version control, easy to parse programmatically, and
 well-supported by LLM and RAG tooling.
 
-The choice matters for downstream tasks. Khan et al.\ \autocite{khan2024} show
-that retrieval precision in RAG systems is directly limited by the quality of
-the upstream text. Fragmented or unstructured text produces poor embeddings,
-which causes retrieval to fail even when the relevant content is in the document.
-Markdown preserves hierarchy through headings, lists and tables, which means
-the document's structure is visible to the embedding model and to any downstream
-reader. A plain paragraph dump does not provide that.
+The choice matters for downstream tasks. Fragmented or unstructured text
+produces poor embeddings, which causes retrieval to fail even when the relevant
+content is in the document. Markdown preserves hierarchy through headings, lists
+and tables, which means the document's structure is visible to the embedding
+model and to any downstream reader. A plain paragraph dump does not provide that.
 
 Markdown also has a practical advantage over XML and HTML for this setting.
 Both of those formats require a parser to read, and neither is easy to inspect
@@ -215,13 +213,11 @@ This finding directly motivates the adaptive approach: if the best tool for one
 document type is the wrong tool for another, a system that applies one strategy
 uniformly will always underperform on at least some content.
 
-Ingemarsson and Persson \autocite{ingemarsson2024} reached a similar conclusion
-from a different angle. They tested rule-based, deep learning-based, and
-multimodal strategies on mixed-content PDFs. Rule-based tools scored 0\% on
-image-only pages. Multimodal tools scored highest overall, but at a cost that
-scales with every page in the document. Their results show that the right
-answer depends on what is on the page, not on the document as a whole. That
-is precisely what per-page adaptive routing addresses.
+Ingemarsson and Persson \autocite{ingemarsson2024} showed the cost side of the
+same trade-off: multimodal tools scored highest overall but applied the same
+high computation to every page regardless of content. The right extraction
+method depends on what a specific page contains, not on the document as a
+whole. Per-page adaptive routing is a direct answer to that observation.
 
 % ----------------------------------------------------------------
 \section{Research Objectives and Questions}

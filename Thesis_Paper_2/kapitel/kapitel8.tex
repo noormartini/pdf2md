@@ -10,14 +10,10 @@ document type, which is itself a finding.
 The most striking finding of this study is that text-only extraction outperforms
 all three vision-based strategies on five of seven metrics, despite using no
 language model and processing each page in under 200 milliseconds. This was not
-predicted. Hypothesis H1 expected the adaptive system to outperform every fixed
-strategy, and hypothesis H4 expected hybrid to be a strong baseline. Neither held
-for this corpus. The explanation lies in the document type. Thesis documents
-consist largely of continuous prose, and PyMuPDF extracts machine-typed text with
-near-perfect character accuracy. A vision-language model given a rendered page
-image paraphrases the content rather than transcribing it, which introduces errors
-that accumulate across paragraphs and code blocks regardless of the model's visual
-capability.
+predicted. Both hypotheses proved wrong on this corpus. The reason, examined in
+Section~7.1, is that thesis documents consist predominantly of machine-typed
+prose, where direct text extraction recovers content with higher fidelity than
+a vision model that paraphrases rather than copies.
 
 RQ1 asked whether per-page strategy selection achieves higher accuracy than any
 fixed strategy. The adaptive system does not outperform text-only on most metrics,
