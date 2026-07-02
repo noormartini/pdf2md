@@ -178,6 +178,33 @@ image-based strategy in this thesis, where rendered page images are passed to a
 multimodal LLM and a postprocessing pipeline corrects structural failures in the
 output.
 
+Table~\ref{tab:tool_comparison} compares the tools discussed in this chapter
+on the dimensions most relevant to structured document conversion.
+\textit{Partial} in the Formulas column means formula pages are routed to a
+vision model but the LaTeX output is not validated; \textit{Partial} in the
+Routing column means the tool routes between two fixed paths rather than by
+content type.
+
+\begin{table}[ht]
+\centering
+\caption{Comparison of PDF processing tools across dimensions relevant to
+structured document conversion}
+\label{tab:tool_comparison}
+\small\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{lXXXXX}
+\toprule
+\textbf{Tool} & \textbf{Input} & \textbf{Formulas} & \textbf{Tables} & \textbf{Per-page routing} & \textbf{Output} \\
+\midrule
+PyMuPDF    & native  & No      & Partial & No              & text     \\
+Tesseract  & scanned & No      & No      & No              & text     \\
+Nougat     & native  & Yes     & Yes     & No              & Markdown \\
+MinerU     & both    & Yes     & Yes     & Partial         & Markdown \\
+\textbf{This work} & native & Partial & Yes & \textbf{Yes} & Markdown \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 \section{Evaluation Methods for Document Conversion}
 
 Evaluating document conversion is harder than evaluating plain text extraction.
