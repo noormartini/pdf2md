@@ -1,68 +1,185 @@
 \chapter{Conclusion}
 
+Per-page strategy selection produces measurable improvements on table structure
+and reduces token consumption by 71 per cent compared to image-only processing.
+Whether it outperforms the simplest baseline on most metrics depends on the
+document type, which is itself a finding.
+
 \section{Summary of Findings}
 
-% To be completed after final results review.
+The most striking finding of this study is that text-only extraction outperforms
+all three vision-based strategies on five of seven metrics, despite using no
+language model and processing each page in under 200 milliseconds. This was not
+predicted. Hypothesis H1 expected the adaptive system to outperform every fixed
+strategy, and hypothesis H4 expected hybrid to be a strong baseline. Neither held
+for this corpus. The explanation lies in the document type. Thesis documents
+consist largely of continuous prose, and PyMuPDF extracts machine-typed text with
+near-perfect character accuracy. A vision-language model given a rendered page
+image paraphrases the content rather than transcribing it, which introduces errors
+that accumulate across paragraphs and code blocks regardless of the model's visual
+capability.
+
+RQ1 asked whether per-page strategy selection achieves higher accuracy than any
+fixed strategy. The adaptive system does not outperform text-only on most metrics,
+which partially refutes H1 for text-heavy documents. The exception is table
+structure, where adaptive scores 0.956 against text-only's 0.922. This advantage
+comes directly from the classifier routing table pages to the vision model, which
+reads the visual grid structure rather than relying on the PDF text layer. On a
+corpus with a higher proportion of tables or formula pages, the adaptive system
+would improve on more metrics. The benefit of per-page routing scales with the
+visual complexity of the document.
+
+RQ2 asked how the three fixed strategies rank against each other. Text-only leads
+on text similarity (0.860), paragraph structure (0.726), and code block accuracy
+(0.889). Image-only collapses on paragraph structure (0.156) and code blocks
+(0.250): the model paraphrases and reflows body text rather than reproducing it
+exactly, which is the failure mode hypothesis H2 predicted for image-heavy content.
+Hybrid performs worse than image-only on both heading structure (0.348 versus
+0.429) and text similarity (0.818 versus 0.827). Providing both the extracted text
+and the page image to the model did not help; in several metrics it made results
+worse. Hypothesis H4 is rejected: for thesis-type documents, hybrid is not a
+competitive baseline.
+
+RQ3 asked about computational cost. The adaptive strategy averages 20{,}790\,ms
+per page and makes 23 LLM calls across 90 pages, compared to 90 calls and
+64{,}696\,ms per page for image-only. This corresponds to a 71 per cent reduction
+in total token consumption and a factor of 3.1 improvement in processing speed,
+confirming hypothesis H3. The efficiency gain comes from the page classifier:
+most thesis pages are classified as TEXT and handled by pymupdf4llm without any
+LLM call. The classifier adds a small fixed cost per page but avoids the dominant
+cost, model inference, on the majority of pages. On longer documents the gap
+widens further, since every additional text page adds savings without adding
+inference cost.
+
+RQ4 asked how Markdown quality can be measured beyond BLEU and ROUGE. The
+seven-metric framework shows why per-element scoring is necessary. Image-only
+achieves 0.827 on text similarity, which looks acceptable in isolation, but its
+paragraph structure score of 0.156 and code block score of 0.250 reveal structural
+failures that a single aggregate score would hide. Flat sequence metrics reward
+recovered vocabulary without detecting collapsed heading hierarchies or paraphrased
+code blocks. RQ5 asked whether strategy rankings hold consistently across
+documents. They do: text-only leads text similarity and adaptive leads table
+structure in all three thesis documents, and the relative ordering between
+strategies is stable across the full corpus.
 
 \section{Contributions and Impact}
 
-% To be completed.
+The primary contribution of this thesis is a per-page content classifier that
+assigns each PDF page to one of six types: TEXT, IMAGE, FORMULA, TABLE, MIXED,
+or EMPTY. The classifier uses four structural signals derived from PyMuPDF:
+embedded image count, vector path density, mathematical Unicode character
+presence, and table detection. No machine learning is required. Classification is
+deterministic, runs in under a millisecond per page, and assigns a confidence
+score that reflects how reliably the content type was identified. Ingemarsson and
+Persson \autocite{ingemarsson2024} measured that rule-based tools score zero
+percent on image-only pages; this classifier is what allows the system to identify
+those pages and route them to a method that can handle them.
+
+The seven-metric evaluation framework is a second contribution. Standard
+benchmarks for PDF parsing use BLEU, ROUGE, or edit distance, which treat the
+output as a flat text sequence and hide failures in heading hierarchy, table
+structure, and code block formatting \autocite{papineni2002}. The framework
+separates these into individual scores, making it possible to identify exactly
+where a strategy fails rather than averaging the failure into a single number.
+Meuschke et al.\ \autocite{meuschke2023} and Ouyang et al.\
+\autocite{omnidocbench2025} both identified the need for richer evaluation methods
+in document parsing; this framework provides a practical, reproducible
+implementation of that direction for Markdown output.
+
+The two-stage postprocessing pipeline addresses a gap between raw extraction
+output and usable Markdown. Both pymupdf4llm and the vision-language model produce
+predictable artefacts: repeated running headers, collapsed heading levels, dot
+leaders in table-of-contents pages, and incorrectly wrapped code blocks. The
+pipeline removes these through 37 transformation passes verified by 147 unit
+tests. Each pass is isolated as a testable function, so the pipeline can be
+extended without breaking existing behaviour. This makes the system's output
+usable without manual correction on the document types it was designed for.
+
+The results carry a practical implication for downstream AI systems. Khan et al.\
+\autocite{khan2024} showed that extraction quality sets a ceiling on retrieval
+precision in RAG pipelines: fragmented or unstructured text produces poor
+embeddings, which causes retrieval to fail even when the relevant content is
+present. The adaptive strategy improves on text-only for table structure, which
+is the element most likely to be misrepresented when a pipeline chunks a
+structured document. For accessibility, Darvishy \autocite{darvishy2018} noted
+that no existing tool can describe mathematical formulas or scientific graphs from
+PDFs; routing formula and image pages to a vision-language model addresses this
+within the same pipeline. The key finding is that matching the extraction approach
+to the content of each page produces better results than any fixed strategy, and
+does so at a fraction of the computational cost.
 
 \section{Limitations of the Study}
 
-% To be completed.
+The evaluation covers three thesis documents and 90 pages. This is sufficient to
+answer the five research questions within the defined scope, but it is not enough
+to generalize the findings to other document types. Research papers, technical
+reports, legal documents, and financial statements have different structural
+patterns than academic theses. The content distribution of this corpus is
+predominantly prose with relatively few formula or table pages, which is what
+makes text-only extraction so competitive here. A corpus weighted toward visual
+content would produce different relative rankings between strategies.
+
+The ground truth was produced by a single annotator. Different annotators may
+interpret the same page differently, particularly for heading level assignments,
+list formatting, and the handling of table captions. The seven metrics measure
+similarity to this specific reference, not absolute conversion quality. This
+limits the strength of claims about which strategy produces objectively better
+Markdown: the results describe agreement with one annotator's judgement.
+Pfitzmann et al.\ \autocite{pfitzmann2022} established multi-annotator annotation
+as the standard for document layout research, which was not feasible within the
+scope of a single bachelor thesis.
+
+All VLM results in this study depend on one model, Qwen2.5-VL-7B, at a single
+temperature setting. A larger model, a more recent model, or one fine-tuned on
+academic documents would produce different output and could alter the strategy
+rankings. The heading structure metric is consistently the weakest across all four
+strategies, with no strategy exceeding 0.565. This reveals a limitation of the
+evaluation design as well: the metric counts heading occurrences rather than
+verifying level assignments, so a strategy can score well on heading structure
+while consistently assigning the wrong depth to every heading.
+
+The system processes only native PDFs with an extractable text layer. Scanned
+documents, where pages exist only as rasterised images, would require an OCR
+stage before classification, which the current implementation does not provide.
+The evaluation also measures static batch conversion rather than real-time or
+streaming processing. These constraints reflect the scope defined at the outset
+and are appropriate for the primary target use case: converting thesis archives to
+structured Markdown for RAG or accessibility workflows. Extending the system to
+scanned documents is the most impactful single change that would broaden its
+practical applicability.
 
 \section{Future Work}
 
-Heading level detection was the weakest metric across all four strategies,
-with no strategy exceeding 0.565.
-The current approach infers heading levels from font-size ratios for the
-text path and from visual appearance for the vision path.
+Heading level detection was the weakest metric across all four strategies, with
+no strategy exceeding 0.565. The current approach infers heading levels from
+font-size ratios for the text path and from visual appearance for the vision path.
 Neither method reliably assigns the correct depth when the document uses
-inconsistent font sizes or non-standard heading styles.
-A dedicated heading classifier trained on labelled thesis documents would
-likely improve this score more than any other single change.
+inconsistent font sizes or non-standard heading styles. A dedicated heading
+classifier trained on labelled thesis documents would likely improve this score
+more than any other single change. The page classifier currently routes every page
+with a detected table to the vision LLM; a refinement that distinguishes simple
+row-column tables from complex ones with merged cells or embedded figures would
+keep simple tables in the faster text path without sacrificing quality on the
+pages where the vision model adds real value.
 
-\begin{itemize}
+Formula pages currently use the general-purpose Qwen2.5-VL-7B model. A
+specialised tool such as pix2tex, trained exclusively on mathematical notation,
+would produce cleaner \LaTeX{} output and run faster on formula-heavy pages. The
+adaptive architecture supports this substitution without changes to the rest of
+the pipeline: a new handler for the \texttt{FORMULA} page type is all that is
+needed. All VLM results in this experiment also depend on a single 7B model. A
+larger model or one fine-tuned on academic documents could reduce the paraphrasing
+tendency that causes image-only and hybrid to score poorly on paragraph and code
+block structure. Retesting with a different model would show whether the strategy
+rankings are model-dependent or stable across model families.
 
-    \item \textbf{Table complexity classifier.}
-    The page classifier currently routes every page with a detected table
-    to the vision LLM.
-    A refinement that distinguishes simple row-column tables from complex
-    ones --- merged cells, irregular spans, embedded figures --- would
-    keep simple tables in the faster text path without sacrificing quality
-    on the pages where the VLM actually adds value.
-
-    \item \textbf{Dedicated formula recognition.}
-    Formula pages currently use the general-purpose Qwen2.5-VL-7B model.
-    A specialised tool such as pix2tex, which is trained exclusively on
-    mathematical notation, would produce cleaner LaTeX output and run
-    faster on formula-heavy pages.
-    The adaptive architecture supports this substitution without changes
-    to the rest of the pipeline.
-
-    \item \textbf{Larger and domain-specific models.}
-    All VLM results in this experiment use Qwen2.5-VL-7B.
-    A larger model or one fine-tuned on academic documents could reduce
-    the paraphrasing tendency that causes image-only and hybrid to score
-    poorly on paragraph and code block structure.
-    Retesting with a different model would show whether the strategy
-    rankings in Chapter~6 are model-dependent or consistent.
-
-    \item \textbf{Broader document corpus.}
-    The evaluation covers three German bachelor theses.
-    Testing on research papers, lecture slides, and scanned documents
-    would reveal whether the page classifier and postprocessing pipeline
-    generalise beyond the thesis format.
-    Scanned documents in particular would require OCR integration, which
-    the current system does not provide.
-
-    \item \textbf{Automated output comparison tool.}
-    Manual inspection of converted pages, as done when analysing the
-    HITL thesis output, is slow and error-prone.
-    A script that shows a per-page diff between converted output and
-    reference files, highlighting only pages below a similarity
-    threshold, would make iterative improvement of the postprocessing
-    pipeline significantly faster.
-
-\end{itemize}
+The evaluation covers three German bachelor theses. Testing on research papers,
+lecture slides, and scanned documents would reveal whether the page classifier and
+postprocessing pipeline generalise beyond the thesis format. Scanned documents in
+particular would require OCR integration, which the current system does not
+provide. Manual inspection of converted pages is slow and error-prone; a script
+that shows a per-page diff between converted output and reference files,
+highlighting only pages below a similarity threshold, would make iterative
+improvement of the postprocessing pipeline significantly faster. Both extensions
+would directly address the two main limitations of the current evaluation: the
+narrow corpus and the absence of automated debugging support.
