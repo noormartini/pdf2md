@@ -1,6 +1,16 @@
 \chapter{Methodology}
 
-This chapter describes the research design, dataset preparation, evaluation metrics, and experimental setup used to compare the four extraction strategies examined in this thesis.
+Comparing four extraction strategies fairly requires a controlled setup: the
+same documents, the same scoring framework, and a baseline simple enough to
+serve as a meaningful lower bound. Figure~\ref{fig:eval_pipeline} shows the
+complete evaluation pipeline.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=\textwidth,height=0.45\textheight,keepaspectratio]{eval_pipeline.png}
+    \caption{Evaluation pipeline: corpus, strategies, ground truth, metrics, and final scores}
+    \label{fig:eval_pipeline}
+\end{figure}
 
 \section{Research Design}
 
@@ -32,7 +42,7 @@ works directly with LLM and RAG systems \autocite{cone2019, khan2024}.
 Table~\ref{tab:format_comparison} compares all three formats across eight
 properties.
 
-\begin{table}[h!]
+\begin{table}[ht]
 \centering
 \caption{Comparison of PDF, Word (.docx), and Markdown as document formats}
 \label{tab:format_comparison}
@@ -152,11 +162,10 @@ Results are reported as mean scores per document category across all pages
 in that category. Meuschke et al.\ \autocite{meuschke2023} used the same
 category-level reporting and found that tools which rank well on one
 document type often rank poorly on another. Category-level means make this
-pattern visible. A strategy that wins overall but fails on one specific
-category is a weaker result than one that performs consistently
-across all four.
+pattern visible. A strategy that wins overall but fails on specific documents is a weaker
+result than one that performs consistently across the full corpus.
 
-\begin{table}[h!]
+\begin{table}[ht]
 \centering
 \caption{Preliminary comparison of PDF extraction strategies}
 \label{tab:strategy_comparison}

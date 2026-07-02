@@ -4,7 +4,7 @@
 
 The experiment evaluates four extraction strategies against a
 hand-written ground truth. The ground truth consists of 90 Markdown
-files --- 30 per thesis document --- written manually by the thesis author.
+files written manually by the thesis author, 30 per thesis document.
 Each file was produced by reading one page of the original PDF and
 writing the Markdown that a correct conversion should produce.
 Headings were assigned the correct depth from the document's numbering
@@ -25,8 +25,8 @@ styles, content densities, and proportions of code, formula, and
 table content, which makes the per-page results more representative
 than a single document would allow.
 
-Each of the four strategies --- text-only, image-only, hybrid, and
-adaptive --- was applied to every page of every document. This produced
+All four strategies (text-only, image-only, hybrid, and adaptive) were
+applied to every page of every document. This produced
 $4 \times 3 \times 30 = 360$ evaluated conversions with zero errors.
 For each conversion, the pipeline output was compared to the
 corresponding reference file using the seven metrics described in
@@ -34,22 +34,22 @@ Section~4.3: text similarity, heading structure, list structure,
 table structure, code block score, paragraph structure, and word
 overlap. Processing time was also recorded per page.
 Results are reported as mean scores per strategy across the full
-90-page corpus. Each subsection connects the findings to the relevant
-research question.
+90-page corpus.
 
 \section{Overall Strategy Performance (RQ1, RQ2)}
 
 Table~\ref{tab:results_overview} shows the mean scores for all four
 strategies across the full corpus.
 
-\begin{table}[h!]
+\begin{table}[ht]
 \centering
 \caption{Mean metric scores per strategy across 90 pages (3 documents)}
 \label{tab:results_overview}
 \renewcommand{\arraystretch}{1.4}
+\small\setlength{\tabcolsep}{4pt}
 \begin{tabularx}{\textwidth}{lXXXXXXX}
 \toprule
-\textbf{Strategy} & \textbf{Text sim.} & \textbf{Heading} & \textbf{Lists} & \textbf{Tables} & \textbf{Code} & \textbf{Paragraphs} & \textbf{Word overlap} \\
+\textbf{Strategy} & \textbf{Text sim.} & \textbf{Heading} & \textbf{Lists} & \textbf{Tables} & \textbf{Code} & \textbf{Paras.} & \textbf{W. overlap} \\
 \midrule
 Text-only & \textbf{0.860} & \textbf{0.565} & 0.859 & 0.922 & \textbf{0.889} & \textbf{0.726} & 0.761 \\
 Adaptive  & 0.838 & 0.542 & 0.868 & \textbf{0.956} & 0.752 & 0.636 & 0.794 \\
@@ -58,6 +58,13 @@ Hybrid    & 0.818 & 0.348 & 0.891 & 0.944 & 0.736 & 0.597 & 0.795 \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=\textwidth]{performance.png}
+    \caption{Mean metric scores per strategy across 90 pages}
+    \label{fig:performance}
+\end{figure}
 
 The most striking result is that text-only scores highest on five of the
 seven metrics, including text similarity (0.860) and code blocks (0.889).
@@ -68,15 +75,14 @@ extraction is very accurate on such content.
 
 The adaptive strategy scores highest on table detection (0.956), which is
 0.034 points above text-only and 0.012 above image-only. This reflects its
-design: pages classified as TABLE or MIXED are routed to the vision-language
-model, which handles table layouts better than direct text extraction.
+design: pages classified as TABLE or MIXED are routed to the vision model,
+which handles table layouts better than direct text extraction.
 On the remaining metrics, adaptive is consistently second or close to
 second among the four strategies.
 
 Image-only shows a severe collapse on paragraph structure (0.156) and code
-blocks (0.250). The vision-language model, when given only a rendered page
-image and no extracted text, does not reproduce the exact paragraph or code
-block structure from the reference. The model paraphrases and reflows the
+blocks (0.250). Given only a rendered page image and no extracted text, the model does not
+reproduce the paragraph or code block structure from the reference. The model paraphrases and reflows the
 content rather than preserving it verbatim. This makes image-only unsuitable
 for documents where structural fidelity matters.
 
@@ -98,7 +104,7 @@ design shows a clear advantage, which Section~\ref{sec:efficiency} details.
 Table~\ref{tab:efficiency} shows the mean processing time per page for
 each strategy.
 
-\begin{table}[h!]
+\begin{table}[ht]
 \centering
 \caption{Mean processing time per page by strategy}
 \label{tab:efficiency}
@@ -114,6 +120,13 @@ Hybrid     & 68{,}009.5 & $345\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.85\textwidth]{efficiency.png}
+    \caption{Mean processing time per page by strategy (log scale)}
+    \label{fig:efficiency}
+\end{figure}
 
 Text-only is by far the fastest strategy at 197\,ms per page on average.
 It makes no LLM calls, so processing time is bounded by disk read and
@@ -135,7 +148,7 @@ Token usage tells the same story from a different angle.
 Table~\ref{tab:tokens} shows the total tokens consumed across all 90 pages
 and the average per LLM call.
 
-\begin{table}[h!]
+\begin{table}[ht]
 \centering
 \caption{Token usage per strategy across 90 pages}
 \label{tab:tokens}

@@ -1,9 +1,10 @@
 \chapter{Related Work}
 
-This chapter reviews existing work in three areas that are directly relevant to
-this thesis: traditional PDF processing tools, modern document conversion
-systems, and LLM-based document understanding. Each section identifies what
-the existing work achieves and where the gaps are that this thesis addresses.
+The gap this thesis addresses does not exist in isolation. It sits at the end
+of a line of work on PDF processing tools, modern conversion systems, and
+LLM-based document understanding. Each of these areas has pushed the field
+forward, and each has a limitation that the next tried to fix. This chapter
+traces that line and identifies where it stops.
 
 \section{Traditional PDF Processing Tools}
 
@@ -85,8 +86,8 @@ from Meuschke et al.\ \autocite{meuschke2023}, Ingemarsson and Persson
 \autocite{ingemarsson2024}, and Subramani et al.\ \autocite{subramani2020} all point
 to the same conclusion: traditional tools work well within a narrow range of
 document types, but they are not sufficient for the diverse, structure-rich
-documents this thesis works with. This is what motivates the move toward
-learning-based and multimodal systems covered in the sections that follow.
+documents this thesis works with. This is what motivated the move toward
+learning-based and multimodal approaches.
 
 \section{Modern Document Conversion Tools}
 
@@ -147,13 +148,13 @@ low-resolution pages. Vision-capable language models changed this: they read a
 rendered page image and produce structured output token by token through
 autoregressive generation, with no hand-coded layout rules in between.
 
-Blecher et al.\ \autocite{blecher2023} introduced Nougat (Neural Optical
-Understanding for Academic Documents), a Visual Transformer trained on paired
-PDF-markup data. It infers headings, equations, tables, and citations without a
-separate layout step. Meuschke et al.\ \autocite{meuschke2023} confirmed this
-pattern: structured-output tools outperformed all rule-based parsers on
-scientific documents. A single multimodal model can replace the multi-stage
-pipeline, at least for academic documents.
+Nougat \autocite{blecher2023}, described in the previous section, is the clearest
+example of this shift: it infers headings, equations, tables, and citations in
+a single model pass with no separate layout step. Meuschke et al.\
+\autocite{meuschke2023} confirmed the pattern: structured-output tools
+outperformed all rule-based parsers on scientific documents. A single
+multimodal model can replace the multi-stage pipeline, at least for academic
+documents.
 
 OpenDataLab \autocite{mineru_software} released MinerU, an open-source dual-engine
 system that automatically detects whether each page is scanned or digitally born

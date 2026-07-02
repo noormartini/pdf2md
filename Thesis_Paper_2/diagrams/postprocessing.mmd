@@ -1,0 +1,29 @@
+flowchart TD
+    A([Raw Page Output]) --> B
+
+    subgraph B[" Stage 1 · clean_page · applied to each page · 12 passes "]
+        B1["Structural noise removal
+        (running headers · lone page numbers · decorative rules)"]
+        B2["LLM artefact removal
+        (markdown fences · prompt echo)"]
+        B3["Heading quality
+        (level reassignment · split-heading merge · bare-number recovery · demotion)"]
+        B4["Special content
+        (figure captions · LaTeX math delimiters · TOC and listing tables)"]
+    end
+
+    B --> C[Join pages with --- separator]
+    C --> D
+
+    subgraph D[" Stage 2 · postprocess_markdown · applied to full document · 5 passes "]
+        D1["Duplicate running header removal"]
+        D2["Title-page metadata demotion"]
+        D3["Abbreviation list → table conversion"]
+        D4["Unicode superscript normalisation · OCR noise removal"]
+    end
+
+    D --> E([Final Markdown Output])
+
+    style A fill:#e8f4f8,stroke:#2c7bb6
+    style E fill:#e8f4f8,stroke:#2c7bb6
+    style C fill:#fff3cd,stroke:#f0ad4e

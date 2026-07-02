@@ -11,7 +11,7 @@ baseline. Neither held for this corpus.
 The explanation lies in the document type. Thesis documents consist
 largely of continuous prose. PyMuPDF extracts machine-typed text with
 near-perfect character accuracy. A vision-language model does not
-transcribe verbatim --- it paraphrases, reorders, and sometimes drops
+transcribe verbatim: it paraphrases, reorders, and sometimes drops
 sentences when given a page image. On text-dominant content, exact
 transcription beats model-generated output every time.
 
@@ -21,7 +21,7 @@ text-only is high because the thesis documents contain structured code
 listings that pymupdf4llm extracts reliably. Image-only collapses on
 the same metric (0.250), which confirms that the VLM does not reproduce
 code blocks exactly. The model reads the code, understands it, and
-writes its own version --- which differs from the reference character by
+writes its own version, which differs from the reference character by
 character. This is not a failure of vision capability; it is a
 paraphrasing tendency that makes VLMs unsuitable for verbatim
 transcription tasks.
@@ -29,8 +29,8 @@ transcription tasks.
 Hybrid performs worse than image-only on text similarity and heading
 structure, which hypothesis H4 did not anticipate. Providing both the
 page image and the extracted text does not help. The model receives
-conflicting signals --- the image shows one layout, the text extraction
-shows another --- and appears to weight the image, which introduces the
+conflicting signals (the image shows one layout, the text extraction
+shows another) and appears to weight the image, which introduces the
 same paraphrasing issues as image-only while also producing a lower
 heading count (0.348 versus 0.429). More input is not always better.
 Hypothesis H4 is rejected.
@@ -40,7 +40,7 @@ Hypothesis H3 is confirmed. The adaptive system processes a page in
 68{,}009\,ms for hybrid. The speedup comes directly from the
 classifier: most thesis pages are classified as TEXT and handled by
 pymupdf4llm without any LLM call. The classifier adds a small fixed
-cost per page but avoids the dominant cost --- model inference --- on the
+cost per page but avoids the dominant cost, model inference, on the
 majority of pages. The adaptive strategy is 3.1 times cheaper than
 image-only while matching or exceeding it on every metric except list
 structure and word overlap.
@@ -51,7 +51,7 @@ Meuschke et al.\ \autocite{meuschke2023} benchmarked ten PDF extraction
 tools across four document categories and found that no tool ranked
 first on all categories. This study reaches the same conclusion at the
 strategy level: no single strategy wins every page or every metric. The
-adaptive design is a direct response to this finding --- instead of
+adaptive design is a direct response to this finding: instead of
 choosing one strategy, it classifies each page and applies the most
 suitable method.
 
@@ -88,14 +88,14 @@ The page classifier is the key component. Its accuracy directly
 determines how much of the efficiency gain is captured. A page
 incorrectly classified as IMAGE sends a text-dominant page through the
 VLM, wasting inference time and introducing paraphrasing errors. The
-classifier in this system uses font-size ratios and image area
-heuristics, which is effective for thesis layouts but may need
-retraining for other document types.
+classifier in this system uses character count, embedded image count,
+vector path density, and PyMuPDF's table detector, which works well for
+thesis layouts but may need adjustment for other document types.
 
 The classifier routes every page with a detected table to the vision LLM.
 This is a conservative choice.
-For complex tables --- merged cells, irregular column spans, or figures embedded
-in cells --- the VLM produces more accurate output than pymupdf4llm alone, because
+For complex tables (merged cells, irregular column spans, or figures embedded
+in cells) the VLM produces more accurate output than pymupdf4llm alone, because
 it reads the visual structure rather than the extracted character stream.
 For the simpler tables common in academic theses, however, pymupdf4llm extracts
 rows and columns directly and would produce equally correct Markdown at no
@@ -109,36 +109,32 @@ A dedicated formula recognition tool such as pix2tex could replace
 this path: it is faster, cheaper, and produces cleaner LaTeX output
 for mathematical content. The adaptive
 architecture supports this substitution without changes to the rest of
-the pipeline --- a new handler for the \texttt{FORMULA} page type is
+the pipeline: a new handler for the \texttt{FORMULA} page type is
 all that is needed.
 
 \section{Threats to Validity}
 
-\textbf{Internal validity.} The reference files were written by the
-thesis author. A single annotator introduces subjectivity: different
-readers may format the same page differently, and the ground truth
-reflects one interpretation of what correct Markdown looks like. The
-seven metrics measure structural similarity to those reference files,
-not absolute correctness. Results would differ if the references were
-written by a different annotator.
+Internal validity is limited by the single-annotator ground truth. The
+reference files were written by the thesis author. Different readers may
+format the same page differently, and the scores reflect one interpretation
+of what correct Markdown looks like. Results would differ if the references
+were written by a different annotator.
 
-\textbf{Construct validity.} The metrics measure structural features
-(heading counts, list counts, code block counts) rather than semantic
-quality. A conversion that produces the right headings at the wrong
-levels would still score well on text similarity but fail in practice.
-The heading structure metric partially addresses this, but it counts
-headings rather than verifying their level assignments.
+The metrics are a construct validity limitation. They measure structural
+features (heading counts, list counts, code block counts) rather than
+semantic quality. A conversion that produces the right headings at the wrong
+levels would score well on text similarity but fail in practice. The heading
+structure metric partially addresses this, but it counts headings rather than
+verifying their level assignments.
 
-\textbf{External validity.} The corpus contains three documents and
-90 pages. All documents are German-language bachelor or master theses.
-The strategy rankings may not hold for other document types (research
-papers, reports, legal documents), other languages, or thesis documents
-with a different content balance. A corpus with more formula-heavy or
-image-heavy documents would likely change the relative standing of the
-adaptive and text-only strategies.
+External validity is the main open question. The corpus covers three
+German-language bachelor theses and 90 pages. Strategy rankings may not hold
+for other document types, other languages, or thesis documents with a different
+content balance. A corpus with more formula or image pages would likely narrow
+the gap between text-only and the vision strategies.
 
-\textbf{Model dependency.} All VLM strategies in this experiment use
-Qwen2.5-VL-7B. A larger or differently trained model would produce
-different output and could change the strategy rankings. The text-only
-strategy has no such dependency: its output depends only on the PDF
-and the version of pymupdf4llm, both of which are stable.
+The results also depend on model choice. All VLM strategies use Qwen2.5-VL-7B.
+A larger or differently trained model could produce different output and change
+the relative rankings. The text-only strategy has no such dependency: its
+output is determined by the PDF content and the pymupdf4llm version, both of
+which are stable across runs.

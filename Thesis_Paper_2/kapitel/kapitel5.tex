@@ -1,6 +1,9 @@
 \chapter{System Design and Implementation}
 
-This chapter describes the architecture of the developed system and the implementation of its core components: the page content classifier, the PDF processing module, the LLM integration layer, and the post-processing pipeline.
+The system was designed around one principle: avoid invoking the LLM when the
+text layer alone is sufficient. This chapter documents how that principle
+shapes each component, from the page classifier that decides when the LLM is
+needed to the postprocessing pipeline that cleans up what it produces.
 
 \section{Architecture Overview}
 
@@ -19,15 +22,17 @@ All other page types are rendered as a base64-encoded PNG image and passed to a 
 The LLM receives a structured prompt suited to the detected content type and returns a Markdown string.
 EMPTY pages are skipped, returning a short placeholder without any processing.
 
-Pages are converted in parallel using a thread pool. The default concurrency is four workers, which overlaps the I/O wait time of LLM calls without overloading the LM Studio server. Each worker opens its own \texttt{fitz.Document} handle, because PyMuPDF document objects are not thread-safe. The results are collected in page order and joined into a single Markdown document, with a horizontal rule between each page. The LLM integration layer communicates with LM Studio \autocite{lmstudio} over a local HTTP server that exposes an OpenAI-compatible API \autocite{khan2024}. All LLM calls are routed through a single \texttt{call\_llm} function, which accepts the server URL, model name, message list, temperature, and token limit as parameters. Every strategy accepts this function as an injectable parameter, so tests can replace it with a fixed-response stub without touching the rest of the code.
+Pages are converted in parallel using a thread pool. The default concurrency is four workers, which overlaps the I/O wait time of LLM calls without overloading the LM Studio server. Each worker opens its own \texttt{fitz.Document} handle, because PyMuPDF document objects are not thread-safe. The results are collected in page order and joined into a single Markdown document, with a horizontal rule between each page.
+
+The LLM integration layer communicates with LM Studio \autocite{lmstudio} over a local HTTP server that exposes an OpenAI-compatible API \autocite{khan2024}. All LLM calls are routed through a single \texttt{call\_llm} function, which accepts the server URL, model name, message list, temperature, and token limit as parameters. Every strategy accepts this function as an injectable parameter, so tests can replace it with a fixed-response stub without touching the rest of the code.
 
 The post-processing pipeline receives the joined Markdown and applies a fixed sequence of cleanup passes before writing the final output file.
 
 Figure~\ref{fig:architecture} shows the complete processing pipeline.
 
-\begin{figure}[h!]
+\begin{figure}[ht]
     \centering
-    \includegraphics[width=\textwidth]{architecture.png}
+    \includegraphics[width=\textwidth,height=0.55\textheight,keepaspectratio]{architecture.png}
     \caption{System architecture: from PDF input to Markdown output}
     \label{fig:architecture}
 \end{figure}
@@ -43,21 +48,34 @@ More than 30 such short paths on a single page indicates the presence of rendere
 Second, the classifier scans the text layer for mathematical Unicode characters such as $\sum$, $\int$, and $\nabla$, as well as LaTeX-style sequences that OCR engines sometimes preserve.
 Either check alone is sufficient to flag the page as formula-containing.
 
-The classification follows a fixed priority order.
-A page with fewer than ten characters, no images, and fewer than five vector paths is classified as EMPTY.
-A page with formula signals but fewer than 50 characters is classified as FORMULA, since formula-only pages tend to have little surrounding text.
-A page with more than three embedded images is classified as IMAGE.
-A page where PyMuPDF's table finder detects at least one table is classified as TABLE.
-A page with any image or formula signal that did not match the earlier conditions is classified as MIXED.
-A page with 50 or more characters and no visual signals is classified as TEXT.
-Any remaining page falls back to MIXED with a lower confidence score of 0.5.
+The classification follows a fixed priority order, working from the narrowest
+conditions toward the broader ones. The first check is for empty pages: fewer
+than ten characters, no images, and fewer than five vector paths. The next
+checks target the most visually distinctive content. A formula page has formula
+signals but fewer than 50 characters, since formula-only layouts tend to carry
+little surrounding body text. An image page has more than three embedded images,
+and a table page has at least one table detected by PyMuPDF's table finder.
+Pages that carry image or formula signals but did not qualify for any of those
+specific types fall into MIXED. Plain-text pages, those with 50 or more
+characters and no visual signals, are classified as TEXT. Any page that passes
+every check without a clear match falls back to MIXED with a confidence score
+of 0.5.
 
 Each classification carries a confidence score between 0.5 and 0.95.
 TEXT pages score the highest at 0.95. To reach that classification, a page must have at least 50 characters and no image, formula, or table signals. That is the hardest combination to satisfy by accident.
 EMPTY and IMAGE pages score 0.9. EMPTY requires fewer than ten characters, no images, and fewer than five vector paths, which is a very narrow condition. IMAGE requires more than three embedded images, which rarely appears on a text-heavy page.
 FORMULA and TABLE score 0.85 because both detectors can misfire. Vector paths above the threshold sometimes come from decorative page elements rather than formulas. PyMuPDF's table finder occasionally flags dense grid layouts that are not real tables.
-MIXED pages that reached the fallback score 0.5. No single signal was strong enough, so the classification carries little certainty.
+MIXED pages score either 0.75 or 0.5. Pages that carry image or formula signals but did not qualify for IMAGE, FORMULA, or TABLE --- for example, a page with one or two embedded images alongside substantial text --- score 0.75. The fallback MIXED at 0.5 catches the remaining pages: fewer than 50 characters with no images, no formulas, and no detected tables. No signal was strong enough to assign a more specific type.
 The score is stored in the \texttt{PageAnalysis} result but the current routing ignores it. A future version could use it to fall back to the hybrid strategy on low-confidence pages.
+
+Figure~\ref{fig:classifier} shows the full decision tree.
+
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.82\textwidth,height=0.75\textheight,keepaspectratio]{classifier.png}
+    \caption{Page classifier decision tree with confidence scores}
+    \label{fig:classifier}
+\end{figure}
 
 \section{PDF Processing Module}
 
@@ -89,17 +107,26 @@ The system also preserves the printed page label for each page using PyMuPDF's \
 \section{LLM Integration}
 
 The system uses five prompt variants, each written for a specific content type.
-The \textit{default} variant is a general-purpose prompt used by the text, image, and hybrid strategies when no specific variant is set.
-The \textit{text} variant is used for text-classified pages and instructs the model to assign heading levels strictly by numbering depth: a top-level chapter heading becomes \texttt{\#}, a section becomes \texttt{\#\#}, a subsection \texttt{\#\#\#}, and so on.
-The \textit{formula} variant instructs the model to transcribe all mathematical content as \LaTeX{} notation and to preserve subscripts, superscripts, and operators exactly without approximation.
-The \textit{table} variant focuses entirely on reconstructing pipe tables from the page image, with instructions to preserve all cell values and to approximate merged cells in flat Markdown.
-The \textit{diagram} variant asks the model to extract all visible text from figures and charts (titles, axis labels, legends) and to add a short description of what the diagram conveys.
+The \textit{default} is a general-purpose prompt used when no more specific type
+is detected. For text pages, the \textit{text} variant is stricter: it instructs
+the model to assign heading levels by numbering depth, mapping chapter headings
+to \texttt{\#}, sections to \texttt{\#\#}, and subsections to \texttt{\#\#\#}.
+Visual pages use one of three specialised variants. The \textit{formula} variant
+instructs the model to transcribe all mathematical content as \LaTeX{} notation,
+preserving subscripts, superscripts, and operators exactly. The \textit{table}
+variant focuses on reconstructing pipe tables, with instructions to preserve all
+cell values and approximate merged cells in flat Markdown. The \textit{diagram}
+variant asks the model to extract all visible text from figures and charts and
+add a short description of what the diagram conveys.
 
-The message structure sent to the API differs by strategy.
-The text strategy sends a single user message containing the extracted text as a plain string, with no image content.
-The image strategy sends a multipart user message containing one or more base64-encoded images as \texttt{image\_url} content blocks; no text from the PDF is included.
-The hybrid strategy sends both: the extracted text is the first content block, followed by the image.
-All three strategies pass the selected system prompt in a system-role message before the user turn, using the OpenAI-compatible chat completions format (see Section~\ref{sec:background:llms}).
+The message structure sent to the API differs by strategy. Text pages go to the
+API as a plain string in a single user message, with no image content. Vision
+pages are sent as multipart messages: the image strategy includes one or more
+base64-encoded images as \texttt{image\_url} content blocks, with no text from
+the PDF. The hybrid strategy combines both, with the extracted text as the first
+content block and the page image following it. All strategies pass the selected
+system prompt in a system-role message before the user turn, using the
+OpenAI-compatible chat completions format (see Section~\ref{sec:background:llms}).
 
 When embedded figures have been extracted from the page in advance, a short text block is prepended to the user message listing them as Markdown image links.
 This instructs the model to include those links at the appropriate positions in its output rather than describing the figures with placeholder text.
@@ -140,10 +167,20 @@ Duplicate headings produced by mid-document running headers are removed by track
 
 The remaining passes handle figures, captions, and encoding.
 Bold-formatted figure caption lines produced by pymupdf4llm are converted to italic and placed directly below their image link; captions that appear before their image are swapped.
-OCR text blocks extracted from embedded figures and wrapped in marker lines are converted to Markdown blockquotes.
+OCR text blocks that pymupdf4llm extracts from embedded figures and wraps in marker lines are removed. The OCR output is redundant since the figure is already included as a Markdown image link, and retaining it adds noise.
 Single non-word Unicode symbols wrapped in italic markers (such as \texttt{\_{}$\Rightarrow$\_{}}) have the markers stripped.
 OCR superscript artefacts of the form \texttt{\_{}EMC\_{}[2]} are replaced with the Unicode superscript character (\texttt{EMC\textsuperscript{2}}).
 LaTeX math delimiters in the \texttt{\textbackslash(...\textbackslash)} and \texttt{\textbackslash[...\textbackslash]} styles are normalised to the \texttt{\$...\$} and \texttt{\$\$...\$\$} forms used throughout the output.
+
+Figure~\ref{fig:postprocessing} shows all passes in both stages.
+
+\clearpage
+\begin{figure}[ht]
+    \centering
+    \includegraphics[width=0.85\textwidth,height=0.70\textheight,keepaspectratio]{postprocessing.png}
+    \caption{Post-processing pipeline: per-page and full-document stages}
+    \label{fig:postprocessing}
+\end{figure}
 
 \section{Implementation Details}
 
@@ -154,14 +191,19 @@ The \texttt{requests} library handles all HTTP communication with LM Studio.
 \texttt{langdetect} identifies the primary language of each page's extracted text so the correct language hint can be appended to the system prompt.
 No training or fine-tuning is required. The system runs entirely with pre-trained models loaded through LM Studio \autocite{lmstudio}.
 
-Two models are loaded in LM Studio for the experiment, as described in Section~4.4.
-Qwen~3.5~9B handles text pages under the text strategy and under the adaptive strategy when it routes to the text path.
-Qwen2.5-VL~7B, a vision-language model, handles all visual pages under the image-only, hybrid, and adaptive vision paths.
-Both models are served through LM Studio's local HTTP server, which exposes an OpenAI-compatible \texttt{/v1/chat/completions} endpoint.
-The server URL and model name are passed as parameters to every strategy function, so switching to a different model or server requires no code changes.
+A single model is used across all LLM-dependent strategies, as described in
+Section~4.4: Qwen2.5-VL~7B, a vision-language model served through LM Studio's
+local HTTP server, which exposes an OpenAI-compatible
+\texttt{/v1/chat/completions} endpoint. The text strategy and the adaptive TEXT
+path do not invoke the LLM at all. The server URL and model name are passed as
+parameters to every strategy function, so switching to a different model or
+server requires no code changes.
 
-Reproducibility is ensured at three levels.
-First, all experiments use temperature 0.0, which makes the LLM output deterministic for the same input.
-Second, the library versions are pinned in the requirements file, so the extraction and rendering behaviour is identical across runs.
-Third, every LLM call is routed through the injectable \texttt{call\_llm} parameter, which means the full pipeline can be exercised in tests using a fake implementation that returns fixed strings, without any dependency on a running LM Studio instance.
+Reproducibility is ensured through three design choices. All experiments run at
+temperature 0.0, which makes LLM output deterministic for the same input.
+Library versions are pinned in the requirements file, so extraction and rendering
+behaviour is identical across runs. Every LLM call goes through the injectable
+\texttt{call\_llm} parameter, which means the full pipeline can be exercised in
+tests using a fixed-response stub, without any dependency on a running LM Studio
+instance.
 The evaluation framework stores all results as JSON and generates reports from that file, so results can be re-analysed without re-running the experiment.

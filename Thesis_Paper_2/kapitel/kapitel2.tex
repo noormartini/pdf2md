@@ -1,6 +1,8 @@
 \chapter{Background and Fundamentals}
 
-This chapter covers the technical background needed for the rest of this thesis. It explains how PDFs are structured internally and why that creates problems for automated extraction. It also covers what Markdown is and why it works well as a target format, how modern LLMs work and what their vision capabilities mean for document conversion, and how the three main extraction strategies differ.
+Choosing the right extraction strategy for a PDF page requires understanding
+both how PDFs encode content and what different extraction methods are capable
+of. This chapter provides that context.
 
 \section{PDF Format and Parsing Challenges}
 
@@ -68,7 +70,7 @@ case for binary or XML-based formats like PDF or DOCX.
 Table~\ref{tab:markdown_syntax} lists the most commonly used Markdown syntax
 elements referenced in this thesis.
 
-\begin{table}[h!]
+\begin{table}[ht]
 \centering
 \caption{Common Markdown syntax elements}
 \label{tab:markdown_syntax}
@@ -148,11 +150,11 @@ privacy benefits of running models locally.
 Vision-capable LLMs are especially relevant to document conversion. By taking
 rendered page images as input, they can detect visual structure that text-layer
 extraction misses entirely: reading order, column boundaries, figure captions,
-and mathematical notation. Prompt instructions can guide this further ---
-specifying the desired output format, the document language, and the content
-type of the page pushes the model toward structured, consistent output. This
-combination of visual input and prompt-driven control is what the image-based
-and hybrid extraction strategies in this thesis rely on.
+and mathematical notation. Prompt instructions can guide this further: specifying the desired output
+format, the document language, and the content type of the page in the system
+prompt pushes the model toward structured, consistent output. This combination
+of visual input and prompt-driven control is what the image-based and hybrid
+extraction strategies in this thesis rely on.
 
 Three parameters control how an LLM generates text and are configurable in
 local runtimes such as LM Studio \autocite{khan2024}. \textit{Temperature} sets
@@ -196,32 +198,31 @@ five, and the difficulty of each task varies depending on the document type.
 This is one of the main reasons fixed-strategy tools struggle on diverse
 real-world documents.
 
-\textbf{Rule-based (text-only) extraction} reads the PDF's embedded text layer
-directly, retrieving character sequences and their coordinates without any
-visual processing. Libraries like PyMuPDF and pdfplumber work this way. They
-are fast, deterministic, and reliable on native PDFs with simple layouts. But
-they cannot process scanned or image-based pages at all, and they discard all
-visual structure \autocite{meuschke2023}. Ingemarsson and Persson
+Rule-based extraction reads the PDF's embedded text layer directly, retrieving
+character sequences and their coordinates without any visual processing.
+Libraries like PyMuPDF and pdfplumber work this way. They are fast,
+deterministic, and reliable on native PDFs with simple layouts, but they cannot
+process scanned or image-based pages at all and they discard all visual
+structure \autocite{meuschke2023}. Ingemarsson and Persson
 \autocite{ingemarsson2024} measured this directly: rule-based tools achieve 0\%
 accuracy on image-only documents, and no amount of configuration changes that.
 
-\textbf{Deep learning-based extraction} uses trained neural network models to
-recognize text, layout regions, and graphical elements from page images.
-Tesseract is a well-known example; more recent tools use deeper models for
-higher accuracy across a wider range of content types. These approaches can
-handle scanned documents that rule-based tools cannot, and they outperform
-multimodal tools on pages dominated by complex images \autocite{ingemarsson2024}.
-But applying them to native PDFs that already have an extractable text layer
-introduces unnecessary noise and throws away existing formatting metadata
+Deep learning approaches use trained neural network models to recognize text,
+layout regions, and graphical elements from page images. Tesseract is a
+well-known example; more recent tools use deeper architectures for higher
+accuracy across a wider range of content types. These approaches can handle
+scanned documents that rule-based tools cannot, and they outperform multimodal
+tools on pages dominated by complex images \autocite{ingemarsson2024}. But
+applying them to native PDFs that already have an extractable text layer
+introduces unnecessary noise and discards existing formatting metadata
 \autocite{meuschke2023}. Multi-stage pipelines also have an error propagation
 problem: a wrong classification in the layout analysis step affects every
-stage that follows --- OCR, table detection, formula recognition --- and the
-resulting errors are hard to trace back to their source \autocite{duan2025}.
+downstream stage, and the resulting errors are hard to trace back to their
+source \autocite{duan2025}.
 
-\textbf{Multimodal extraction} combines the text layer with visual
-understanding, using models that process both the raw text content and a
-rendered image of the page at the same time. These systems extract all content
-types --- text, images, and tables --- process each one appropriately, and
+Multimodal extraction combines the text layer with visual understanding, using
+models that process both raw text and a rendered image of the page at the same
+time. These systems can extract text, images, and tables in a single pass and
 align them according to the document's logical structure. This preserves
 relationships between figures and their captions, and between equations and
 the surrounding text \autocite{ingemarsson2024}. Ingemarsson and Persson

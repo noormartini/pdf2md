@@ -33,10 +33,9 @@ knowledge, no widely used open-source tool picks a different strategy per page
 based on what that page actually contains.
 
 This thesis builds and evaluates a system that does exactly that. Instead of
-applying one fixed strategy to the whole document, the system inspects each page
-individually and selects the most suitable approach based on its content type:
-plain text, images, tables, hyperlinks, page numbers, source code, or
-mathematical formulas. The system runs locally using LM Studio as the LLM
+applying one fixed strategy to the whole document, the system classifies each
+page as plain text, image-heavy, formula-heavy, table-heavy, mixed content, or
+empty, and routes it to the extraction method best suited to that type. The system runs locally using LM Studio as the LLM
 runtime, so there is no dependency on external cloud services and results are
 fully reproducible. Converting a PDF to Markdown is more than a format change ---
 it means recovering the document's structure: headings, lists, tables, links,
@@ -65,7 +64,6 @@ on the same page. No single extraction strategy handles all of these
 correctly. Meuschke et al.\ \autocite{meuschke2023} evaluated mainstream parsing
 tools across multiple document domains and found that even the top performers
 failed on scientific and patent documents.
-The specific challenges each content type creates are covered in Chapter~2.
 
 \subsection{Limited OCR Accuracy for Complex Layouts}
 
@@ -177,8 +175,7 @@ what motivates the work in this thesis.
 Among common output formats, Markdown is the most practical choice for the
 use cases this thesis targets. It is human-readable without a renderer,
 compatible with Git for version control, easy to parse programmatically, and
-well-supported by LLM and RAG tooling. A detailed comparison of PDF, Word,
-and Markdown across eight relevant criteria is provided in Chapter~4.
+well-supported by LLM and RAG tooling.
 
 The choice matters for downstream tasks. Khan et al.\ \autocite{khan2024} show
 that retrieval precision in RAG systems is directly limited by the quality of
@@ -207,9 +204,7 @@ pages that do not need it. The hybrid strategy improves structural fidelity
 by combining both text and image signals, but still applies the same pipeline
 to every page uniformly. The adaptive approach routes each page to the
 strategy that fits its detected content type, which is the key difference
-none of the other three provide. A full comparison across criteria such as
-scanned PDF support, reading-order preservation, formula handling, and
-computational cost is in Chapter~4 (Table~\ref{tab:strategy_comparison}).
+none of the other three provide.
 
 Meuschke et al.\ \autocite{meuschke2023} evaluated mainstream PDF parsing tools
 across multiple document types and found that no single tool performed
@@ -279,10 +274,10 @@ On documents with only one content type, adaptive should equal the
 corresponding fixed strategy rather than exceed it.
 
 \textbf{H2 --- Strategy-content fit.} Text-only will work well on plain-text
-pages but fail on image-heavy or formula-rich content. Vision-based strategies
-(image-only and hybrid) should handle diverse content well, which is a non-obvious result given their
-black-box nature, but at significant computational cost, since every page is rendered as an image and sent through
-a vision LLM regardless of whether that is actually needed.
+pages but fail on image-heavy or formula-rich content. Image-only and hybrid
+strategies should handle diverse content well. Both treat every page as an
+image and pass it through a vision LLM regardless of what the page actually
+contains, which produces higher coverage but at significant computational cost.
 
 \textbf{H3 --- Efficiency of the adaptive approach.} Despite the extra
 classification step, the adaptive system should cost less on average than
@@ -323,45 +318,53 @@ architecture could support it through prompt changes.
 \section{Thesis Contributions}
 % ----------------------------------------------------------------
 
-This thesis makes the following contributions.
+The central contribution is a per-page content classifier that assigns each
+PDF page to one of six types: TEXT, IMAGE, FORMULA, TABLE, MIXED, or EMPTY.
+It uses structural signals from PyMuPDF: embedded image count, vector path
+density, presence of mathematical Unicode symbols, table detection, and
+character count. No LLM is involved at this stage, so classification is fast
+and deterministic.
 
-\textbf{Per-page content classifier.} Each PDF page is classified into one
-of six types (TEXT, IMAGE, FORMULA, TABLE, MIXED, or EMPTY) using structural
-signals from PyMuPDF: embedded image count, vector path density, presence of
-mathematical Unicode symbols, table detection, and character count. No LLM
-is used at this stage, so classification is fast and deterministic.
+For text pages, heading levels are inferred from font sizes. The system
+tallies font sizes by character count to find the dominant body text size, then
+promotes spans that are 15\%, 40\%, and 80\% larger to heading levels H3, H2,
+and H1 respectively. For pages routed to the vision path,
+embedded figures are extracted using PyMuPDF's image extraction API and
+saved as individual files. The vision LLM is instructed to include these paths
+as Markdown image links, so figures are preserved in the output.
 
-\textbf{Font-size-based heading detection.} Heading levels are inferred from
-font sizes. The system computes a character-weighted tally of font sizes on
-each page to find the dominant body text size, then promotes spans that are
-15\%, 40\%, and 80\% larger to Markdown heading levels H3, H2, and H1
-respectively. This produces structured Markdown output for text pages
-instead of flat unstructured text.
+Output quality is measured across seven metrics: text similarity, heading
+structure, list structure, table structure, code block score, paragraph
+structure, and word overlap. These cover aspects of structural fidelity that
+BLEU and ROUGE cannot capture. A configurable experiment runner tests all
+combinations of strategy, model, prompt variant, temperature, and page across
+the benchmark documents, records scores and token usage per page, and generates
+comparison reports.
 
-\textbf{Per-page figure extraction with Markdown linking.} Embedded figures
-are extracted from vision-processed pages using PyMuPDF's
-\texttt{extract\_image} API and saved as individual files (e.g.\
-\texttt{figures/page\_001\_fig\_001.png}). The vision LLM is instructed to
-reference these paths as Markdown image links, so figures are preserved in
-the output.
-
-\textbf{Seven-metric evaluation framework.} Output quality is measured across
-seven metrics: text similarity (difflib SequenceMatcher ratio), heading
-structure score, list structure score, table structure score, code block
-score, paragraph structure score, and word overlap (Jaccard similarity). This
-covers aspects of structural fidelity that BLEU and ROUGE cannot capture.
-
-\textbf{Systematic experiment runner.} A configurable script tests all
-combinations of strategy, model, prompt variant, temperature, and page
-across the benchmark documents, records per-page scores and token usage, and
-generates summary reports for strategy and model comparison.
-
-\textbf{Reproducible open-source implementation.} The full system runs
-locally using PyMuPDF, pymupdf4llm, and LM Studio. All prompt templates,
-evaluation scripts, experiment configurations, and test suites are included.
+The full system runs locally using PyMuPDF, pymupdf4llm, and LM Studio. All
+prompt templates, evaluation scripts, experiment configurations, and test
+suites are included in the repository.
 
 % ----------------------------------------------------------------
 \section{Thesis Structure}
 % ----------------------------------------------------------------
 
-The thesis is structured as follows. Chapter~2 provides the technical background: how PDF stores content internally, why that causes parsing problems, what Markdown is and why it suits this use case, how modern LLMs work, and how the three main extraction strategies differ. Chapter~3 reviews related work in three areas --- traditional PDF tools, modern AI-based conversion systems, and LLM-based document understanding --- and identifies the gaps this work addresses. Chapter~4 describes the research design, covering the document dataset, ground truth construction, evaluation metrics, and experimental setup. Chapter~5 documents the system architecture and implementation, including the per-page classifier, the four conversion strategies, the LM Studio integration, and the post-processing pipeline. Chapter~6 presents the experimental results: scores by strategy, model, temperature, and document type, with qualitative case studies of where each strategy succeeds or fails. Chapter~7 interprets those results against the five research questions and four hypotheses, examines threats to validity, and connects the findings to the broader research landscape. Chapter~8 closes with a summary of contributions, acknowledged limitations, and directions for future work.
+The thesis builds in three phases. The first establishes the foundations and
+situates the work. Chapter~2 covers the technical background: how PDF stores
+content internally, what Markdown is and why it suits this use case, how
+modern LLMs process documents, and how the three main extraction strategies
+differ. Chapter~3 surveys existing tools and systems, from traditional PDF
+parsers to multimodal AI models, and identifies the gap this work addresses.
+
+The second phase covers the research design and implementation. Chapter~4
+describes the methodology: the document dataset, ground truth construction,
+evaluation metrics, and experimental setup. Chapter~5 documents the system
+architecture, from the per-page classifier and four conversion strategies to
+the LM Studio integration and post-processing pipeline.
+
+The third phase presents the findings and their interpretation. Chapter~6
+reports the experimental results, with scores by strategy, model, and
+document, and qualitative analysis of where each strategy succeeds or fails.
+Chapter~7 interprets those results against the five research questions and
+four hypotheses, and examines threats to validity. Chapter~8 closes with a
+summary of contributions, limitations, and directions for future work.
