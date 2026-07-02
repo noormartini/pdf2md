@@ -50,8 +50,8 @@ and are often merged with body text by extractors \autocite{blecher2023}.
 Images embedded in a PDF carry no context linking them to the surrounding text,
 so their relationship to a caption or paragraph is lost during extraction
 \autocite{gao2011}. Tables are similarly problematic: there is no explicit row
-or column structure in PDF, and complex merged cells often require HTML output
-rather than Markdown, since Markdown has no native support for \texttt{rowspan}
+or column structure in PDF, and complex merged cells often require
+HTML (HyperText Markup Language) output rather than Markdown, since Markdown has no native support for \texttt{rowspan}
 and \texttt{colspan} \autocite{zhu2022}. Code blocks can be identified through
 monospaced font detection and consistent horizontal spacing, but standard text
 extractors tend to fragment them because they do not preserve
@@ -67,6 +67,8 @@ inline code, and triple backticks for fenced code blocks. Because the syntax is
 so simple, a Markdown file is readable without any renderer, which is not the
 case for binary or XML-based formats like PDF or DOCX.
 
+Several elements in this thesis use GitHub Flavored Markdown (GFM) extensions,
+including pipe-delimited tables and inline \LaTeX{} math.
 Table~\ref{tab:markdown_syntax} lists the most commonly used Markdown syntax
 elements referenced in this thesis.
 

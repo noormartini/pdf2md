@@ -1,9 +1,10 @@
 \chapter{Introduction}
 
-PDF is the dominant format for sharing and archiving documents across law,
-finance, healthcare, academia and government. This is largely because a PDF
-looks identical on every device and cannot be accidentally edited. But that
-same property creates a serious problem for automated processing. PDF stores
+Portable Document Format (PDF) is the dominant format for sharing and archiving
+documents across law, finance, healthcare, academia and government. This is
+largely because a PDF looks identical on every device and cannot be accidentally
+edited. But that same property creates a serious problem for automated
+processing. PDF stores
 text as individual characters placed at specific coordinates on a page. There
 is no native concept of paragraphs, headings, or lists. Any tool that tries to extract content from
 a PDF has to reconstruct that structure from scratch, using only positional
@@ -12,7 +13,7 @@ and typographic signals, which is unreliable \autocite{whitington2012}.
 Three main approaches exist for PDF-to-Markdown conversion. Text-based parsers
 such as PyMuPDF and pdfplumber \autocite{meuschke2023} read the raw text layer of
 a native PDF and recover the characters, but discard layout structure in the
-process. OCR tools such as Tesseract \autocite{smith2007} treat the page as a flat
+process. Optical Character Recognition (OCR) tools such as Tesseract \autocite{smith2007} treat the page as a flat
 image and recognize characters pixel by pixel. This works for scanned documents,
 but the output is plain text with no structure. A newer generation of
 AI-based systems, including Marker, Microsoft MarkItDown, LlamaParse, and
@@ -35,7 +36,7 @@ based on what that page actually contains.
 This thesis builds and evaluates a system that does exactly that. Instead of
 applying one fixed strategy to the whole document, the system classifies each
 page as plain text, image-heavy, formula-heavy, table-heavy, mixed content, or
-empty, and routes it to the extraction method best suited to that type. The system runs locally using LM Studio as the LLM
+empty, and routes it to the extraction method best suited to that type. The system runs locally using LM Studio as the Large Language Model (LLM)
 runtime, so there is no dependency on external cloud services and results are
 fully reproducible. Converting a PDF to Markdown is more than a format change ---
 it means recovering the document's structure: headings, lists, tables, links,
@@ -257,7 +258,9 @@ token usage, and LLM call count) of each strategy and of the adaptive system,
 and how do those costs relate to accuracy?
 
 \textbf{RQ4 --- Output quality.} How can Markdown quality be reliably measured
-beyond BLEU and ROUGE, given that structured output requires evaluating heading
+beyond BLEU (Bilingual Evaluation Understudy) and ROUGE (Recall-Oriented
+Understudy for Gisting Evaluation), given that structured output requires
+evaluating heading
 hierarchy, list fidelity, and table reconstruction?
 
 \textbf{RQ5 --- Consistency.} Do the performance differences between strategies
@@ -296,7 +299,8 @@ unnecessary LLM calls on plain-text pages.
 
 This thesis works only with PDF as the input format. The system is tested
 on bachelor and master thesis documents in German and English. The system
-architecture is compatible with any LLM backend that supports a vision API,
+architecture is compatible with any LLM backend that supports a vision
+Application Programming Interface (API),
 but all experiments are conducted locally using LM Studio, so there is no
 cloud dependency and results are fully reproducible.
 

@@ -51,7 +51,7 @@ architecture of Tesseract, the most widely used open-source OCR engine. It
 runs a two-pass pipeline: the first pass uses adaptive thresholding and
 connected-component analysis to isolate character candidates, and the second
 pass applies a word-level language model to resolve ambiguous boundaries.
-Tesseract 4.0 added an LSTM-based recognition model that improved accuracy on
+Tesseract 4.0 added a Long Short-Term Memory (LSTM)-based recognition model that improved accuracy on
 degraded and stylised text while keeping the same two-stage structure.
 Subramani et al.\ \autocite{subramani2020} reviewed deep learning approaches to
 document understanding and placed classical engines like Tesseract in that
@@ -159,7 +159,7 @@ documents.
 OpenDataLab \autocite{mineru_software} released MinerU, an open-source dual-engine
 system that automatically detects whether each page is scanned or digitally born
 and routes it to a Vision-Language Model or a classical OCR path. It supports
-109 languages and outputs structured Markdown or JSON. Duan \autocite{duan2025}
+109 languages and outputs structured Markdown or JSON (JavaScript Object Notation). Duan \autocite{duan2025}
 pushes the argument further:
 end-to-end decoder transformers outperform pipeline-based systems on accuracy
 because they never pass an incorrect intermediate result down a fixed processing
@@ -219,7 +219,7 @@ BLEU misses.
 
 All three metrics treat the full output as a flat sequence. A table with one
 column shifted receives a low Levenshtein score even when nearly all the content
-is correct. TEDS (Tree Edit Distance based Similarity) addresses this for tables:
+is correct. Tree Edit Distance based Similarity (TEDS) addresses this for tables:
 it compares the predicted tree structure against a reference and gives partial
 credit when individual cells are right even if the overall structure differs.
 Research in document parsing evaluation has shown that no single metric covers

@@ -18,13 +18,13 @@ This classification determines which extraction path the page takes.
 The decision is made per page, so a single document can route different pages to different strategies.
 
 TEXT pages are handled entirely by pymupdf4llm \autocite{pymupdf4llm}, which extracts the text layer and converts it to Markdown without invoking the LLM.
-All other page types are rendered as a base64-encoded PNG image and passed to a vision-capable LLM.
+All other page types are rendered as a base64-encoded PNG (Portable Network Graphics) image and passed to a vision-capable LLM.
 The LLM receives a structured prompt suited to the detected content type and returns a Markdown string.
 EMPTY pages are skipped, returning a short placeholder without any processing.
 
 Pages are converted in parallel using a thread pool. The default concurrency is four workers, which overlaps the I/O wait time of LLM calls without overloading the LM Studio server. Each worker opens its own \texttt{fitz.Document} handle, because PyMuPDF document objects are not thread-safe. The results are collected in page order and joined into a single Markdown document, with a horizontal rule between each page.
 
-The LLM integration layer communicates with LM Studio \autocite{lmstudio} over a local HTTP server that exposes an OpenAI-compatible API \autocite{khan2024}. All LLM calls are routed through a single \texttt{call\_llm} function, which accepts the server URL, model name, message list, temperature, and token limit as parameters. Every strategy accepts this function as an injectable parameter, so tests can replace it with a fixed-response stub without touching the rest of the code.
+The LLM integration layer communicates with LM Studio \autocite{lmstudio} over a local HyperText Transfer Protocol (HTTP) server that exposes an OpenAI-compatible API \autocite{khan2024}. All LLM calls are routed through a single \texttt{call\_llm} function, which accepts the server URL, model name, message list, temperature, and token limit as parameters. Every strategy accepts this function as an injectable parameter, so tests can replace it with a fixed-response stub without touching the rest of the code.
 
 The post-processing pipeline receives the joined Markdown and applies a fixed sequence of cleanup passes before writing the final output file.
 
@@ -97,7 +97,7 @@ Each line's dominant font size is then compared to the body size as a ratio: lin
 This produces a lightweight Markdown representation of the text layer that the LLM receives alongside the rendered image.
 
 Image rendering converts each page to a base64-encoded PNG using PyMuPDF's pixmap renderer.
-The render resolution is 150 DPI, set via a \texttt{fitz.Matrix(150/72,~150/72)} scale factor, which is about twice the PDF native resolution of 72 DPI.
+The render resolution is 150 dots per inch (DPI), set via a \texttt{fitz.Matrix(150/72,~150/72)} scale factor, which is about twice the PDF native resolution of 72 DPI.
 The higher resolution preserves fine detail in tables, formulas, and diagrams, which improves LLM recognition accuracy.
 The encoded string is passed directly in the API request body as a data URI, so no temporary files are written to disk for vision pages.
 The render DPI is a configurable constant, so it can be raised for documents with very dense content or lowered to reduce memory use.
