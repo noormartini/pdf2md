@@ -175,22 +175,28 @@ def adaptive_strategy(
         return ConversionResult(markdown="*[Empty page — skipped]*", timing_ms=0.0, token_usage=0, llm_calls=0)
 
     if page_type == PageType.TEXT:
-        # TEXT pages have no images and no formulas (per analyze_page), so
-        # pymupdf4llm's output is the answer — skip the LLM entirely to save
-        # the 3–10 s round-trip per page.
-        return text_call(
-            base_url=base_url,
-            model_name=model_name,
-            pdf_path=pdf_path,
-            page_num=page_num,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            figures_dir=figures_dir,
-            prompt_variant="text",
-            language=language,
-            llm_call=None,
-            pre_extracted_markdown=pre_extracted_markdown,
-        )
+        # If the pre-extracted markdown contains image links, the page has
+        # embedded raster formula images that page.get_images() missed.
+        # Route these pages to the vision LLM so formulas become LaTeX.
+        if pre_extracted_markdown and re.search(r'!\[.*?\]\(', pre_extracted_markdown):
+            page_type = PageType.MIXED
+        else:
+            # TEXT pages have no images and no formulas (per analyze_page), so
+            # pymupdf4llm's output is the answer — skip the LLM entirely to save
+            # the 3–10 s round-trip per page.
+            return text_call(
+                base_url=base_url,
+                model_name=model_name,
+                pdf_path=pdf_path,
+                page_num=page_num,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                figures_dir=figures_dir,
+                prompt_variant="text",
+                language=language,
+                llm_call=None,
+                pre_extracted_markdown=pre_extracted_markdown,
+            )
 
     if page_type == PageType.FORMULA:
         return image_call(

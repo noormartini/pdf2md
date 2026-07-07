@@ -223,17 +223,14 @@ whole. Per-page adaptive routing is a direct answer to that observation.
 \section{Research Objectives and Questions}
 % ----------------------------------------------------------------
 
-The main goal of this thesis is:
-
-\begin{quote}
-\textit{To design, implement, and evaluate a multimodal, content-aware system
-that converts PDF documents into structured Markdown by selecting an extraction
-strategy per page based on detected content type, using LM Studio as a local
-LLM runtime to ensure full reproducibility without dependence on external cloud
-services, and to test whether this per-page selection outperforms any single
-fixed strategy when applied to documents with diverse content types, while
-reducing computational cost by skipping the LLM on plain-text pages.}
-\end{quote}
+The main goal of this thesis is to design, implement, and evaluate a multimodal,
+content-aware system that converts PDF documents into structured Markdown by
+selecting an extraction strategy per page based on detected content type. The
+system uses LM Studio as a local LLM runtime to ensure full reproducibility
+without dependence on external cloud services. The central question is whether
+this per-page selection outperforms any single fixed strategy on documents with
+diverse content types, while reducing computational cost by skipping the LLM on
+plain-text pages.
 
 In practice, plain-text pages are routed to PyMuPDF and visually complex pages
 are sent to a locally hosted vision LLM via LM Studio. A single document can
@@ -325,10 +322,8 @@ density, presence of mathematical Unicode symbols, table detection, and
 character count. No LLM is involved at this stage, so classification is fast
 and deterministic.
 
-For text pages, heading levels are inferred from font sizes. The system
-tallies font sizes by character count to find the dominant body text size, then
-promotes spans that are 15\%, 40\%, and 80\% larger to heading levels H3, H2,
-and H1 respectively. For pages routed to the vision path,
+For text pages, heading levels are inferred from font sizes relative to the
+dominant body text size on the page. For pages routed to the vision path,
 embedded figures are extracted using PyMuPDF's image extraction API and
 saved as individual files. The vision LLM is instructed to include these paths
 as Markdown image links, so figures are preserved in the output.

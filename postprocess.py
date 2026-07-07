@@ -131,6 +131,11 @@ _TOC_CONTENTS_HEADER_RE = re.compile(
     r"^\|\s*(Contents|Inhaltsverzeichnis)\s*\|(\s*\|)?\s*$", re.IGNORECASE
 )
 
+# TOC table whose header cell is "Seite" (page number first, title second).
+_TOC_SEITE_HEADER_RE = re.compile(
+    r"^\|\s*Seite\s*\|(\s*\|)?\s*$", re.IGNORECASE
+)
+
 # TOC continuation table with Chapter/Section/Page column headers.
 _TOC_CHAPTER_HEADER_RE = re.compile(
     r"^\|\s*(?:Kapitel|Chapter)\s*\|\s*(?:Abschnitt|Section)\s*\|\s*(?:Seite|Page)\s*\|\s*$",
@@ -144,7 +149,7 @@ _TABLE_SEPARATOR_RE = re.compile(r"^\|[\s\-:]+(?:\|[\s\-:]+)+\|$")
 # Matches both the 1-column form "| List of Figures |" and the 2-column VLM
 # form "| List of Figures |  |".
 _LISTING_PAGE_HEADER_RE = re.compile(
-    r"^\|\s*(List of Figures|List of Tables|Listings)\s*\|(?:\s*\|)?\s*$", re.IGNORECASE
+    r"^\|\s*(List of Figures|Abbildungsverzeichnis|List of Tables|Tabellenverzeichnis|Listings|Quellcodeverzeichnis)\s*\|(?:\s*\|)?\s*$", re.IGNORECASE
 )
 
 # Matches a figure-number token like "1.1" or "4.10".
@@ -184,7 +189,7 @@ _DECLARATION_LINE_RE = re.compile(
 # **List of Figures** when it appears as a standalone line (the VLM sometimes outputs
 # these as bold text rather than pipe-table headers).
 _BOLD_LISTING_TITLE_RE = re.compile(
-    r"^\*\*(List of Figures|List of Tables|Listings)\*\*\s*$", re.IGNORECASE | re.MULTILINE
+    r"^\*\*(List of Figures|Abbildungsverzeichnis|List of Tables|Tabellenverzeichnis|Listings|Quellcodeverzeichnis)\*\*\s*$", re.IGNORECASE | re.MULTILINE
 )
 
 # Matches a PDF running header (Kopfzeile) line — a plain-text repetition of the
@@ -324,6 +329,32 @@ def _convert_toc_table(md: str) -> str:
                 if len(cells) >= 4:
                     entry = cells[1].strip()
                     page = cells[2].strip()
+                    if entry:
+                        items.append(_toc_2col_entry(entry, page))
+                i += 1
+            result.append("## Contents")
+            result.append("")
+            result.extend(items)
+            continue
+
+        # ── 2-column TOC with "| Seite |" header (page first, title second) ────
+        if _TOC_SEITE_HEADER_RE.match(stripped):
+            items = []
+            i += 1
+            while i < len(lines):
+                if not lines[i].strip():
+                    i += 1
+                    continue
+                if not lines[i].strip().startswith("|"):
+                    break
+                row = lines[i].strip()
+                if _TABLE_SEPARATOR_RE.match(row):
+                    i += 1
+                    continue
+                cells = row.split("|")
+                if len(cells) >= 4:
+                    page = cells[1].strip()
+                    entry = cells[2].strip()
                     if entry:
                         items.append(_toc_2col_entry(entry, page))
                 i += 1
@@ -499,7 +530,7 @@ def _fix_lof_numbers(md: str, raw_page_text: str = "") -> str:
     number column missing.  This pass detects that and rebuilds the section as
     a proper 3-column table using the figure numbers parsed from raw fitz text.
     """
-    if not raw_page_text or "List of Figures" not in raw_page_text:
+    if not raw_page_text or not re.search(r'List of Figures|Abbildungsverzeichnis', raw_page_text, re.IGNORECASE):
         return md
 
     entries = _parse_lof_entries(raw_page_text)
@@ -511,8 +542,8 @@ def _fix_lof_numbers(md: str, raw_page_text: str = "") -> str:
     i = 0
     while i < len(lines):
         stripped = lines[i].strip()
-        is_lof = re.match(r"^\|\s*List of Figures\s*\|", stripped, re.IGNORECASE) or re.match(
-            r"^#{1,3}\s*List of Figures\s*$", stripped, re.IGNORECASE
+        is_lof = re.match(r"^\|\s*(List of Figures|Abbildungsverzeichnis)\s*\|", stripped, re.IGNORECASE) or re.match(
+            r"^#{1,3}\s*(List of Figures|Abbildungsverzeichnis)\s*$", stripped, re.IGNORECASE
         )
         if is_lof:
             # Consume the rest of the section (table rows and blank separators).
