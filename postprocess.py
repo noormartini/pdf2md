@@ -1433,6 +1433,22 @@ def _normalise_latex_delimiters(md: str) -> str:
         \\( expr \\)  →  $expr$
         \\[ expr \\]  →  $$expr$$
     """
+    # \begin{equation}...\end{equation} (with optional \tag{}) → $$...$$
+    def _equation_env(m: re.Match) -> str:
+        body = m.group(1).strip()
+        tag = m.group(2)
+        body = re.sub(r"\\tag\{[^}]*\}", "", body).strip()
+        if tag:
+            return f"$$\n{body} \\quad ({tag})\n$$"
+        return f"$$\n{body}\n$$"
+
+    md = re.sub(
+        r"\\begin\{equation\*?\}(.*?)\\end\{equation\*?\}"
+        r"(?:\s*\\tag\{([^}]*)\})?",
+        _equation_env,
+        md,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
     # Display math first (so \\[ isn't accidentally matched by the inline rule).
     md = re.sub(r"\\\[\s*(.*?)\s*\\\]", r"$$\1$$", md, flags=re.DOTALL)
     md = re.sub(r"\\\(\s*(.*?)\s*\\\)", r"$\1$", md, flags=re.DOTALL)
@@ -1454,6 +1470,14 @@ def postprocess_markdown(md: str) -> str:
 
     md = _strip_mid_doc_page_numbers(md)
     md = _strip_mid_doc_running_headers(md)
+
+    # Split multiple supervisor/professor entries that got merged onto one line.
+    # Pattern: "Prof. ... Mannheim Prof. ..." → two separate lines.
+    md = re.sub(
+        r"((?:Prof\.|Dr\.)[^\n]+?(?:Hochschule|University|Institut)[^\n]*?)\s+((?:Prof\.|Dr\.)\s)",
+        r"\1\n\2",
+        md,
+    )
 
     # Remove PDF page-footer numbers before page-break separators or at end.
     md = re.sub(r"\n\n(\d{1,3})\n\n---", "\n\n---", md)

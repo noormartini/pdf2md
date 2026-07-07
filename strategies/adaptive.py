@@ -178,7 +178,17 @@ def adaptive_strategy(
         # If the pre-extracted markdown contains image links, the page has
         # embedded raster formula images that page.get_images() missed.
         # Route these pages to the vision LLM so formulas become LaTeX.
-        if pre_extracted_markdown and re.search(r'!\[.*?\]\(', pre_extracted_markdown):
+        # Exception: TOC/list pages with decorative images must stay on the
+        # text path so the postprocessing TOC converter can handle them.
+        _is_toc_page = bool(
+            pre_extracted_markdown
+            and re.search(
+                r"^\|\s*(?:Contents|Inhaltsverzeichnis|Seite|Kapitel|Chapter)\s*\|",
+                pre_extracted_markdown,
+                re.IGNORECASE | re.MULTILINE,
+            )
+        )
+        if pre_extracted_markdown and not _is_toc_page and re.search(r'!\[.*?\]\(', pre_extracted_markdown):
             page_type = PageType.MIXED
         else:
             # TEXT pages have no images and no formulas (per analyze_page), so
