@@ -278,7 +278,12 @@ def _toc_2col_entry(entry: str, page: str) -> str:
         return f"    - {entry} {page}"
     if re.match(r"^\d+\.\d+\s", entry):
         return f"  - {entry} {page}"
-    return f"- **{entry}** {page}"
+    # Chapter-level entries that have a plain digit prefix (e.g. "7 Fazit").
+    if re.match(r"^\d+\s", entry):
+        return f"- **{entry}** {page}"
+    # Entries with no number at all — the chapter number was in a separate PDF
+    # column and is lost. Don't bold them; that would imply false hierarchy.
+    return f"- {entry} {page}"
 
 
 def _toc_3col_entry(col1_raw: str, col2: str, col3: str) -> str:
@@ -1325,10 +1330,10 @@ def _strip_duplicate_section_headers(md: str) -> str:
 
         # ── # Kapitel/Chapter N Title running header ──────────────────────────
         m_kapitel = re.match(
-            r"^#\s+(?:Kapitel|Chapter)\s+\d+\s+(.+)$", line, re.IGNORECASE
+            r"^#\s+(?:Kapitel|Chapter)\s+\d+[:\s]\s*(.+)$", line, re.IGNORECASE
         )
         if m_kapitel:
-            title = m_kapitel.group(1).strip().lower()
+            title = re.sub(r"^[:\s]+", "", m_kapitel.group(1).strip()).lower()
             if title in seen_all_headings:
                 continue  # already seen as a real heading — this is a repeat
             seen_all_headings.add(title)

@@ -412,7 +412,7 @@ def test_convert_toc_table_two_col_nesting():
     )
     result = _convert_toc_table(md)
     assert "## Contents" in result
-    assert "- **List of Abbreviations** vii" in result
+    assert "- List of Abbreviations vii" in result
     assert "- **1 Introduction** 1" in result
     assert "- **2 Foundations** 3" in result
     assert "  - 2.1 Background 4" in result
