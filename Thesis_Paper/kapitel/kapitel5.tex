@@ -155,7 +155,9 @@ Several further passes remove artefacts specific to LLM output.
 One strips decorative horizontal rules that appear directly after a heading, which come from PDF underlines misread as Markdown separators.
 Another removes prompt instruction text that some models copy verbatim into their output.
 A third strips \texttt{```markdown} fences that some models place around their entire response: the fence is valid syntax for a code block but not for the top-level document.
-Table-of-contents pages also receive a dedicated pass that removes dot leaders, the sequences of dots or spaces used to connect section titles to page numbers in a printed layout, which have no meaning in Markdown.
+Table-of-contents pages and front-matter list pages (List of Figures, List of Tables, List of Listings, and the abbreviations list) each receive a dedicated pass.
+These pages are classified as TEXT and processed entirely by pymupdf4llm without invoking the LLM.
+The postprocessing pass converts the pipe-table structure that pymupdf4llm produces into a clean nested Markdown list, inferring heading hierarchy from section-number prefixes, and removes dot leaders, the sequences of dots or spaces used to connect section titles to page numbers in a printed layout, which have no meaning in Markdown.
 
 The second group targets heading quality.
 pymupdf4llm often collapses all headings to the same level (\texttt{\#\#}), so the pipeline re-assigns levels based on section-number patterns: a line matching \texttt{1.1.1 Title} becomes \texttt{\#\#\#}, a line matching \texttt{1.1 Title} becomes \texttt{\#\#}, and a standalone chapter title becomes \texttt{\#}.

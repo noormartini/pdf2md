@@ -59,9 +59,7 @@ whitespace-sensitive formatting \autocite{meuschke2023}.
 
 \section{Markdown Format}
 
-Markdown is a lightweight markup language created by John Gruber in 2004. It
-was designed to be readable as plain text while also converting cleanly to HTML
-and other formats \autocite{cone2019}. The syntax uses standard ASCII characters:
+Markdown's syntax uses standard ASCII characters:
 \texttt{\#} symbols for headings, hyphens or asterisks for lists, backticks for
 inline code, and triple backticks for fenced code blocks. Because the syntax is
 so simple, a Markdown file is readable without any renderer, which is not the
@@ -106,16 +104,6 @@ of what academic and technical documents require. This means the output of a
 PDF-to-Markdown conversion can be fed directly into documentation platforms,
 static site generators, or AI pipelines without any extra transformation step.
 
-Markdown is plain text, so it works naturally with version control systems like
-Git: every change is tracked at the character level, which PDF and Word formats
-cannot offer. For LLM and retrieval-augmented generation (RAG) workflows,
-Markdown is a well-suited input format because it preserves document hierarchy.
-Khan et al.\ \autocite{khan2024} show this concretely: the quality of the upstream
-text extraction sets a ceiling on downstream retrieval precision. Poorly
-structured or fragmented text produces low-quality embeddings, which causes
-retrieval to fail even when the relevant content is present in the document.
-These are the main reasons Markdown was chosen as the target format for this
-system.
 
 \section{Large Language Models}
 \label{sec:background:llms}
@@ -137,26 +125,11 @@ they also require more memory and compute \autocite{ingemarsson2024}. For docume
 conversion, the context window determines how much of a page, or how many pages at once,
 can be submitted in a single prompt.
 
-LLMs vary in capability and cost. Proprietary models like GPT-4o combine text
-and visual inputs in a single end-to-end network, which lets them process
-rendered page images alongside extracted text \autocite{ingemarsson2024}.
-Open-source alternatives like Meta's LLaMA~3 and Mistral's Mixtral reach
+LLMs vary in capability and cost. Proprietary models like GPT-4.1 combine text
+and visual inputs in a single end-to-end network.
+Open-source alternatives like Meta's LLaMA~3.3 and Mistral Large reach
 competitive performance at much lower inference cost, which makes them
-practical for local deployment via runtimes like LM Studio. Ingemarsson and
-Persson \autocite{ingemarsson2024} tested several model families on PDF parsing
-tasks and found that GPT-4-Turbo and GPT-4o reached the highest document
-understanding scores (77--78\%), while open-source models clustered around
-70\%. That gap is worth noting, but it must be weighed against the cost and
-privacy benefits of running models locally.
-
-Vision-capable LLMs are especially relevant to document conversion. By taking
-rendered page images as input, they can detect visual structure that text-layer
-extraction misses entirely: reading order, column boundaries, figure captions,
-and mathematical notation. Prompt instructions can guide this further: specifying the desired output
-format, the document language, and the content type of the page in the system
-prompt pushes the model toward structured, consistent output. This combination
-of visual input and prompt-driven control is what the image-based and hybrid
-extraction strategies in this thesis rely on.
+practical for local deployment via runtimes like LM Studio.
 
 Three parameters control how an LLM generates text and are configurable in
 local runtimes such as LM Studio \autocite{khan2024}. \textit{Temperature} sets
@@ -224,13 +197,17 @@ source \autocite{duan2025}.
 
 Multimodal extraction combines the text layer with visual understanding, using
 models that process both raw text and a rendered image of the page at the same
-time. These systems can extract text, images, and tables in a single pass and
-align them according to the document's logical structure. This preserves
-relationships between figures and their captions, and between equations and
-the surrounding text \autocite{ingemarsson2024}. Ingemarsson and Persson
-\autocite{ingemarsson2024} found that multimodal tools achieved the best overall
-performance across diverse document types, reaching 90\% accuracy with GPT-4o.
-This makes them the strongest choice when the page content is unknown or mixed.
+time. By taking rendered page images as input, these models can detect visual
+structure that text-layer extraction misses entirely: reading order, column
+boundaries, figure captions, and mathematical notation. Prompt instructions can
+guide this further --- specifying the output format, document language, and page
+content type pushes the model toward structured, consistent output. These systems
+can extract text, images, and tables in a single pass and align them according to
+the document's logical structure \autocite{ingemarsson2024}. Ingemarsson and
+Persson \autocite{ingemarsson2024} found that multimodal tools achieved the best
+overall performance across diverse document types, reaching 90\% accuracy with
+GPT-4o at the time of publication. This makes them the strongest choice when the
+page content is unknown or mixed.
 
 All three strategies involve trade-offs. Rule-based methods are fast and
 reliable for text but cannot handle images. Deep learning methods handle visual

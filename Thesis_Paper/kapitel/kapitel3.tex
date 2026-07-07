@@ -28,20 +28,21 @@ tabular data. pypdfium2 wraps the PDFium rendering engine (the same one
 used in Google Chrome) and produces high-fidelity rendering, but does
 little structural post-processing on its own.
 
-Meuschke et al.\ \autocite{meuschke2023} evaluated these tools across academic,
-legal, and technical documents. All three libraries performed well on simple
-single-column native PDFs with clean encodings, but accuracy dropped noticeably
-as document complexity increased, especially on documents that mixed content
-types such as embedded images, side-by-side tables, and footnotes. No single
-library came out on top across all categories: PyMuPDF handled text-dense
-documents fastest, while pdfplumber's coordinate data gave it an edge on
-documents that required positional grouping. Ingemarsson and Persson \autocite{ingemarsson2024} identified
-a hard limit: on pages where content exists only as rasterised images,
-text-layer parsers recover nothing, because there is no embedded text object
-to read. For mathematical expressions, Gao et al.\ \autocite{gao2011} show that
-sequential character extraction loses the spatial relationships between glyphs
-that make formulas meaningful. The output is character-correct, but the
-structure is gone.
+Meuschke et al.\ \autocite{meuschke2023} benchmarked ten tools on 500,000 pages
+of academic documents and measured F1 scores across element types. The results
+are specific. PyMuPDF scored F1=0.51 on paragraph extraction because it assigns
+sections, captions, lists, and equations all to the same paragraph label, producing
+noisy output. Table extraction was poor across every tool: the best result was
+F1=0.47 (Adobe Extract), while dedicated table parsers like Camelot and Tabula
+reached only 0.28--0.30, partly because they misidentify two-column layouts as
+tables. List extraction scored zero for every tool tested. Equation extraction
+was near zero. These are not edge cases --- they are common elements in academic
+and technical documents. Ingemarsson and Persson \autocite{ingemarsson2024}
+identified a further hard limit: on pages where content exists only as rasterised
+images, text-layer parsers recover nothing. For mathematical expressions, Gao
+et al.\ \autocite{gao2011} show that sequential character extraction loses the
+spatial relationships that make formulas meaningful. The output is
+character-correct, but the structure is gone.
 
 \subsection{OCR Solutions}
 
@@ -75,13 +76,16 @@ It applies to any modular pipeline architecture \autocite{duan2025}.
 
 Both text-layer parsers and OCR tools share a gap that Darvishy
 \autocite{darvishy2018} identified: no traditional tool can interpret or describe
-mathematical formulas or scientific graphs in PDFs. Text-layer parsers flatten
-formulas into character sequences with no spatial encoding. OCR tools recognise
-individual symbols but do not rebuild the two-dimensional structure that gives
-mathematical notation its meaning. Superscripts, subscripts, fraction bars,
-and summation bounds are all flattened out. For the academic and scientific documents
-this thesis targets, formulas and figures are not decorative. They carry
-the core content, so losing their structure is a real problem. The evidence
+mathematical formulas or scientific graphs in PDFs. Ouyang et al.\
+\autocite{omnidocbench2025} show this extends even to specialised formula tools:
+exact-match rates are near zero despite high character-level scores, because
+structural grouping is lost even when individual symbols are correct. Figures
+fare no better: every tool in their benchmark omitted figure content from
+structured output entirely. Multi-column layouts are a third shared weakness:
+reading-order error roughly doubles on complex layouts compared to single-column
+pages across every tool category tested \autocite{omnidocbench2025}. For the
+academic and scientific documents this thesis targets, formulas, figures, and
+multi-column layouts are not edge cases. The evidence
 from Meuschke et al.\ \autocite{meuschke2023}, Ingemarsson and Persson
 \autocite{ingemarsson2024}, and Subramani et al.\ \autocite{subramani2020} all point
 to the same conclusion: traditional tools work well within a narrow range of
