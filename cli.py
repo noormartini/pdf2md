@@ -28,8 +28,8 @@ def parse_args():
         "-n",
         "--max-pages",
         type=int,
-        default=20,
-        help="Max pages to convert to markdown",
+        default=10000,
+        help="Max pages to convert (default: entire PDF)",
     )
     parser.add_argument(
         "-s",

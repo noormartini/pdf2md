@@ -9,7 +9,30 @@ Bachelor's thesis project. Converts PDF documents to Markdown using local LLMs v
 1. **Analyse** — each PDF page is inspected with PyMuPDF to detect its content type (text, image, formula, table, mixed, or empty)
 2. **Extract** — text pages have their Markdown extracted directly with pymupdf4llm; all other pages are rendered as PNG screenshots
 3. **Convert** — image pages are sent to a local vision LLM in LM Studio, which returns clean Markdown
-4. **Post-process** — over 20 per-page cleanup passes plus 10 document-level passes normalise headings, fix tables, remove extraction artefacts, and produce a single `.md` file
+4. **Post-process** — 38 cleanup passes normalise headings, fix tables, remove extraction artefacts, and produce a single `.md` file
+
+---
+
+## Requirements
+
+- Python 3.12+
+- [LM Studio](https://lmstudio.ai) running locally with a vision-capable model loaded
+- Recommended model: **Qwen2.5-VL-7B**
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Quick Start
+
+Start LM Studio, load a vision model, then:
+
+```bash
+# convert a PDF using the adaptive strategy (recommended)
+python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result.md -s adaptive
+```
 
 ---
 
@@ -17,10 +40,10 @@ Bachelor's thesis project. Converts PDF documents to Markdown using local LLMs v
 
 | Strategy | How it works | Best for |
 |----------|-------------|----------|
-| `text` | Extracts raw text with pymupdf4llm | Clean text-only documents |
+| `text` | Extracts raw text with pymupdf4llm — no LLM | Fast, clean text-only documents |
 | `image` | Renders every page as PNG → vision LLM | Image-heavy documents |
 | `hybrid` | Sends both text and image to vision LLM | Mixed-content documents |
-| `adaptive` | Auto-detects page type, picks best strategy per page | Full thesis documents |
+| `adaptive` | Auto-detects page type, picks best strategy per page | Full thesis documents (recommended) |
 
 The **adaptive** strategy is the core thesis contribution. It classifies each page and routes accordingly:
 
@@ -31,65 +54,89 @@ The **adaptive** strategy is the core thesis contribution. It classifies each pa
 - `MIXED` → rendered as PNG, general prompt → vision LLM
 - `EMPTY` → skipped
 
-Pages are processed in parallel using a `ThreadPoolExecutor`.
+---
+
+## All Commands
+
+### Convert each PDF (full document)
+
+```bash
+# Sentiment analysis thesis
+python3 main.py \
+  -i pdf_source/test_pdf_source.pdf \
+  -o output/sentiment_thesis.md \
+  -s adaptive
+
+# HITL thesis
+python3 main.py \
+  -i "pdf_source/A_human_in_the_loop_system_for_research_paper_generation_using_local_large_language_models.pdf" \
+  -o output/hitl_thesis.md \
+  -s adaptive
+
+# Neural networks thesis
+python3 main.py \
+  -i pdf_source/Bachelor_Thesis_Informatik_Koehler_Sven.pdf \
+  -o output/koehler_thesis.md \
+  -s adaptive
+```
+
+### Convert first N pages only
+
+```bash
+python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result.md -s adaptive -n 20
+```
+
+### Try each strategy on a PDF
+
+```bash
+python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result_text.md    -s text
+python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result_image.md   -s image
+python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result_hybrid.md  -s hybrid
+python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result_adaptive.md -s adaptive
+```
+
+### Use a different model
+
+```bash
+python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result.md -s adaptive \
+  -m your-model-name-in-lmstudio
+```
+
+### Deterministic output (for reproducible results)
+
+```bash
+python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result.md -s adaptive -t 0.0
+```
 
 ---
 
-## Requirements
+## Evaluation Experiment
 
-- Python 3.12+
-- [LM Studio](https://lmstudio.ai) running locally with a vision-capable model loaded
-- Recommended model: **Qwen2.5-VL-7B**
+Runs all four strategies on all three PDFs, computes seven metrics per page against hand-written reference files, and produces a comparison report.
 
-Install dependencies:
+**Requires LM Studio running with Qwen2.5-VL-7B loaded.**
 
 ```bash
-pip install -r requirements.txt
+# step 1 — run the experiment (takes ~30–60 min)
+python3 -m evaluation.compare -c experiments/sample.json -o output/results.json
+
+# step 2 — generate the Markdown report
+python3 -m evaluation.report -i output/results.json -o output/report.md
 ```
 
----
+The experiment config (`experiments/sample.json`) controls which PDFs, strategies, models, and temperatures to compare. Reference ground-truth pages are in `references/`.
 
-## Usage
+### Metrics computed per page
 
-LM Studio must be running with a model loaded before running any command.
-
-```bash
-# default: adaptive strategy
-python3 main.py
-
-# specify a PDF and strategy
-python3 main.py -i pdf_source/thesis.pdf -s adaptive
-
-# limit to first 20 pages
-python3 main.py -i pdf_source/thesis.pdf -s adaptive -n 20
-
-# override model
-python3 main.py -i pdf_source/thesis.pdf -s adaptive -m qwen/qwen2.5-vl-7b
-```
-
-Output is saved to `output/test_pdf_output.md` by default.
-
-### Single-file version
-
-`project.py` is a self-contained single-file version of the entire pipeline — no imports from other modules required.
-
-```bash
-python3 project.py -i pdf_source/thesis.pdf -o output/result.md -s adaptive -n 20
-```
-
-### CLI Options
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-i` / `--input` | `pdf_source/test_pdf_source.pdf` | Input PDF file |
-| `-o` / `--output` | `output/test_pdf_output.md` | Output Markdown file |
-| `-s` / `--strategy` | `text` | Strategy: `text`, `image`, `hybrid`, `adaptive` |
-| `-m` / `--model` | `qwen/qwen2.5-vl-7b` | Model name as loaded in LM Studio |
-| `-b` / `--base-url` | `http://127.0.0.1:1234/v1` | LM Studio API base URL |
-| `-n` / `--max-pages` | `3` | Maximum number of pages to convert |
-| `-t` / `--temperature` | `0.2` | LLM sampling temperature (0.0 = deterministic) |
-| `-T` / `--max-tokens` | `4096` | Maximum tokens in LLM response |
-| `-c` / `--concurrency` | `4` | Number of parallel worker threads |
+| Metric | What it measures |
+|--------|-----------------|
+| Text similarity | Character-level overlap with reference (difflib) |
+| Heading structure | H1/H2/H3 count match vs. reference |
+| List structure | Bullet and numbered list fidelity |
+| Table detection | Presence and count of Markdown tables |
+| Code block accuracy | Fenced code block match |
+| Paragraph count | Paragraph count vs. reference (20% tolerance) |
+| Word overlap | Bag-of-words Jaccard similarity |
 
 ---
 
@@ -99,35 +146,23 @@ python3 project.py -i pdf_source/thesis.pdf -o output/result.md -s adaptive -n 2
 pytest postprocess_test.py
 ```
 
-147 tests cover all postprocessing functions individually as well as end-to-end `postprocess_markdown()` behaviour.
+147 tests cover all postprocessing functions individually and end-to-end `postprocess_markdown()` behaviour.
 
 ---
 
-## Evaluation
+## CLI Options
 
-Run a comparison experiment across strategies, models, and temperatures:
-
-```bash
-# run experiments (requires LM Studio running)
-python3 -m evaluation.compare -c experiments/sample.json -o output/results.json
-
-# generate markdown report from results
-python3 -m evaluation.report -i output/results.json -o output/report.md
-```
-
-The experiment config (`experiments/sample.json`) controls which PDFs, strategies, models, prompt variants, and temperatures to compare. Reference ground-truth pages are stored in `references/`.
-
-**Metrics computed per page:**
-
-| Metric | What it measures |
-|--------|-----------------|
-| Text similarity | Character-level overlap with reference (difflib) |
-| Heading structure | H1/H2/H3 count match vs. reference |
-| List structure | Bullet and numbered list fidelity |
-| Table detection | Presence and count of Markdown tables |
-| Code block accuracy | Fenced code block match |
-| Paragraph count | Paragraph count vs. reference |
-| Word overlap | Bag-of-words Jaccard similarity |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-i` / `--input` | `pdf_source/test_pdf_source.pdf` | Input PDF file |
+| `-o` / `--output` | `output/test_pdf_output.md` | Output Markdown file |
+| `-s` / `--strategy` | `text` | Strategy: `text`, `image`, `hybrid`, `adaptive` |
+| `-m` / `--model` | `qwen2.5-vl-7b-instruct-abliterated` | Model name as loaded in LM Studio |
+| `-b` / `--base-url` | `http://127.0.0.1:1234/v1` | LM Studio API base URL |
+| `-n` / `--max-pages` | entire PDF | Maximum number of pages to convert |
+| `-t` / `--temperature` | `0.2` | LLM sampling temperature (0.0 = deterministic) |
+| `-T` / `--max-tokens` | `4096` | Maximum tokens in LLM response |
+| `-c` / `--concurrency` | `4` | Number of parallel worker threads |
 
 ---
 
@@ -135,16 +170,15 @@ The experiment config (`experiments/sample.json`) controls which PDFs, strategie
 
 ```
 PDF2MD/
-├── pdf_source/              # Input PDFs for testing
-├── references/              # Ground-truth Markdown pages (hand-corrected)
+├── pdf_source/              # Input PDFs
+├── references/              # Hand-written ground-truth Markdown pages
 ├── experiments/             # Experiment config files (JSON)
 ├── output/                  # Conversion output and evaluation reports
-├── main.py                  # Entry point (multi-module version)
-├── project.py               # Self-contained single-file version of the pipeline
+├── main.py                  # Entry point
 ├── app.py                   # Main pipeline logic
 ├── cli.py                   # Argument parsing
 ├── config.py                # Config dataclass and classification thresholds
-├── postprocess.py           # Multi-pass Markdown cleanup pipeline
+├── postprocess.py           # 38-pass Markdown cleanup pipeline
 ├── postprocess_test.py      # 147 unit tests for postprocessing
 ├── strategies/
 │   ├── adaptive.py          # Per-page classification and routing (core contribution)
@@ -153,9 +187,9 @@ PDF2MD/
 │   ├── hybrid.py            # Text + image combined strategy
 │   └── result.py            # ConversionResult dataclass
 ├── extraction/
-│   ├── text.py              # PyMuPDF text extraction
+│   ├── text.py              # PyMuPDF text extraction with font-size heading detection
 │   ├── image.py             # PyMuPDF page-to-image rendering
-│   └── language.py          # Document language detection (German / English)
+│   └── language.py          # Document language detection
 ├── llm/
 │   ├── client.py            # LM Studio API client
 │   └── prompts.py           # Prompt templates per page type and language
@@ -167,63 +201,8 @@ PDF2MD/
 
 ---
 
-## What Has Been Implemented
-
-### Adaptive strategy (core contribution)
-- Per-page content classification: `TEXT`, `IMAGE`, `FORMULA`, `TABLE`, `MIXED`, `EMPTY`
-- Automatic routing: text pages bypass the LLM entirely; all other types go to the vision LLM with a typed prompt
-- Parallelised page conversion with `ThreadPoolExecutor`
-- Bulk text extraction with pymupdf4llm once per document (avoids O(N²) font-histogram rescanning)
-- Document language detection; prompts sent in the detected language
-
-### Postprocessing pipeline
-Applied in two stages: per-page passes inside `clean_page()`, then document-level passes inside `postprocess_markdown()`.
-
-Selected passes:
-
-| Pass | What it fixes |
-|------|--------------|
-| Bold stripping in headings | `## **Title**` → `## Title` |
-| Space before colon in labels | `**Schmitt, Steven :**` → `**Schmitt, Steven:**` |
-| Declaration heading promotion | Standalone `Erklärung / Declaration` promoted to `##` heading |
-| Listing title promotion | `**Listings**` as bold text → `## Listings` |
-| TOC dot-leader cleaning | `. . . . . 32` artefacts removed from table-of-contents cells |
-| TOC table conversion | Pipe-table TOC → clean nested Markdown list |
-| List of Figures/Tables repair | Dot-leader page numbers recovered from raw text; missing headers added |
-| Listings table repair | Dot-leader debris in Listings page cleaned to proper 3-column table |
-| Abbreviation table conversion | Inline bold abbreviation lists → 2-column Markdown table |
-| Greek letter → LaTeX | `_φ_` → `$\varphi$` |
-| OCR superscript cleanup | Citation markers like `[1]` extracted from garbled OCR runs |
-| Figure caption formatting | Captions normalised; reordered after their image when extracted before |
-| Chapter heading merging | `# Chapter N` + `## Title` pairs merged into `# Chapter N: Title` |
-| Title-page heading demotion | Metadata before first structural section demoted to plain text |
-| Bibliography dash stripping | Leading and trailing `—` artefacts removed from citation entries |
-| Picture-text block removal | Tesseract OCR noise from embedded figure images dropped |
-| Running header removal | Repeated chapter/section titles at top of each page stripped |
-| Mid-document page number removal | Isolated page-footer numbers removed |
-
-### Evaluation framework
-- Experiment runner compares strategies × models × temperatures across multiple PDFs
-- Seven metrics computed per page with hand-corrected reference ground truth
-- Aggregated Markdown report generation
-
-### Test suite
-- 147 unit tests covering every postprocessing function individually
-- End-to-end `postprocess_markdown()` integration tests
-
----
-
 ## Known Limitations
 
-### Medium
-- **Subscript and inline-math artefacts** — expressions like `( _s_ + 1) _/_ 2` are mangled because pymupdf4llm renders italic/superscript characters as Markdown underscores. No safe regex fix exists without understanding the surrounding math context.
-- **Bibliography dash mid-sentence** — in German bibliography format the em-dash separator sometimes ends up in the middle of a title string rather than at the end of the authorship line, depending on where the PDF line break falls. The trailing-dash case is handled; the mid-sentence case is not.
-
-### Hard / Out of scope
-- **LLM output quality** — the vision LLM occasionally misreads page numbers in List of Tables/Figures, confuses listing numbers with page numbers, or omits post-table text. These are model-quality issues, not postprocessing problems.
-- **Figures in text-strategy path** — diagrams and charts are marked `==> picture [NxN] intentionally omitted <==` when using the text strategy. The adaptive strategy avoids this by routing image pages to the vision LLM.
-
-
-qwen 3.5- 9b
-- benchmark machen wie lange
-
+- **Scanned PDFs** — the page classifier relies on the PDF text layer. Image-path strategies can still process scanned pages (they render to PNG), but the classifier thresholds were designed for native PDFs. Scanned documents are not part of the evaluation.
+- **Subscript and inline-math artefacts** — expressions like `(_s_ + 1) _/_ 2` are mangled because pymupdf4llm renders italic/superscript characters as Markdown underscores. No safe regex fix without math context.
+- **Figures in text strategy** — diagrams are marked `==> picture [NxN] intentionally omitted <==`. The adaptive strategy avoids this by routing image pages to the vision LLM.
