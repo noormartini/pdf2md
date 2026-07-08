@@ -17,7 +17,7 @@ Bachelor's thesis project. Converts PDF documents to Markdown using local LLMs v
 
 - Python 3.12+
 - [LM Studio](https://lmstudio.ai) running locally with a vision-capable model loaded
-- Recommended model: **Qwen2.5-VL-7B**
+- A vision-capable model loaded in LM Studio (any OpenAI-compatible vision LLM works)
 
 ```bash
 # runtime dependencies
