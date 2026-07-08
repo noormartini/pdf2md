@@ -1,0 +1,21 @@
+% Dokumententyp, benutzte Pakete und deren Einstellungen
+\documentclass[	\hsmasprache,%
+				\hsmaabgabe,%
+				\hsmapublizieren,%
+				\genderhinweis,
+				\hsmaquellcode,
+				\hsmasymbole,
+				\hsmaglossar,
+				\hsmatc]{HMA}
+
+% Wo sind die Bilder?
+\graphicspath{{bilder/}}
+
+\usepackage{float}
+
+% Wo liegt Sourcecode?
+\newcommand{\srcloc}{src/}
+
+% Checklisten mit zwei Ebenen
+\newlist{checklist}{itemize}{2}
+\setlist[checklist]{label=$\square$}

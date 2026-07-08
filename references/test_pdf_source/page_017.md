@@ -1,0 +1,3 @@
+tiefen neuronalen Netzwerken, um in hochdimensionalen oder dynamischen Umgebungen zu lernen. In den von Kiran u. a. beschriebenen Anwendungen kommen unter anderem Varianten des Q-Learning wie DQN oder DDPG zum Einsatz, um Navigationsentscheidungen auf Basis von Sensordaten, Kameraeingaben oder simulierten Umgebungen zu treffen.
+
+Dabei zeigen sich viele der auch in dieser Arbeit behandelten Herausforderungen, etwa hinsichtlich der Wahl geeigneter Lernraten, stabiler Netzwerkarchitekturen oder explorativer Strategien. Die Arbeit von Kiran u. a. [16] verdeutlicht somit, dass viele Überlegungen aus kontrollierten Umgebungen, wie sie im Rahmen dieser Arbeit untersucht werden, auch für Systeme in unserer realen Welt eine zentrale Rolle spielen.

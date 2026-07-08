@@ -22,10 +22,11 @@ from strategies.result import ConversionResult
 
 
 class PageType(Enum):
-    TEXT = "text"       # Pure text   → text_strategy with "text" prompt
-    IMAGE = "image"     # Image-heavy → image_strategy with "diagram" prompt
-    FORMULA = "formula" # Math-heavy  → image_strategy with "formula" prompt
-    MIXED = "mixed"     # Text+visual → image_strategy with "default" prompt
+    TEXT = "text"       # Pure text    → text_strategy with "text" prompt
+    IMAGE = "image"     # Image-heavy  → image_strategy with "diagram" prompt
+    FORMULA = "formula" # Math-heavy   → image_strategy with "formula" prompt
+    TABLE = "table"     # Table-heavy  → image_strategy with "table" prompt
+    MIXED = "mixed"     # Text+visual  → image_strategy with "default" prompt
     EMPTY = "empty"     # Mostly empty → skip
 
 
@@ -35,7 +36,9 @@ class PageAnalysis:
     page_type: PageType
     has_images: bool
     has_formulas: bool
+    has_tables: bool
     image_count: int
+    table_count: int
     text_length: int
     vector_path_count: int
     confidence: float  # 0.0–1.0
@@ -88,12 +91,18 @@ def analyze_page(page: fitz.Page) -> PageAnalysis:
     has_formulas = _detect_formulas(page, drawings)
     text_length = len(page.get_text("text").strip())
 
+    finder = page.find_tables()
+    table_count = len(finder.tables)
+    has_tables = table_count > 0
+
     if text_length < 10 and not has_images and vector_path_count < 5:
         page_type, confidence = PageType.EMPTY, 0.9
     elif has_formulas and text_length < _MIN_TEXT_CHARACTERS:
         page_type, confidence = PageType.FORMULA, 0.85
     elif has_images and image_count > 3:
         page_type, confidence = PageType.IMAGE, 0.9
+    elif has_tables:
+        page_type, confidence = PageType.TABLE, 0.85
     elif has_images or has_formulas:
         page_type, confidence = PageType.MIXED, 0.75
     elif text_length >= _MIN_TEXT_CHARACTERS:
@@ -105,7 +114,9 @@ def analyze_page(page: fitz.Page) -> PageAnalysis:
         page_type=page_type,
         has_images=has_images,
         has_formulas=has_formulas,
+        has_tables=has_tables,
         image_count=image_count,
+        table_count=table_count,
         text_length=text_length,
         vector_path_count=vector_path_count,
         confidence=confidence,
@@ -131,6 +142,7 @@ def adaptive_strategy(
     figures_dir: str = "figures",
     figure_refs: list[str] | None = None,
     language: str = "en",
+    pre_extracted_markdown: str | None = None,
     text_call: Callable = _text_strategy,
     image_call: Callable = _image_strategy,
 ) -> ConversionResult:
@@ -149,6 +161,10 @@ def adaptive_strategy(
         figures_dir:  Directory to save inline images from text pages.
         figure_refs:  Pre-extracted figure paths to include as Markdown links
                       in the LLM output for non-text pages.
+        pre_extracted_markdown: Optional pre-extracted pymupdf4llm output for
+                      this page (used only when page_type == TEXT).  Lets
+                      callers bulk-extract once instead of paying the all-pages
+                      font-histogram pass on every per-page call.
         text_call:    Injectable text strategy (default: text_strategy).
         image_call:   Injectable image strategy (default: image_strategy).
 
@@ -156,22 +172,41 @@ def adaptive_strategy(
         ConversionResult for this page.
     """
     if page_type == PageType.EMPTY:
-        return ConversionResult(markdown="*[Empty page — skipped]*", timing_ms=0.0, token_usage=None)
+        return ConversionResult(markdown="*[Empty page — skipped]*", timing_ms=0.0, token_usage=0, llm_calls=0)
 
     if page_type == PageType.TEXT:
-        from llm.client import call_llm
-        return text_call(
-            base_url=base_url,
-            model_name=model_name,
-            pdf_path=pdf_path,
-            page_num=page_num,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            figures_dir=figures_dir,
-            prompt_variant="text",
-            language=language,
-            llm_call=call_llm,
+        # If the pre-extracted markdown contains image links, the page has
+        # embedded raster formula images that page.get_images() missed.
+        # Route these pages to the vision LLM so formulas become LaTeX.
+        # Exception: TOC/list pages with decorative images must stay on the
+        # text path so the postprocessing TOC converter can handle them.
+        _is_toc_page = bool(
+            pre_extracted_markdown
+            and re.search(
+                r"^\|\s*(?:Contents|Inhaltsverzeichnis|Seite|Kapitel|Chapter)\s*\|",
+                pre_extracted_markdown,
+                re.IGNORECASE | re.MULTILINE,
+            )
         )
+        if pre_extracted_markdown and not _is_toc_page and re.search(r'!\[.*?\]\(', pre_extracted_markdown):
+            page_type = PageType.MIXED
+        else:
+            # TEXT pages have no images and no formulas (per analyze_page), so
+            # pymupdf4llm's output is the answer — skip the LLM entirely to save
+            # the 3–10 s round-trip per page.
+            return text_call(
+                base_url=base_url,
+                model_name=model_name,
+                pdf_path=pdf_path,
+                page_num=page_num,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                figures_dir=figures_dir,
+                prompt_variant="text",
+                language=language,
+                llm_call=None,
+                pre_extracted_markdown=pre_extracted_markdown,
+            )
 
     if page_type == PageType.FORMULA:
         return image_call(
@@ -193,6 +228,18 @@ def adaptive_strategy(
             temperature=temperature,
             max_tokens=max_tokens,
             prompt_variant="diagram",
+            figure_refs=figure_refs,
+            language=language,
+        )
+
+    if page_type == PageType.TABLE:
+        return image_call(
+            base_url=base_url,
+            model_name=model_name,
+            images=[page_image],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            prompt_variant="table",
             figure_refs=figure_refs,
             language=language,
         )

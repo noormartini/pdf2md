@@ -1,0 +1,13 @@
+die erkundeten Schritte nach Abschluss einer Episode rückwärts zu durchlaufen, wird auch noch eine invertierte Kopie des Arrays mit den ausgeführten Schritten erstellt.
+
+Beim Erreichen eines Terminalzustandes wird eine Episode beendet und alle bereits erkundeten Zustände werden rückwärts durchlaufen, um sie zu bewerten. Dadurch soll der Agent deutlich weniger Episoden benötigen, um ein deterministisches Problem zu erlernen, als das klassische Q-Learning. Neben dem RBQL Agenten wird in diesem Paper auch ein normaler Q-Learning Agent umgesetzt, um die Ergebnisse beider Agenten miteinander zu vergleichen.
+
+Die aufgezeigten Ergebnisse zeigen deutlich, dass bei einer 10 x 10 großen Gitterwelt bereits nach vier bis sechs Episoden der RBQL Agent den optimalen Pfad erlernt hat. Das klassische Q-Learning hingegen hat selbst nach 24 Episoden noch nicht den optimalen Weg gefunden. Dabei benötigt der RBQL Agent auch deutlich weniger Schritte, um die Problemstellung zu lösen. Die Arbeit vergleicht die Ergebnisse von drei verschieden großen Gitterwelten. Dabei wird deutlich, dass je größer die Gitterwelt ist, desto deutlicher ist der Unterschied zwischen Q-Learning und RBQL. Dies zeigt den Vorteil von RBQL gegenüber Q-Learning bei großen, komplexen Zustandsräumen. So benötigt das klassische Q-Learning bei einer 15 x 15 Gitterwelt im Schnitt in der ersten Episode durchschnittlich 7000 Schritte, um zu einem Terminalzustand zu gelangen, während der RBQL Agent nur etwa 2000 Schritte benötigte. [4]
+
+Dies zeigt schon deutlich das Potential, welches im RBQL Agenten steckt. In dieser Abschlussarbeit soll deswegen der RBQL Algorithmus nun auf ein anderes Szenario angewandt werden und auch mit dem bisher sehr verbreiteten Experience Replay Q-Learning verglichen werden. Des Weiteren soll in dieser Arbeit untersucht werden, ob sich mit dem RBQL Agent ein neuronales Netz effektiv trainieren lässt.
+
+## 3.4 Einsatz neuronaler Q-Learning-Verfahren in realen Anwendungen
+
+Auch wenn in dieser Arbeit vor allem tabellarische und einfach neuronale Umsetzungen des Q-Learning-Verfahrens betrachtet werden, existieren in der aktuellen Forschung verschiedene Ansätze, die komplexere Architekturen in realen Szenarien erproben. Besonders hervorzuheben ist dabei der Bereich des autonomen Fahrens. Kiran u. a. geben in ihrer umfangreichen Übersichtsarbeit „Deep Reinforcement Learning for Autonomous Driving: A Survey" [16] einen systematischen Überblick darüber, wie Verstärkungslernen mit tiefen neuronalen Netzen zur Entscheidungsfindung autonomer Agenten eingesetzt wird.
+
+In der Literatur wird in solchen Fällen häufig von Deep Reinforcement Learning (DRL) gesprochen, also der Kombination klassischer Reinforcement-Learning-Algorithmen mit

@@ -1,0 +1,52 @@
+%% !TeX program = lualatex
+
+% Dokumenteneinstellungen und Infos importieren
+\input{docinfo}
+
+% Preambel importieren
+\input{preambel}
+
+% Abstrakt der Abschlussarbeit
+\input{abstrakt}
+
+% Literatur-Datenbank
+\addbibresource{literatur.bib}
+
+
+% Anfang des Dokuments
+\begin{document}
+
+% Abkürzungen, Glossar, Symbole laden
+\input{kapitel/abkuerzungen}
+\input{kapitel/glossar}
+\input{kapitel/symbole}
+
+\pagestyle{headings}
+
+\mainmatter
+
+% Kapitel
+\input{kapitel/kapitel1}  % Introduction
+\input{kapitel/kapitel2}  % Background and Fundamentals
+\input{kapitel/kapitel3}  % Related Work
+\input{kapitel/kapitel4}  % Methodology
+\input{kapitel/kapitel5}  % System Design and Implementation
+\input{kapitel/kapitel6}  % Results and Evaluation
+\input{kapitel/kapitel7}  % Discussion
+\input{kapitel/kapitel8}  % Conclusion
+\newpage
+
+% Beginn des Anhangs
+\appendix
+
+% Römische Seitenzahlen im "backmatter"
+\pagenumbering{roman}
+\setcounter{page}{\value{frontmatterpage}}
+
+% Literaturverzeichnis
+\printbibliography
+
+% Anhang
+\input{kapitel/anhang-a}
+
+\end{document}

@@ -1,29 +1,35 @@
 {
   "name": "Sample Experiment",
   "input_pdfs": [
-    "pdf_source/test_pdf_source.pdf",
-    "pdf_source/A_human_in_the_loop_system_for_research_paper_generation_using_local_large_language_models.pdf",
-    "pdf_source/Bachelor_Thesis_Informatik_Koehler_Sven.pdf"
+    {
+      "path": "pdf_source/test_pdf_source.pdf",
+      "category": "academic"
+    },
+    {
+      "path": "pdf_source/A_human_in_the_loop_system_for_research_paper_generation_using_local_large_language_models.pdf",
+      "category": "academic"
+    },
+    {
+      "path": "pdf_source/Bachelor_Thesis_Informatik_Koehler_Sven.pdf",
+      "category": "academic"
+    }
   ],
   "reference_dir": "references",
   "strategies": [
+    "adaptive",
     "text",
     "image",
-    "hybrid",
-    "adaptive"
+    "hybrid"
   ],
   "models": [
-    "qwen/qwen3.5-9b",
     "qwen2.5-vl-7b-instruct-abliterated"
   ],
   "prompt_variants": [
     "default"
   ],
   "temperatures": [
-    0.0,
-    0.2,
-    0.5
+    0.0
   ],
-  "max_pages": 1,
+  "max_pages": 30,
   "base_url": "http://localhost:1234/v1"
 }

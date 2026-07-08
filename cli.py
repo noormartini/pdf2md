@@ -1,6 +1,6 @@
 import argparse
 
-from config import DEFAULT_BASE_URL, DEFAULT_MODEL
+from config import DEFAULT_BASE_URL, DEFAULT_CONCURRENCY, DEFAULT_MODEL
 
 
 def parse_args():
@@ -28,8 +28,8 @@ def parse_args():
         "-n",
         "--max-pages",
         type=int,
-        default=20,
-        help="Max pages to convert to markdown",
+        default=10000,
+        help="Max pages to convert (default: entire PDF)",
     )
     parser.add_argument(
         "-s",
@@ -51,5 +51,12 @@ def parse_args():
         type=int,
         default=4096,
         help="Max response length from LLM",
+    )
+    parser.add_argument(
+        "-c",
+        "--concurrency",
+        type=int,
+        default=DEFAULT_CONCURRENCY,
+        help="Number of pages converted in parallel (LLM calls are run in a thread pool)",
     )
     return parser.parse_args()

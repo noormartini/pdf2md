@@ -1,0 +1,33 @@
+%%{init: {'theme': 'default', 'themeVariables': {'fontSize': '22px', 'fontFamily': 'arial'}}}%%
+flowchart TD
+    A([PDF Page]) --> B[Extract Signals\nimage count · vector path count\ntext length · table count]
+
+    B --> C{text < 10 chars\nno images\nvector paths < 5?}
+    C -->|Yes| D([EMPTY · 0.90])
+
+    C -->|No| E{has formulas AND\ntext < 50 chars?}
+    E -->|Yes| F([FORMULA · 0.85])
+
+    E -->|No| G{has images AND\nimage count > 3?}
+    G -->|Yes| H([IMAGE · 0.90])
+
+    G -->|No| I{table\ndetected?}
+    I -->|Yes| J([TABLE · 0.85])
+
+    I -->|No| K{has images\nOR formulas?}
+    K -->|Yes| L([MIXED · 0.75])
+
+    K -->|No| M{text ≥ 50 chars?}
+    M -->|Yes| N([TEXT · 0.95])
+    M -->|No| O([MIXED · 0.50])
+
+    N -->|reroute: extracted markdown\ncontains image links?| P([MIXED · 0.75])
+
+    style D fill:#f8d7da,stroke:#dc3545
+    style F fill:#fff3cd,stroke:#f0ad4e
+    style H fill:#cce5ff,stroke:#004085
+    style J fill:#d1ecf1,stroke:#0c5460
+    style L fill:#e2d9f3,stroke:#6f42c1
+    style N fill:#d4edda,stroke:#28a745
+    style O fill:#e2d9f3,stroke:#6f42c1
+    style P fill:#e2d9f3,stroke:#6f42c1

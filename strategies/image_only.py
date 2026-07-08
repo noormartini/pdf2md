@@ -63,4 +63,5 @@ def image_strategy(
         markdown=response,
         timing_ms=elapsed_ms,
         token_usage=token_usage,
+        llm_calls=1,
     )

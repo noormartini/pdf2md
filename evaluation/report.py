@@ -243,6 +243,34 @@ def generate_per_page_breakdown(results: list[dict]) -> str:
     return format_table(headers, rows)
 
 
+def generate_category_comparison(results: list[dict]) -> str:
+    """Generate table comparing strategies per document category."""
+    # Only include results that have a category set
+    categorised = [r for r in results if r.get("category") and not r.get("error")]
+    if not categorised:
+        return "*No category labels found in results. Add `category` fields to the experiment config.*"
+
+    categories = sorted({r["category"] for r in categorised})
+    strategies = sorted({r["strategy"] for r in categorised})
+
+    # Mean text_similarity per (category, strategy)
+    data: dict[tuple[str, str], list[float]] = {}
+    for r in categorised:
+        key = (r["category"], r["strategy"])
+        data.setdefault(key, []).append(r["metrics"]["text_similarity"])
+
+    headers = ["Category"] + strategies
+    rows = []
+    for cat in categories:
+        row = [cat]
+        for strat in strategies:
+            scores = data.get((cat, strat), [])
+            row.append(f"{sum(scores)/len(scores):.3f} (n={len(scores)})" if scores else "-")
+        rows.append(row)
+
+    return format_table(headers, rows, col_alignments=["left"] + ["center"] * len(strategies))
+
+
 def generate_temperature_comparison(results: list[dict]) -> str:
     """Generate table comparing different temperatures."""
     temp_data = {}
@@ -308,6 +336,11 @@ def generate_full_report(results: list[dict], output_path: Optional[str] = None)
     # Strategy x Model Matrix
     lines.append("## Strategy × Model Matrix (Text Similarity)\n")
     lines.append(generate_strategy_model_matrix(results))
+    lines.append("")
+
+    # Category Comparison
+    lines.append("## Results by Document Category\n")
+    lines.append(generate_category_comparison(results))
     lines.append("")
 
     # Per-Page Breakdown

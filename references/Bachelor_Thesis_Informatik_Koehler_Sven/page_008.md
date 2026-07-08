@@ -1,0 +1,35 @@
+    - 4.2.4 Evaluation and visualization 33
+    - 4.2.5 Convolutional Networks 37
+- **5 Experimental setup** 41
+  - 5.1 Naive Bayes 41
+    - 5.1.1 Train the model 42
+    - 5.1.2 Inference step 42
+    - 5.1.3 Optimization 43
+  - 5.2 Support vector machines 45
+    - 5.2.1 Train the Model 46
+    - 5.2.2 Inference step 47
+    - 5.2.3 Optimization 48
+  - 5.3 Convolutional network 54
+    - 5.3.1 Train the model 55
+    - 5.3.2 Inference step 57
+    - 5.3.3 Optimization 57
+- **6 Results** 59
+  - 6.1 Accuracy 59
+    - 6.1.1 Naive Bayes 59
+    - 6.1.2 SVM 62
+    - 6.1.3 CNN 68
+  - 6.2 Visualization and semi-supervised clustering 69
+    - 6.2.1 Word vectors 70
+    - 6.2.2 Document vectors 76
+    - 6.2.3 Improvements 81
+- **7 Conclusion** 85
+  - 7.1 Outcome 86
+    - 7.1.1 Naive Bayes 86
+    - 7.1.2 SVM 86
+    - 7.1.3 CNN 87
+  - 7.2 Further work 87
+  - 7.3 Own Opinion 89
+- **List of Abbreviations** vii
+- **List of Tables** ix
+- **List of Figures** xi
+- **Bibliography** xvii

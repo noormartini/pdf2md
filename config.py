@@ -21,13 +21,19 @@ ADAPTIVE_RENDER_DPI: int = 150
 # ---------------------------------------------------------------------------
 
 # Model loaded in LM Studio for vision/hybrid/adaptive strategies
-DEFAULT_MODEL: str = "qwen/qwen3.5-9b"
+DEFAULT_MODEL: str = "qwen2.5-vl-7b-instruct-abliterated"
 
 # LM Studio local server URL
 DEFAULT_BASE_URL: str = "http://127.0.0.1:1234/v1"
 
 # Seconds to wait for a single LLM response (vision inference on CPU is slow)
 DEFAULT_LLM_TIMEOUT: int = 300
+
+# Number of pages converted in parallel.  LLM calls are I/O-bound on the
+# socket to LM Studio; a small thread pool overlaps them.  The practical
+# ceiling is GPU memory on the LM Studio side, not CPU cores — 4 is a
+# reasonable default for a single local GPU.
+DEFAULT_CONCURRENCY: int = 4
 
 
 @dataclass
@@ -41,3 +47,4 @@ class Config:
     temperature: float = 0.2
     max_tokens: int = 4096
     llm_timeout: int = DEFAULT_LLM_TIMEOUT
+    concurrency: int = DEFAULT_CONCURRENCY

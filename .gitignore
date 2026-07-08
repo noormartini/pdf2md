@@ -2,19 +2,49 @@ venv/
 __pycache__/
 output/
 PRESENTATION.md
+PLAN.md
+TODO.md
 .DS_Store
 
 # LaTeX build artifacts
-Thesis_Paper/NoorMartini_Thesis.pdf
+Thesis_Paper/*.pdf
 Thesis_Paper/*.aux
+Thesis_Paper/*.log
 Thesis_Paper/*.fdb_latexmk
 Thesis_Paper/*.fls
-Thesis_Paper/*.log
 Thesis_Paper/*.out
 Thesis_Paper/*.synctex.gz
 Thesis_Paper/*.toc
-Thesis_Paper/images/*.aux
-Thesis_Paper/images/*.log
-Thesis_Paper/images/*.pdf
+Thesis_Paper/*.bbl
+Thesis_Paper/*.bcf
+Thesis_Paper/*.blg
+Thesis_Paper/*.run.xml
+Thesis_Paper/*.acn
+Thesis_Paper/*.acr
+Thesis_Paper/*.alg
+Thesis_Paper/*.glg
+Thesis_Paper/*.glo
+Thesis_Paper/*.gls
+Thesis_Paper/*.glsdefs
+Thesis_Paper/*.idx
+Thesis_Paper/*.ilg
+Thesis_Paper/*.ind
+Thesis_Paper/*.ist
+Thesis_Paper/*.loc
+Thesis_Paper/*.lof
+Thesis_Paper/*.lol
+Thesis_Paper/*.lot
+Thesis_Paper/*.mw
+Thesis_Paper/*.slo
+Thesis_Paper/*.soc
+Thesis_Paper/*.syg
+Thesis_Paper/*.xdy
+Thesis_Paper/*.slg
+Thesis_Paper/*.sls
+Thesis_Paper/*.syi
+Thesis_Paper/Literatures
 
 writing rules
+codenotes.md
+
+prof methode

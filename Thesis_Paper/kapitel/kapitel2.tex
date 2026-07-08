@@ -1,0 +1,221 @@
+\chapter{Background and Fundamentals}
+
+Choosing the right extraction strategy for a PDF page requires understanding
+both how PDFs encode content and what different extraction methods are capable
+of. This chapter provides that context.
+
+\section{PDF Format and Parsing Challenges}
+
+PDF evolved from PostScript, a page description language built for rendering,
+not for storing structured information \autocite{whitington2012}. Because of this
+origin, PDF encodes content as drawing instructions rather than semantic
+elements. Text is stored as individual glyphs placed at $(x, y)$ coordinates
+on the page, with no native concept of paragraph, heading, or list. The page
+origin sits at the bottom-left corner with $Y$ increasing upward, which is the
+opposite of screen coordinates. This means any tool trying to recover reading
+order must first apply a coordinate transformation, and even then the result
+fails on multi-column layouts \autocite{whitington2012}. Any structure a reader
+perceives has to be rebuilt from geometric cues alone, which is unreliable in
+practice \autocite{gao2011}.
+
+The ISO 32000-1 standard introduced ``tagged PDF'' in version 1.4. Tagged PDFs
+include a logical structure tree that maps rendering commands to semantic roles
+such as headings and paragraphs and specifies reading order
+\autocite{darvishy2018}. But most PDFs in practice are untagged, so structure must
+be guessed from geometry alone. And even when tags are present, correct reading
+order still requires manual verification \autocite{darvishy2018}. There is also an
+important distinction between \textit{native PDFs}, which contain actual text
+objects with bounding boxes that can be parsed directly, and \textit{scanned
+PDFs}, where pages exist only as images and need OCR and visual region detection
+before any text can be extracted \autocite{whitington2012}. Deciding which category a
+page belongs to is itself a preprocessing step, usually done by comparing the
+ratio of embedded text area to image area. To make things more complicated,
+some digitally produced PDFs contain visually correct but internally garbled
+text encodings, which means they need an OCR fallback even though they are not
+scanned \autocite{whitington2012}.
+
+Text extraction from native PDFs has its own set of problems. PDF can embed
+fonts with custom encoding vectors, so character codes in the file do not
+always map to Unicode. This is a common cause of garbled or incomplete
+extraction, especially in older documents \autocite{whitington2012}. Even when
+characters are recovered correctly, simple sequential extraction still loses
+paragraph boundaries, list structure, and semantic grouping
+\autocite{meuschke2023}. Multi-column layouts, footnotes, and mixed-language
+documents make this worse, because positional order no longer corresponds to
+reading order \autocite{gao2011}. Formulas are a particular problem: PDF stores
+them as sequences of individual characters at specific coordinates, so
+superscripts, subscripts, and multi-line expressions have no semantic markup
+and are often merged with body text by extractors \autocite{blecher2023}.
+
+Images embedded in a PDF carry no context linking them to the surrounding text,
+so their relationship to a caption or paragraph is lost during extraction
+\autocite{gao2011}. Tables are similarly problematic: there is no explicit row
+or column structure in PDF, and complex merged cells often require
+HTML (HyperText Markup Language) output rather than Markdown, since Markdown has no native support for \texttt{rowspan}
+and \texttt{colspan} \autocite{zhu2022}. Code blocks can be identified through
+monospaced font detection and consistent horizontal spacing, but standard text
+extractors tend to fragment them because they do not preserve
+whitespace-sensitive formatting \autocite{meuschke2023}.
+
+\section{Markdown Format}
+
+Markdown's syntax uses standard ASCII characters:
+\texttt{\#} symbols for headings, hyphens or asterisks for lists, backticks for
+inline code, and triple backticks for fenced code blocks. Because the syntax is
+so simple, a Markdown file is readable without any renderer, which is not the
+case for binary or XML-based formats like PDF or DOCX.
+
+Several elements in this thesis use GitHub Flavored Markdown (GFM) extensions,
+including pipe-delimited tables and inline \LaTeX{} math.
+Table~\ref{tab:markdown_syntax} lists the most commonly used Markdown syntax
+elements referenced in this thesis.
+
+\begin{table}[ht]
+\centering
+\caption{Common Markdown syntax elements}
+\label{tab:markdown_syntax}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabularx}{\textwidth}{llX}
+\toprule
+\textbf{Element} & \textbf{Syntax} & \textbf{Description} \\
+\midrule
+Heading 1       & \texttt{\# Heading}           & Top-level section heading \\
+Heading 2       & \texttt{\#\# Heading}          & Second-level heading \\
+Heading 3       & \texttt{\#\#\# Heading}        & Third-level heading \\
+Bold            & \texttt{**text**}             & Bold emphasis \\
+Italic          & \texttt{*text*}               & Italic emphasis \\
+Unordered list  & \texttt{- item}               & Bullet list item \\
+Ordered list    & \texttt{1. item}              & Numbered list item \\
+Inline code     & \texttt{`code`}               & Monospace inline snippet \\
+Code block      & \texttt{```lang \ldots{} ```} & Fenced block with optional language tag \\
+Link            & \texttt{[text](url)}          & Hyperlink \\
+Image           & \texttt{![alt](path)}         & Embedded image reference \\
+Table           & \texttt{| col | col |}        & GFM pipe-delimited table \\
+Math (inline)   & \texttt{\$formula\$}          & Inline \LaTeX{} expression (GFM extension) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Markdown preserves semantic hierarchy through headings, nested lists, emphasis,
+and tables, which makes the output usable by both human readers and automated
+tools. The GitHub Flavored Markdown (GFM) extension adds support for tables,
+task lists, and \LaTeX-style math notation \autocite{duan2025}, which covers most
+of what academic and technical documents require. This means the output of a
+PDF-to-Markdown conversion can be fed directly into documentation platforms,
+static site generators, or AI pipelines without any extra transformation step.
+
+
+\section{Large Language Models}
+\label{sec:background:llms}
+
+Large language models (LLMs) are neural networks trained on large text corpora
+to predict and generate text. Almost all modern LLMs are built on the
+transformer architecture, which uses self-attention as its core mechanism.
+Self-attention lets each token in a sequence attend to every other token,
+regardless of how far apart they are. This is what allows LLMs to handle long
+documents and maintain coherence across a full text. Training on diverse data (books, articles, code, and web text) gives these
+models broad knowledge
+and the ability to perform many language tasks: translation, summarization,
+question answering, and code generation, among others.
+
+One practical constraint is the \textit{context window}: the maximum number of
+tokens a model can process in a single inference call. Larger context windows
+allow the model to consider longer documents without losing earlier content, but
+they also require more memory and compute \autocite{ingemarsson2024}. For document
+conversion, the context window determines how much of a page, or how many pages at once,
+can be submitted in a single prompt.
+
+LLMs vary in capability and cost. Proprietary models like GPT-4.1 combine text
+and visual inputs in a single end-to-end network.
+Open-source alternatives like Meta's LLaMA~3.3 and Mistral Large reach
+competitive performance at much lower inference cost, which makes them
+practical for local deployment via runtimes like LM Studio.
+
+Three parameters control how an LLM generates text and are configurable in
+local runtimes such as LM Studio \autocite{khan2024}. \textit{Temperature} sets
+how much randomness is applied when the model picks the next token. At
+temperature 0, the model always picks the most probable token, so the output
+is the same every time for the same input. Higher values make the model sample
+more broadly --- useful for creative tasks, but a problem for document
+conversion where consistency matters. \textit{Top-K} limits candidates to the
+$K$ most likely tokens at each step. \textit{Top-P} (nucleus sampling) works
+differently: it selects from the smallest group of tokens whose combined
+probability reaches a threshold $P$ \autocite{khan2024}. At $P = 0.9$, only the
+tokens that together cover 90\% of the probability mass are candidates, and
+the size of that group shifts at each step based on how confident the model
+is. For document conversion, temperature 0 is the right setting. It removes
+randomness, ensures the same page produces the same output on every run, and
+makes evaluation results repeatable.
+
+A specific class of models has been developed for visually rich document
+understanding (VRD-CU). These models treat documents as multimodal objects
+where text, spatial layout, and visual features all carry meaning together.
+The LayoutLM family \autocite{ding2026} is a well-known example: these models are
+pretrained on text content, two-dimensional positional embeddings that encode
+word locations on the page, and visual features from page images. This joint
+training lets the model recognize a heading not just from its words, but from
+its position, font size, and surrounding whitespace --- signals that a
+text-only model cannot see. The field has gone through three generations:
+early feature-based models (2018--2020), BERT-style document models
+(2020--2022), and LLM-instruction-tuned frameworks (2022--present)
+\autocite{ding2026}, which shows how quickly multimodal document understanding
+has matured as a research area.
+
+\section{Multimodal Processing Strategies}
+
+PDF parsing approaches fall into three broad categories based on how they
+interpret document content: rule-based text extraction, deep learning-based
+recognition, and multimodal processing \autocite{ingemarsson2024}. A complete
+parsing system has to handle five interdependent tasks: layout analysis, text
+recognition, table structure recognition, mathematical expression recognition,
+and chart understanding \autocite{subramani2020}. No single approach handles all
+five, and the difficulty of each task varies depending on the document type.
+This is one of the main reasons fixed-strategy tools struggle on diverse
+real-world documents.
+
+Rule-based extraction reads the PDF's embedded text layer directly, retrieving
+character sequences and their coordinates without any visual processing.
+Libraries like PyMuPDF and pdfplumber work this way. They are fast,
+deterministic, and reliable on native PDFs with simple layouts, but they cannot
+process scanned or image-based pages at all and they discard all visual
+structure \autocite{meuschke2023}. Ingemarsson and Persson
+\autocite{ingemarsson2024} measured this directly: rule-based tools achieve 0\%
+accuracy on image-only documents, and no amount of configuration changes that.
+
+Deep learning approaches use trained neural network models to recognize text,
+layout regions, and graphical elements from page images. Tesseract is a
+well-known example; more recent tools use deeper architectures for higher
+accuracy across a wider range of content types. These approaches can handle
+scanned documents that rule-based tools cannot, and they outperform multimodal
+tools on pages dominated by complex images \autocite{ingemarsson2024}. But
+applying them to native PDFs that already have an extractable text layer
+introduces unnecessary noise and discards existing formatting metadata
+\autocite{meuschke2023}. Multi-stage pipelines also have an error propagation
+problem: a wrong classification in the layout analysis step affects every
+downstream stage, and the resulting errors are hard to trace back to their
+source \autocite{duan2025}.
+
+Multimodal extraction combines the text layer with visual understanding, using
+models that process both raw text and a rendered image of the page at the same
+time. By taking rendered page images as input, these models can detect visual
+structure that text-layer extraction misses entirely: reading order, column
+boundaries, figure captions, and mathematical notation. Prompt instructions can
+guide this further --- specifying the output format, document language, and page
+content type pushes the model toward structured, consistent output. These systems
+can extract text, images, and tables in a single pass and align them according to
+the document's logical structure \autocite{ingemarsson2024}. Ingemarsson and
+Persson \autocite{ingemarsson2024} found that multimodal tools achieved the best
+overall performance across diverse document types, reaching 90\% accuracy with
+GPT-4o at the time of publication. This makes them the strongest choice when the
+page content is unknown or mixed.
+
+All three strategies involve trade-offs. Rule-based methods are fast and
+reliable for text but cannot handle images. Deep learning methods handle visual
+content better but may over-process native PDFs. Multimodal methods offer the
+broadest coverage but at higher computational cost. No single strategy is the
+right choice for every page. Recent benchmarks support this: Ouyang et al.\
+\autocite{omnidocbench2025} benchmarked pipeline-based and end-to-end multimodal
+systems across diverse document layouts in OmniDocBench and found that no single
+system performs consistently well across all content types. Structural failures
+persisted across all tested parsers, particularly for charts and complex visual
+layouts.

@@ -1,0 +1,216 @@
+\chapter{Appendix}
+
+The appendix collects supporting material referenced in the main chapters.
+
+\section{Implementation Code Snippets}
+
+The full implementation is available in the project repository. The source is
+organised into six packages: \texttt{app.py} (entry point and pipeline
+orchestration), \texttt{strategies/} (the four extraction strategies),
+\texttt{extraction/} (page classifier and language detection),
+\texttt{llm/} (prompt definitions and API client),
+\texttt{postprocess.py} (the two-stage post-processing pipeline), and
+\texttt{evaluation/} (metrics, strategy comparison, and report generation).
+
+\section{Complete Results Tables}
+
+Table~\ref{tab:appendix_results} lists the mean scores for all four strategies
+across all seven metrics and the mean processing time per page, computed over
+90 evaluated pages. Bold values indicate the best result in each column.
+
+\begin{table}[ht]
+\centering
+\caption{Mean metric scores and processing time per strategy (90 pages, $n=90$)}
+\label{tab:appendix_results}
+\small\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabularx}{\textwidth}{lXXXXXXXX}
+\toprule
+\textbf{Strategy} & \textbf{\shortstack{Time\\(ms)}} & \textbf{\shortstack{Text\\Sim.}} & \textbf{Heading} & \textbf{List} & \textbf{Table} & \textbf{Code} & \textbf{Paras.} & \textbf{\shortstack{W.\\Overlap}} \\
+\midrule
+Text-only  & \textbf{197}   & \textbf{0.860} & \textbf{0.565} & 0.859          & 0.922          & \textbf{0.889} & \textbf{0.726} & 0.761 \\
+Adaptive   & 20{,}790       & 0.838          & 0.542          & 0.868          & \textbf{0.956} & 0.752          & 0.636          & 0.794 \\
+Image-only & 64{,}696       & 0.827          & 0.429          & \textbf{0.914} & 0.944          & 0.250          & 0.156          & \textbf{0.811} \\
+Hybrid     & 68{,}010       & 0.818          & 0.348          & 0.891          & 0.944          & 0.736          & 0.597          & 0.795 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Sample Documents and Outputs}
+
+The three thesis documents used as the evaluation corpus, their ground truth
+reference files, and the raw per-page Markdown outputs are available in the
+project repository. The corpus configuration is in
+\texttt{experiments/sample.json}, reference files are in the corresponding
+\texttt{references/} subdirectory, and all per-page conversion results are
+stored in \texttt{output/results.json}.
+
+\section{Prompt Templates}
+\label{sec:prompt_templates}
+
+The five system prompt variants used by the LLM integration layer are listed
+below. Each variant defines a system prompt only. The user message is a single
+placeholder \texttt{\{text\}}, which the calling strategy replaces with the
+extracted page text or a base64-encoded image before sending the API request.
+For non-English documents, the \texttt{with\_language\_hint} function appends
+a language-preservation note to the system prompt at runtime.
+
+\medskip\noindent\textbf{Variant: \textit{default} --- general-purpose}
+
+\begin{lstlisting}[basicstyle=\footnotesize\ttfamily,breaklines=true,breakatwhitespace=true,columns=fullflexible,frame=single]
+You are a PDF-to-Markdown conversion specialist. Convert the following
+PDF-extracted text into clean, well-structured Markdown.
+
+## Rules
+
+**Content Integrity:**
+- Preserve the original meaning exactly - do not add, remove, or invent content.
+- Do not include any commentary, explanations, or meta-text in your output.
+
+**Structure & Formatting:**
+- Fix broken line breaks within paragraphs (common PDF artifact).
+- Preserve meaningful paragraph breaks.
+- Detect headings and format as Markdown headings (# for title, ## for
+  sections, ### for subsections).
+- If a heading includes a section number (e.g. "1.1 Motivation"), preserve
+  the number exactly as it appears -- do not drop it.
+- Only use Markdown headings for structural section titles -- do NOT convert
+  bold or italic text to a heading.
+- Format lists (bulleted or numbered) as proper Markdown lists.
+- Wrap source code in fenced code blocks with language identifier if detectable.
+
+**Figures & Captions:**
+- When you include an image link, look for a visible caption near the figure.
+- Include the caption as italic text on a new line below the image link.
+- Do not skip captions -- they are part of the content.
+
+**Special Content:**
+- Convert inline mathematical formulas to LaTeX: $E = mc^2$
+- Convert display/block formulas to LaTeX: $$\int_0^\infty f(x)\,dx$$
+- Preserve tables in Markdown table format if structure is clear.
+- Keep footnotes and references intact.
+
+**Output:**
+- Return ONLY the final Markdown - no preamble, no explanations.
+\end{lstlisting}
+
+\medskip\noindent\textbf{Variant: \textit{text} --- plain-text pages (adaptive TEXT path)}
+
+\begin{lstlisting}[basicstyle=\footnotesize\ttfamily,breaklines=true,breakatwhitespace=true,columns=fullflexible,frame=single]
+You are a PDF-to-Markdown conversion specialist. You will receive raw text
+extracted from a PDF page. Convert it into clean, well-structured Markdown.
+
+## Rules
+
+**Content Integrity:**
+- Preserve the original meaning exactly -- do not add, remove, or invent content.
+- Do not include commentary, explanations, or meta-text in your output.
+
+**Structure & Formatting:**
+- Fix broken line breaks caused by PDF extraction (re-join hyphenated words,
+  merge split sentences).
+- Assign heading levels strictly by numbering depth:
+  - Chapter / top-level title (e.g. "Chapter 1", "1. Title") -> #
+  - Section (e.g. "1.1 Title", "2.3 Title") -> ##
+  - Subsection (e.g. "1.1.1 Title") -> ###
+  - Deeper levels -> ####
+- Only use Markdown headings for structural section titles -- do NOT convert
+  bold or italic text to a heading.
+- Format bullet and numbered lists correctly.
+- Detect and wrap source code in fenced code blocks with a language tag.
+
+**Tables & Special Content:**
+- Reconstruct tables in Markdown table syntax when the structure is recoverable.
+- Convert inline mathematical formulas or symbols to LaTeX: $E = mc^2$
+- Convert display/block formulas to LaTeX: $$\int_0^\infty f(x)\,dx$$
+- Keep footnotes, citations, and references intact.
+
+**Output:**
+- Return ONLY the Markdown -- no preamble, no closing remarks.
+\end{lstlisting}
+
+\medskip\noindent\textbf{Variant: \textit{formula} --- formula pages}
+
+\begin{lstlisting}[basicstyle=\footnotesize\ttfamily,breaklines=true,breakatwhitespace=true,columns=fullflexible,frame=single]
+You are a mathematical document converter. You will receive an image of a PDF
+page that contains mathematical formulas. Extract all content and convert it
+to structured Markdown with LaTeX math notation.
+
+## Rules
+
+**Math Formatting:**
+- Convert all inline formulas to LaTeX: $E = mc^2$
+- Convert all display/block formulas to LaTeX: $$\int_0^\infty f(x)\,dx$$
+- Preserve subscripts, superscripts, Greek letters, and operators accurately.
+- Do not approximate or simplify formulas -- transcribe them exactly.
+
+**Surrounding Text:**
+- Preserve explanatory text, theorem labels, and proof steps in Markdown.
+- Maintain the logical flow of derivations.
+- Preserve page numbers exactly as they appear in the document.
+
+**Output:**
+- Return ONLY the Markdown+LaTeX -- no commentary, no preamble.
+\end{lstlisting}
+
+\medskip\noindent\textbf{Variant: \textit{table} --- table pages}
+
+\begin{lstlisting}[basicstyle=\footnotesize\ttfamily,breaklines=true,breakatwhitespace=true,columns=fullflexible,frame=single]
+You are a document table extraction specialist. You will receive an image of a
+PDF page containing one or more tables. Extract all table content and produce
+valid Markdown.
+
+## Rules
+
+**Table Formatting:**
+- Reconstruct every table using Markdown table syntax: | col | col | with a
+  |---|---| separator after the header row.
+- Preserve all cell values exactly -- do not paraphrase or summarise.
+- If a cell spans multiple columns, approximate it in flat Markdown.
+- Align columns consistently.
+
+**Surrounding Text:**
+- Extract any text outside the tables (headings, captions, footnotes) and
+  place it before or after the relevant table.
+- Preserve page numbers exactly as they appear.
+
+**Formulas:**
+- If a cell contains a formula, convert it to LaTeX: $formula$ inline,
+  $$formula$$ for display.
+
+**Output:**
+- Return ONLY the Markdown -- no preamble, no explanations.
+\end{lstlisting}
+
+\medskip\noindent\textbf{Variant: \textit{diagram} --- image and diagram pages}
+
+\begin{lstlisting}[basicstyle=\footnotesize\ttfamily,breaklines=true,breakatwhitespace=true,columns=fullflexible,frame=single]
+You are a document analysis specialist. You will receive an image of a PDF
+page that is dominated by figures, charts, or diagrams. Extract all content
+and produce structured Markdown.
+
+## Rules
+
+**Text Extraction:**
+- Extract all visible text: titles, axis labels, legends, annotations, captions.
+- If a heading includes a section number (e.g. "1.1 Motivation"), preserve
+  the number exactly -- do not drop it.
+
+**Diagram Description:**
+- Identify the type of diagram (flowchart, bar chart, architecture diagram, etc.).
+- Summarise the key information the diagram conveys in 1-3 sentences.
+- Use a Markdown blockquote or italics for the description.
+
+**Tables:**
+- If the image contains a table, reconstruct it in Markdown table syntax.
+
+**Formulas:**
+- If the image contains mathematical formulas, convert them to LaTeX:
+  $formula$ for inline, $$formula$$ for display/block.
+
+**Page Numbers:**
+- Preserve any page numbers visible in headers or footers as plain text.
+
+**Output:**
+- Return ONLY the Markdown -- no meta-commentary, no preamble.
+\end{lstlisting}

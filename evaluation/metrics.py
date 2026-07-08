@@ -27,6 +27,9 @@ class EvaluationResult:
     timing_ms: float
     token_usage: Optional[int] = None
     error: Optional[str] = None
+    category: Optional[str] = None
+    llm_calls: int = 0
+    pdf_path: str = ""
 
 
 def text_similarity(reference: str, candidate: str) -> float:
@@ -233,6 +236,9 @@ def evaluate_conversion(
     timing_ms: float,
     token_usage: Optional[int] = None,
     error: Optional[str] = None,
+    category: Optional[str] = None,
+    llm_calls: int = 0,
+    pdf_path: str = "",
 ) -> EvaluationResult:
     """
     Evaluate a single conversion against a reference.
@@ -258,6 +264,9 @@ def evaluate_conversion(
             timing_ms=timing_ms,
             token_usage=token_usage,
             error=error,
+            category=category,
+            llm_calls=llm_calls,
+            pdf_path=pdf_path,
         )
 
     metrics = {
@@ -279,6 +288,9 @@ def evaluate_conversion(
         metrics=metrics,
         timing_ms=timing_ms,
         token_usage=token_usage,
+        category=category,
+        pdf_path=pdf_path,
+        llm_calls=llm_calls,
     )
 
 
@@ -317,6 +329,8 @@ def aggregate_results(results: list[EvaluationResult]) -> dict:
         by_strategy[strategy] = {
             "count": len(strat_results),
             "avg_timing_ms": sum(r.timing_ms for r in strat_results) / len(strat_results),
+            "total_llm_calls": sum(r.llm_calls for r in strat_results),
+            "avg_llm_calls": sum(r.llm_calls for r in strat_results) / len(strat_results),
             "metrics": {
                 metric: sum(r.metrics[metric] for r in strat_results) / len(strat_results)
                 for metric in metric_names
@@ -350,6 +364,20 @@ def aggregate_results(results: list[EvaluationResult]) -> dict:
             }
         }
 
+    # By document category (only populated when category labels are present)
+    categories = sorted({r.category for r in valid_results if r.category})
+    by_category = {}
+    for cat in categories:
+        cat_results = [r for r in valid_results if r.category == cat]
+        by_category[cat] = {
+            "count": len(cat_results),
+            "avg_timing_ms": sum(r.timing_ms for r in cat_results) / len(cat_results),
+            "metrics": {
+                metric: sum(r.metrics[metric] for r in cat_results) / len(cat_results)
+                for metric in metric_names
+            },
+        }
+
     return {
         "total_pages": len(valid_results),
         "error_count": len(results) - len(valid_results),
@@ -357,4 +385,5 @@ def aggregate_results(results: list[EvaluationResult]) -> dict:
         "by_strategy": by_strategy,
         "by_model": by_model,
         "by_page": by_page,
+        "by_category": by_category,
     }
