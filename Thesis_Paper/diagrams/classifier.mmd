@@ -1,3 +1,4 @@
+%%{init: {'theme': 'default', 'themeVariables': {'fontSize': '22px', 'fontFamily': 'arial'}}}%%
 flowchart TD
     A([PDF Page]) --> B[Extract Signals\nimage count · vector path count\ntext length · table count]
 
@@ -20,6 +21,8 @@ flowchart TD
     M -->|Yes| N([TEXT · 0.95])
     M -->|No| O([MIXED · 0.50])
 
+    N -->|reroute: extracted markdown\ncontains image links?| P([MIXED · 0.75])
+
     style D fill:#f8d7da,stroke:#dc3545
     style F fill:#fff3cd,stroke:#f0ad4e
     style H fill:#cce5ff,stroke:#004085
@@ -27,3 +30,4 @@ flowchart TD
     style L fill:#e2d9f3,stroke:#6f42c1
     style N fill:#d4edda,stroke:#28a745
     style O fill:#e2d9f3,stroke:#6f42c1
+    style P fill:#e2d9f3,stroke:#6f42c1
