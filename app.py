@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
@@ -107,6 +108,7 @@ def _run_in_pool(indices: list[int], concurrency: int, worker) -> list:
 
 
 def run(config: Config):
+    start_time = time.perf_counter()
     figures_dir = os.path.join(os.path.dirname(os.path.abspath(config.output)), "figures")
     llm_call = partial(call_llm, timeout=config.llm_timeout)
 
@@ -293,7 +295,11 @@ def run(config: Config):
     with open(config.output, "w", encoding="utf-8") as f:
         f.write(markdown)
 
+    elapsed_s = time.perf_counter() - start_time
+    avg_per_page = elapsed_s / num_pages if num_pages > 0 else 0
+
     print(f"Done! Output saved as '{config.output}'.")
+    print(f"Conversion time: {elapsed_s:.1f}s total — {num_pages} pages — {avg_per_page:.1f}s/page avg")
     if total_llm_calls > 0:
         avg = total_tokens // total_llm_calls
         print(f"Token usage: {total_tokens:,} tokens ({total_llm_calls} LLM calls, avg {avg:,}/call)")
