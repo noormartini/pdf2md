@@ -70,20 +70,6 @@ The confidence score is stored in the \texttt{PageAnalysis} result but plays no 
 
 Figure~\ref{fig:classifier} shows the full decision tree.
 
-\begin{figure}[ht]
-    \centering
-    \includegraphics[width=0.65\textwidth]{classifier.png}
-    \caption{Page classifier decision tree with confidence scores}
-    \label{fig:classifier}
-\end{figure}
-
-\begin{figure}[ht]
-    \centering
-    \includegraphics[width=0.48\textwidth]{postprocessing.png}
-    \caption{Two-stage post-processing pipeline: \texttt{clean\_page} applies structural, LLM artefact, heading, and special-content passes per page; \texttt{postprocess\_markdown} applies heading, running-header, and encoding passes to the full joined document}
-    \label{fig:postprocessing}
-\end{figure}
-
 \section{PDF Processing Module}
 
 The PDF processing module has two sub-pipelines: one that extracts the text layer and one that renders pages as images.
@@ -178,7 +164,7 @@ This bypasses pymupdf4llm entirely for TOC pages, avoiding the noisy pipe-table 
 Front-matter list pages (List of Figures, List of Tables, and Listings) are classified as TEXT and processed by pymupdf4llm, then a dedicated pass converts the pipe-table structure into clean Markdown and removes dot leaders.
 Bold-formatted figure caption lines are converted to italic and placed directly below their image link; captions that appear before their image are swapped.
 OCR text blocks that pymupdf4llm extracts from embedded figures are removed: the figure is already included as a Markdown image link, so the OCR output adds noise.
-Italic spans containing only Greek letters are converted to inline LaTeX (e.g.\ \texttt{\_φ\_} $\to$ \texttt{\$\textbackslash varphi\$}).
+Italic spans containing only Greek letters are converted to inline LaTeX (e.g.\ an italic $\varphi$ becomes \texttt{\$\textbackslash varphi\$}).
 OCR superscript artefacts of the form \texttt{\_EMC\_[2]} are replaced with Unicode superscript characters.
 
 The second stage repeats some of these on the joined document, where page-spanning artefacts only become visible.
@@ -188,6 +174,20 @@ Heading demotion passes run again on the full document.
 LaTeX math delimiters in the \texttt{\textbackslash(...\textbackslash)} and \texttt{\textbackslash[...\textbackslash]} styles are normalised to the \texttt{\$...\$} and \texttt{\$\$...\$\$} forms used throughout the output.
 
 Figure~\ref{fig:postprocessing} shows all passes in both stages.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.60\textwidth]{classifier.png}
+    \caption{Page classifier decision tree with confidence scores}
+    \label{fig:classifier}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.37\textwidth]{postprocessing.png}
+    \caption{Two-stage post-processing pipeline: \texttt{clean\_page} applies structural, LLM artefact, heading, and special-content passes per page; \texttt{postprocess\_markdown} applies heading, running-header, and encoding passes to the full joined document}
+    \label{fig:postprocessing}
+\end{figure}
 
 \section{Implementation Details}
 
