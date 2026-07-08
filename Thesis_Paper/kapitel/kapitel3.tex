@@ -108,12 +108,9 @@ for both.
 
 Commercial tools such as LlamaParse, Marker, and Mistral OCR follow this general
 architecture but add API layers and post-processing for downstream use cases.
-Ouyang et al.\ \autocite{omnidocbench2025} evaluated pipeline-based and end-to-end
-multimodal parsers across diverse real-world document layouts in OmniDocBench.
-No single parser performed consistently well across all document types. Gaps were
-largest for charts and degraded scanned pages. These results highlight how
-difficult it is to build one general-purpose tool for structurally diverse
-documents.
+Ouyang et al.\ \autocite{omnidocbench2025} evaluated these tools across diverse
+real-world document layouts and found no single system performs consistently well
+across all content types.
 
 Blecher et al.\ \autocite{blecher2023} introduced Nougat, a Visual Transformer
 trained on paired PDF-markup data that converts full academic document pages
@@ -137,28 +134,16 @@ and question-answering rather than full document conversion.
 Even so, key limitations remain. Meuschke et al.\ \autocite{meuschke2023} found
 that even modern parsing tools struggle with scientific and patent documents
 containing dense formulas and non-standard layouts.
-Darvishy \autocite{darvishy2018} notes that no existing tool provides mechanisms to
-interpret and describe mathematical formulas or scientific graphs in PDFs. This gap
-is one of the central motivations for the image-based extraction strategy in this
-thesis, where rendered page images are passed to a multimodal LLM that can reason
-about text and visual content together.
 
 \section{LLM-based Document Understanding}
 
 Before large language models, document understanding depended on chains of
-specialised tools. Subramani et al.\ \autocite{subramani2020} showed that even
-deep-learning OCR broke down on complex layouts, mixed scripts, and
-low-resolution pages. Vision-capable language models changed this: they read a
+specialised tools. Vision-capable language models changed this: they read a
 rendered page image and produce structured output token by token through
 autoregressive generation, with no hand-coded layout rules in between.
-
 Nougat \autocite{blecher2023}, described in the previous section, is the clearest
-example of this shift: it infers headings, equations, tables, and citations in
-a single model pass with no separate layout step. Meuschke et al.\
-\autocite{meuschke2023} confirmed the pattern: structured-output tools
-outperformed all rule-based parsers on scientific documents. A single
-multimodal model can replace the multi-stage pipeline, at least for academic
-documents.
+example: Meuschke et al.\ \autocite{meuschke2023} confirmed that structured-output
+tools of this kind outperformed all rule-based parsers on scientific documents.
 
 OpenDataLab \autocite{mineru_software} released MinerU, an open-source dual-engine
 system that automatically detects whether each page is scanned or digitally born
@@ -169,13 +154,9 @@ end-to-end decoder transformers outperform pipeline-based systems on accuracy
 because they never pass an incorrect intermediate result down a fixed processing
 chain.
 
-Ding et al.\ \autocite{ding2026} survey Visually Rich Document Content Understanding
-(VRD-CU), covering documents that combine text, layout, and visual elements.
-Models pretrained across all three modalities consistently outperform text-only
-approaches. Instruction-tuned LLM architectures now achieve cross-modal reasoning
-that earlier models could not. Persistent gaps remain: word-level representations
-miss document-level semantic structure, and multi-page documents with mixed
-content are still an open challenge.
+Persistent gaps remain across all approaches: word-level representations miss
+document-level semantic structure, and multi-page documents with mixed content
+are still an open challenge \autocite{ding2026}.
 
 No current model covers all content types reliably. This gap motivates the
 image-based strategy in this thesis, where rendered page images are passed to a
@@ -204,7 +185,7 @@ PyMuPDF    & native  & No      & Partial & No              & text     \\
 Tesseract  & scanned & No      & No      & No              & text     \\
 Nougat     & native  & Yes     & Yes     & No              & Markdown \\
 MinerU     & both    & Yes     & Yes     & Partial         & Markdown \\
-\textbf{This work} & native & Partial & Yes & \textbf{Yes} & Markdown \\
+\textbf{This work} & both   & Partial & Yes & \textbf{Yes} & Markdown \\
 \bottomrule
 \end{tabularx}
 \end{table}

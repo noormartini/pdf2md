@@ -81,7 +81,14 @@ primarily in German, with a subset in English, reflecting the intended usage
 context. Each selected document contains at least one structurally challenging
 page: a formula-heavy section, a multi-column spread, or a table with complex
 cell structure. The final corpus consists of three thesis documents totalling 90 evaluated
-pages, 30 per document.
+pages, 30 per document. All three belong to a single document category:
+academic bachelor and master theses. This single-category design keeps the
+comparison focused on the intended use case but limits the scope of the
+results to this document type. Three documents is a small corpus. The
+results support strategy comparisons within this set, but are not sufficient
+for general claims about other document types, multilingual content, or
+different academic formats. This limitation is discussed further in
+Chapter~8.
 
 Each test document has a corresponding reference Markdown file, created by
 hand. Each reference captures the full document structure: heading hierarchy,
@@ -158,10 +165,10 @@ for RQ3. Table~\ref{tab:strategy_comparison}
 summarises the expected strengths and weaknesses of each approach based on
 the literature \autocite{meuschke2023, whitington2012}.
 
-Results are reported as mean scores per document category across all pages
-in that category. Meuschke et al.\ \autocite{meuschke2023} used the same
-category-level reporting and found that tools which rank well on one
-document type often rank poorly on another. Category-level means make this
+Results are reported as mean scores per document across all pages in that
+document. Meuschke et al.\ \autocite{meuschke2023} used the same
+document-level reporting and found that tools which rank well on one
+document often rank poorly on another. Document-level means make this
 pattern visible. A strategy that wins overall but fails on specific documents is a weaker
 result than one that performs consistently across the full corpus.
 
