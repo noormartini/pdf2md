@@ -8,17 +8,10 @@ questions.
 \section{Experiment Setup}
 
 The experiment evaluates four extraction strategies against a
-hand-written ground truth. The ground truth consists of 90 Markdown
-files written manually by the thesis author, 30 per thesis document.
-Each file was produced by reading one page of the original PDF and
-writing the Markdown that a correct conversion should produce.
-Headings were assigned the correct depth from the document's numbering
-hierarchy, code blocks were wrapped in fenced code blocks with the
-appropriate language tag, tables were reconstructed in pipe-table
-syntax, and formulas were written in LaTeX notation.
-Writing these files by hand was necessary to ensure an honest ground
-truth: an automatically generated reference would contain the same
-errors as the system under evaluation, making the comparison circular.
+hand-written ground truth of 90 Markdown files, 30 per thesis document,
+as described in Section~4.2. The ground truth was written manually to
+avoid circularity: an automatically generated reference would embed the
+same errors as the system under evaluation.
 
 The three documents in the corpus are a German computer science
 bachelor thesis on neural networks (referred to here as the neural
@@ -71,6 +64,7 @@ Hybrid    & 0.818 & 0.348 & 0.891 & 0.944 & 0.736 & 0.597 & 0.795 \\
     \label{fig:performance}
 \end{figure}
 
+Figure~\ref{fig:performance} shows the mean scores per strategy across all seven metrics.
 The most striking result is that text-only scores highest on five of the
 seven metrics, including text similarity (0.860) and code blocks (0.889).
 This is a non-obvious finding. The strategy uses no LLM and costs under
@@ -86,10 +80,7 @@ On the remaining metrics, adaptive is consistently second or close to
 second among the four strategies.
 
 Image-only shows a severe collapse on paragraph structure (0.156) and code
-blocks (0.250). Given only a rendered page image and no extracted text, the model does not
-reproduce the paragraph or code block structure from the reference. The model paraphrases and reflows the
-content rather than preserving it verbatim. This makes image-only unsuitable
-for documents where structural fidelity matters.
+blocks (0.250). Section~\ref{sec:output_quality} discusses what this means structurally.
 
 Hybrid combines image input with extracted text, which partially recovers
 the paragraph and code block scores (0.597 and 0.736 respectively) compared
@@ -133,6 +124,7 @@ Hybrid     & 68{,}009.5 & $345\times$ \\
     \label{fig:efficiency}
 \end{figure}
 
+Figure~\ref{fig:efficiency} shows the mean processing time per page for each strategy on a log scale.
 Text-only is by far the fastest strategy at 197\,ms per page on average.
 It makes no LLM calls, so processing time is bounded by disk read and
 PyMuPDF parsing speed. The adaptive strategy averages 20{,}790\,ms per page.
@@ -191,10 +183,11 @@ around $80{,}000$ with adaptive, assuming a similar content distribution.
 \section{Per-Page Analysis and Consistency (RQ5)}
 
 The per-page breakdown shows that no single strategy wins every page.
-Across the 30 evaluated page positions, hybrid produces the best text
-similarity on 14 pages, adaptive on 11, image-only on 5, and text-only
-on 2. The variation reflects the content mix within each document.
-Pages with complex table or figure layouts favour hybrid and adaptive.
+Across the 90 evaluated pages, hybrid produces the highest text similarity
+on 27 pages, image-only on 15, text-only on 9, and adaptive on 3.
+On the remaining 36 pages, two or more strategies scored equally.
+The variation reflects the content mix within each document.
+Pages with complex table or figure layouts favour hybrid and image-only.
 Dense text pages favour text-only.
 
 Page 6 is the lowest-scoring page across all strategies, with a best
@@ -213,14 +206,14 @@ formula or image pages would widen the gap between adaptive and text-only
 because the classifier would route more pages to the vision model.
 
 \section{Output Quality Metrics (RQ4)}
+\label{sec:output_quality}
 
 The seven-metric framework reveals failure modes that a single similarity
-score would hide. Image-only scores 0.827 on text similarity, which looks
-acceptable. But its paragraph structure score of 0.156 and code block score
-of 0.250 expose a fundamental problem: the model reproduces most of the
-words but loses the structural layout entirely. A RAG system ingesting this
-output would receive the right vocabulary in the wrong format, which breaks
-chunk boundaries and damages retrieval precision.
+score would hide. Image-only's collapsed paragraph and code block scores expose a fundamental
+structural problem: the model reproduces most of the words but loses the
+layout entirely. A RAG system ingesting this output would receive the right
+vocabulary in the wrong format, which breaks chunk boundaries and damages
+retrieval precision.
 
 The heading structure scores for all four strategies are below 0.600. This
 is a consistent weakness. The strategies differ in how they assign heading

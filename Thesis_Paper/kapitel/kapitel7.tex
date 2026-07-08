@@ -80,6 +80,7 @@ consistent with the table structure result here (adaptive 0.956 versus
 text-only 0.922), but the advantage disappears on text-dominant pages.
 
 \section{Practical Implications}
+\label{sec:practical_implications}
 
 For thesis documents specifically, the text strategy is the best choice
 when speed matters and the document has no complex tables or formulas.
@@ -131,14 +132,10 @@ levels would score well on text similarity but fail in practice. The heading
 structure metric partially addresses this, but it counts headings rather than
 verifying their level assignments.
 
-External validity is the main open question. The corpus covers three
-German-language bachelor theses and 90 pages. Strategy rankings may not hold
-for other document types, other languages, or thesis documents with a different
-content balance. A corpus with more formula or image pages would likely narrow
-the gap between text-only and the vision strategies.
+External validity is the main open question. The corpus covers three bachelor theses --- two in German, one in English --- totalling 90 pages. Three documents is a very small sample. The rankings are consistent across all three, but consistency across three documents does not establish generalisability across document types.
 
-The results also depend on model choice. All VLM strategies use Qwen2.5-VL-7B.
-A larger or differently trained model could produce different output and change
-the relative rankings. The text-only strategy has no such dependency: its
-output is determined by the PDF content and the pymupdf4llm version, both of
-which are stable across runs.
+The results depend on what thesis documents look like. The three documents in this study follow a standard single-column layout with numbered headings, code listings, and occasional tables. That structure favours text-only extraction: the text layer is clean and PyMuPDF reproduces it accurately. Multi-column scientific papers, documents with dense formula environments, or reports with irregular table structures would break this advantage. On such documents, the vision strategies would likely close the gap or overtake text-only on more metrics.
+
+Language and script add a second dimension. The language detection module adds a prompt hint that preserves the output language, but the classifier thresholds --- particularly the 50-character minimum for TEXT classification --- were calibrated on German and English content. Right-to-left scripts such as Arabic or Hebrew, or documents mixing CJK characters with Latin text, have not been tested. The character count threshold may behave differently on short-character scripts, misclassifying pages that should route to the vision model. Testing on a two-column scientific paper and a right-to-left script document would be the most informative next step for external validation.
+
+The model dependency is a limitation of this evaluation, not of the system. All VLM results use Qwen2.5-VL-7B. The architecture is model-agnostic: the server URL and model name are parameters, so any OpenAI-compatible vision-language model can be substituted without code changes. A larger or document-specialised model would likely improve all VLM scores, particularly on formula and table pages where the 7B scale may be a limiting factor. The relative rankings between strategies could change with a different model. The text-only strategy has no such dependency: its output is determined by the PDF content and the pymupdf4llm version, both of which are stable across runs.

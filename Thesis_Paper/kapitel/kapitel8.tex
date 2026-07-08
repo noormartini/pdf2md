@@ -10,7 +10,7 @@ document type, which is itself a finding.
 The most striking finding of this study is that text-only extraction outperforms
 all three vision-based strategies on five of seven metrics, despite using no
 language model and processing each page in under 200 milliseconds. This was not
-predicted. Both hypotheses proved wrong on this corpus. The reason, examined in
+predicted. Two of the four hypotheses proved wrong on this corpus. The reason, examined in
 Section~7.1, is that thesis documents consist predominantly of machine-typed
 prose, where direct text extraction recovers content with higher fidelity than
 a vision model that paraphrases rather than copies.
@@ -86,7 +86,7 @@ The two-stage postprocessing pipeline addresses a gap between raw extraction
 output and usable Markdown. Both pymupdf4llm and the vision-language model produce
 predictable artefacts: repeated running headers, collapsed heading levels, dot
 leaders in table-of-contents pages, and incorrectly wrapped code blocks. The
-pipeline removes these through 37 transformation passes verified by 147 unit
+pipeline removes these through 38 transformation passes verified by 147 unit
 tests. Each pass is isolated as a testable function, so the pipeline can be
 extended without breaking existing behaviour. This makes the system's output
 usable without manual correction on the document types it was designed for.
@@ -152,18 +152,19 @@ font-size ratios for the text path and from visual appearance for the vision pat
 Neither method reliably assigns the correct depth when the document uses
 inconsistent font sizes or non-standard heading styles. A dedicated heading
 classifier trained on labelled thesis documents would likely improve this score
-more than any other single change. The page classifier currently routes every page
-with a detected table to the vision LLM; a refinement that distinguishes simple
-row-column tables from complex ones with merged cells or embedded figures would
-keep simple tables in the faster text path without sacrificing quality on the
-pages where the vision model adds real value.
+more than any other single change. Section~\ref{sec:practical_implications} identifies the table classifier as
+conservative: all detected tables are routed to the VLM regardless of complexity.
+Building and evaluating a table complexity check would show whether simple
+row-column tables can stay in the text path without losing table structure score,
+and how much that reduces token usage on table-heavy documents.
 
-Formula pages currently use the general-purpose Qwen2.5-VL-7B model. A
-specialised tool such as pix2tex, trained exclusively on mathematical notation,
-would produce cleaner \LaTeX{} output and run faster on formula-heavy pages. The
-adaptive architecture supports this substitution without changes to the rest of
-the pipeline: a new handler for the \texttt{FORMULA} page type is all that is
-needed. All VLM results in this experiment also depend on a single 7B model. A
+Section~\ref{sec:practical_implications} notes that the \texttt{FORMULA} path
+can be replaced by a specialised tool such as pix2tex without any pipeline
+changes. What remains untested is whether that substitution actually improves
+output quality: a dedicated evaluation comparing pix2tex against the current
+VLM path on formula-heavy pages would show how much \LaTeX{} accuracy improves
+and whether the speed gain justifies the switch.
+All VLM results in this experiment also depend on a single 7B model. A
 larger model or one fine-tuned on academic documents could reduce the paraphrasing
 tendency that causes image-only and hybrid to score poorly on paragraph and code
 block structure. Retesting with a different model would show whether the strategy

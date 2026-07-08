@@ -190,6 +190,11 @@ MinerU     & both    & Yes     & Yes     & Partial         & Markdown \\
 \end{tabularx}
 \end{table}
 
+The \textit{both} label for this work reflects the image-path strategies: text-only pages go through PyMuPDF's text layer, while all other page types are rendered as PNG images and passed to the vision-language model.
+A scanned PDF would follow the same image path and the VLM would read the rendered scan.
+However, the page classifier relies on text-layer signals (character count, table detection, formula detection), which are absent in scanned documents.
+The evaluation in this thesis covers native PDFs only, and the classifier thresholds were calibrated on native content.
+
 \section{Evaluation Methods for Document Conversion}
 
 Evaluating document conversion is harder than evaluating plain text extraction.

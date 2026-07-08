@@ -195,7 +195,7 @@ The system is implemented in Python and depends on four external libraries.
 PyMuPDF \autocite{pymupdf} (version 1.27) provides the core PDF interface: page analysis, text extraction, image rendering, and table detection.
 pymupdf4llm \autocite{pymupdf4llm} (version 1.27, matching PyMuPDF) wraps it to produce Markdown output directly from the text layer.
 The \texttt{requests} library handles all HTTP communication with LM Studio.
-\texttt{langdetect} identifies the primary language of each page's extracted text so the correct language hint can be appended to the system prompt.
+\texttt{langdetect} detects the document language once from the first page's extracted text. Since thesis documents use a consistent language throughout, the same hint is applied to all LLM calls in that document.
 No training or fine-tuning is required. The system runs entirely with pre-trained models loaded through LM Studio \autocite{lmstudio}.
 
 A single model is used across all LLM-dependent strategies, as described in
