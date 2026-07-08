@@ -222,3 +222,8 @@ Selected passes:
 ### Hard / Out of scope
 - **LLM output quality** — the vision LLM occasionally misreads page numbers in List of Tables/Figures, confuses listing numbers with page numbers, or omits post-table text. These are model-quality issues, not postprocessing problems.
 - **Figures in text-strategy path** — diagrams and charts are marked `==> picture [NxN] intentionally omitted <==` when using the text strategy. The adaptive strategy avoids this by routing image pages to the vision LLM.
+
+
+qwen 3.5- 9b
+- benchmark machen wie lange
+
