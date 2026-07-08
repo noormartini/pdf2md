@@ -1,4 +1,5 @@
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
@@ -16,6 +17,54 @@ from strategies.text_only import text_strategy
 from strategies.image_only import image_strategy
 from strategies.hybrid import hybrid_strategy
 from strategies.adaptive import analyze_page, adaptive_strategy, render_page_as_base64, PageType
+
+
+_TOC_HEADER_RE = re.compile(
+    # pipe-row format: | Inhaltsverzeichnis | or | Kapitel | …
+    r"^\|\s*(?:Contents|Inhaltsverzeichnis|Seite|Kapitel|Chapter|Abschnitt)\s*\|"
+    # heading / plain-text format: ## **Inhaltsverzeichnis** or bare "Inhaltsverzeichnis"
+    r"|^(?:#{1,3}\s+)?(?:\*{1,2})?(?:Contents|Inhaltsverzeichnis)(?:\*{1,2})?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _build_toc_markdown(doc: fitz.Document) -> str:
+    """Format doc.get_toc() as a nested Markdown list with display page labels."""
+    toc = doc.get_toc()
+    if not toc:
+        return ""
+    lines = ["## Contents", ""]
+    for level, title, page_num in toc:
+        label = ""
+        if 0 < page_num <= len(doc):
+            label = doc[page_num - 1].get_label() or str(page_num)
+        else:
+            label = str(page_num)
+        if level == 1:
+            lines.append(f"- **{title}** {label}")
+        elif level == 2:
+            lines.append(f"  - {title} {label}")
+        else:
+            lines.append(f"    - {title} {label}")
+    return "\n".join(lines)
+
+
+def _find_toc_page_indices(page_markdowns: list[str]) -> set[int]:
+    """Return 0-based indices of TOC pages (first page + any continuation page)."""
+    indices: set[int] = set()
+    for i, md in enumerate(page_markdowns):
+        if md and _TOC_HEADER_RE.search(md):
+            indices.add(i)
+            # Continuation: next page starts with the TOC title word and has pipe rows
+            if i + 1 < len(page_markdowns):
+                nxt = page_markdowns[i + 1]
+                if (
+                    nxt
+                    and re.search(r"^(?:Inhaltsverzeichnis|Contents)\b", nxt, re.IGNORECASE | re.MULTILINE)
+                    and "|" in nxt
+                ):
+                    indices.add(i + 1)
+    return indices
 
 
 def _page_label(doc: fitz.Document, index: int) -> str:
@@ -177,8 +226,22 @@ def run(config: Config):
             # one bulk call.
             page_markdown = _bulk_extract_markdown(config.input, num_pages, figures_dir)
 
+            with fitz.open(config.input) as _toc_doc:
+                toc_markdown = _build_toc_markdown(_toc_doc)
+
+            toc_page_indices = _find_toc_page_indices(page_markdown) if toc_markdown else set()
+            first_toc_page = min(toc_page_indices) if toc_page_indices else None
+
             def _convert(i: int) -> tuple:
                 label = page_labels[i]
+
+                # TOC pages: use the PDF bookmark outline directly, no LLM.
+                # First TOC page gets the full nested list; continuation pages
+                # are left empty (the list is complete on the first page).
+                if toc_markdown and i in toc_page_indices:
+                    content = toc_markdown if i == first_toc_page else ""
+                    return f"<!-- Page {label} -->\n\n{content}", 0, 0
+
                 raw_text = ""
                 with fitz.open(config.input) as worker_doc:
                     page = worker_doc[i]

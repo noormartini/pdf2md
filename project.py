@@ -1728,6 +1728,12 @@ def postprocess_markdown(md: str) -> str:
     md = _strip_mid_doc_page_numbers(md)
     md = _strip_mid_doc_running_headers(md)
 
+    md = re.sub(
+        r"((?:Prof\.|Dr\.)[^\n]+?(?:Hochschule|University|Institut)[^\n]*?)\s+((?:Prof\.|Dr\.)\s)",
+        r"\1\n\2",
+        md,
+    )
+
     md = re.sub(r"\n\n(\d{1,3})\n\n---", "\n\n---", md)
     md = re.sub(r"\n\n(\d{1,3})\s*$", "", md)
 
@@ -1740,6 +1746,47 @@ def postprocess_markdown(md: str) -> str:
 # ===========================================================================
 # Main pipeline  (app.py)
 # ===========================================================================
+
+_TOC_HEADER_RE = re.compile(
+    r"^\|\s*(?:Contents|Inhaltsverzeichnis|Seite|Kapitel|Chapter|Abschnitt)\s*\|"
+    r"|^(?:#{1,3}\s+)?(?:\*{1,2})?(?:Contents|Inhaltsverzeichnis)(?:\*{1,2})?\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def _build_toc_markdown(doc: fitz.Document) -> str:
+    """Format doc.get_toc() as a nested Markdown list with display page labels."""
+    toc = doc.get_toc()
+    if not toc:
+        return ""
+    lines = ["## Contents", ""]
+    for level, title, page_num in toc:
+        label = doc[page_num - 1].get_label() or str(page_num) if 0 < page_num <= len(doc) else str(page_num)
+        if level == 1:
+            lines.append(f"- **{title}** {label}")
+        elif level == 2:
+            lines.append(f"  - {title} {label}")
+        else:
+            lines.append(f"    - {title} {label}")
+    return "\n".join(lines)
+
+
+def _find_toc_page_indices(page_markdowns: list[str]) -> set[int]:
+    """Return 0-based indices of TOC pages (first page + any continuation page)."""
+    indices: set[int] = set()
+    for i, md in enumerate(page_markdowns):
+        if md and _TOC_HEADER_RE.search(md):
+            indices.add(i)
+            if i + 1 < len(page_markdowns):
+                nxt = page_markdowns[i + 1]
+                if (
+                    nxt
+                    and re.search(r"^(?:Inhaltsverzeichnis|Contents)\b", nxt, re.IGNORECASE | re.MULTILINE)
+                    and "|" in nxt
+                ):
+                    indices.add(i + 1)
+    return indices
+
 
 def _page_label(doc: fitz.Document, index: int) -> str:
     """Return the printed page label (e.g. 'v', '3') for a 0-based page index."""
@@ -1878,8 +1925,19 @@ def run(config: Config) -> None:
         case "adaptive":
             page_markdown = _bulk_extract_markdown(config.input, num_pages, figures_dir)
 
+            with fitz.open(config.input) as _toc_doc:
+                toc_markdown = _build_toc_markdown(_toc_doc)
+
+            toc_page_indices = _find_toc_page_indices(page_markdown) if toc_markdown else set()
+            first_toc_page = min(toc_page_indices) if toc_page_indices else None
+
             def _convert_adaptive(i: int) -> tuple:
                 label = page_labels[i]
+
+                if toc_markdown and i in toc_page_indices:
+                    content = toc_markdown if i == first_toc_page else ""
+                    return f"<!-- Page {label} -->\n\n{content}", 0, 0
+
                 raw_text = ""
                 with fitz.open(config.input) as worker_doc:
                     page = worker_doc[i]
