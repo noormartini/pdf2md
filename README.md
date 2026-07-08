@@ -20,7 +20,11 @@ Bachelor's thesis project. Converts PDF documents to Markdown using local LLMs v
 - Recommended model: **Qwen2.5-VL-7B**
 
 ```bash
+# runtime dependencies
 pip install -r requirements.txt
+
+# include pytest for running tests
+pip install -r requirements-dev.txt
 ```
 
 ---
