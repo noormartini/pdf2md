@@ -31,11 +31,20 @@ pip install -r requirements-dev.txt
 
 ## Quick Start
 
-Start LM Studio, load a vision model, then:
+1. Open LM Studio and load a vision-capable model
+2. In LM Studio, go to **Developer** → **Local Server** and start the server
+3. Copy the exact model name shown in LM Studio (e.g. `qwen2.5-vl-7b-instruct-abliterated`)
+4. Pass it with `-m` when running a command:
 
 ```bash
-# convert a PDF using the adaptive strategy (recommended)
-python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result.md -s adaptive
+python3 main.py -i pdf_source/test_pdf_source.pdf -o output/result.md -s adaptive \
+  -m your-model-name-here
+```
+
+To avoid typing `-m` every time, set it as the default in `config.py`:
+
+```python
+DEFAULT_MODEL: str = "your-model-name-here"
 ```
 
 ---
