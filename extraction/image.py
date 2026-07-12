@@ -28,31 +28,34 @@ def _bbox_is_code_listing(page: fitz.Page, bbox: fitz.Rect, threshold: float = 0
     return total > 0 and (mono / total) >= threshold
 
 
-def _vector_drawing_bbox(page: fitz.Page) -> fitz.Rect | None:
-    """Return the bounding box covering all of a page's vector drawings.
+def _cluster_vector_rects(page: fitz.Page, gap_threshold: float = 40) -> list[fitz.Rect]:
+    """Group a page's vector drawings into spatially separate clusters.
 
-    Covers charts/plots exported as vector paths (e.g. matplotlib figures
-    embedded in the PDF) — these have no XObject image for get_images() to
-    find. Returns None for boxes that are too small to be a real figure, or
-    that turn out to be a decorative box around a source-code listing.
+    A page can hold multiple unrelated vector-drawn elements — e.g. two
+    separate code-listing boxes, or a diagram and an unrelated decoration
+    lower down. Unioning all of them into one bbox (as a single page-wide
+    bounding box) would span everything in between, including any prose
+    sitting between them. Each cluster gets its own bounding box instead;
+    only drawings within `gap_threshold` points of each other vertically
+    are considered part of the same figure.
     """
     drawings = page.get_drawings()
-    rects = [d["rect"] for d in drawings if d.get("rect")]
+    rects = sorted((d["rect"] for d in drawings if d.get("rect")), key=lambda r: r.y0)
     if not rects:
-        return None
+        return []
 
-    bbox = rects[0]
+    clusters: list[fitz.Rect] = []
+    current = fitz.Rect(rects[0])
     for r in rects[1:]:
-        bbox.include_rect(r)
+        if r.y0 - current.y1 <= gap_threshold:
+            current.include_rect(r)
+        else:
+            clusters.append(current)
+            current = fitz.Rect(r)
+    clusters.append(current)
 
-    # Skip vanishingly small bounding boxes — stray marks, not real figures.
-    if bbox.width < 50 or bbox.height < 50:
-        return None
-
-    if _bbox_is_code_listing(page, bbox):
-        return None
-
-    return bbox
+    # Skip vanishingly small clusters — stray marks, not real figures.
+    return [c for c in clusters if c.width >= 50 and c.height >= 50]
 
 
 def _render_region(page: fitz.Page, bbox: fitz.Rect, dpi: int = 200) -> bytes:
@@ -132,20 +135,24 @@ def extract_page_figures(
     fig_idx = 1
 
     raster_images = page.get_images(full=True)
-    vector_bbox = _vector_drawing_bbox(page)
+    all_overlapping_xrefs: set[int] = set()
 
-    overlapping_xrefs: set[int] = set()
-    if vector_bbox is not None and raster_images:
-        overlapping_xrefs, dominant_found = _overlapping_raster_xrefs(page, doc, raster_images, vector_bbox)
-    else:
-        dominant_found = False
+    for vector_bbox in _cluster_vector_rects(page):
+        if _bbox_is_code_listing(page, vector_bbox):
+            continue
 
-    if vector_bbox is not None and not dominant_found:
-        # Include any raster images overlapping the vector content (e.g. a
+        overlapping_xrefs, dominant_found = (
+            _overlapping_raster_xrefs(page, doc, raster_images, vector_bbox)
+            if raster_images else (set(), False)
+        )
+        if dominant_found:
+            # A real raster already represents this cluster; it'll be
+            # picked up by the normal raster-extraction loop below.
+            continue
+
+        # Include any raster images overlapping this cluster (e.g. a
         # heatmap's colorbar legend exported as a raster strip) so the
         # render still captures them alongside the vector-drawn figure body.
-        # Rasters elsewhere on the page (unrelated screenshots) are left for
-        # the normal extraction loop below.
         combined_bbox = fitz.Rect(vector_bbox)
         for img_info in raster_images:
             if img_info[0] not in overlapping_xrefs:
@@ -160,15 +167,12 @@ def extract_page_figures(
             f.write(cropped)
         refs.append(f"figures/{filename}")
         fig_idx += 1
-    else:
-        # The dominant raster already represents the vector content; don't
-        # skip extracting it below.
-        overlapping_xrefs = set()
+        all_overlapping_xrefs |= overlapping_xrefs
 
     for img_info in raster_images:
         xref = img_info[0]
-        if xref in overlapping_xrefs:
-            continue  # already captured by the vector-region render above
+        if xref in all_overlapping_xrefs:
+            continue  # already captured by a vector-region render above
 
         try:
             img_dict = doc.extract_image(xref)

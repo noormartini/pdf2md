@@ -94,6 +94,14 @@ _PLAIN_NEGATIVE_EXPONENT_RE = re.compile(r"\b10−(\d+)\b")
 # that also breaks bold rendering for any text that follows on the same line.
 _BOLD_EXPONENT_RE = re.compile(r"\b([A-Za-z]+)\*\*(\d+)\b")
 
+# A URL or numeric ID (arXiv ID, DOI) that wrapped across a line in the PDF
+# sometimes gets a stray space inserted at the wrap point during extraction —
+# e.g. "htt ps://arxiv.org/..." or "2408.0 6292" for "2408.06292". These
+# always live inside a backtick code span in this pipeline's output.
+_CODE_SPAN_RE = re.compile(r"`([^`\n]*)`")
+_LOOKS_LIKE_URL_OR_ID_RE = re.compile(r"https?://|arxiv|doi\.org|openreview", re.IGNORECASE)
+_LOOKS_LIKE_NUMERIC_ID_RE = re.compile(r"\s*\[?\d[\d\s.]*\]?(?:\s*\[[\w.]+\])?\s*")
+
 # The \LaTeX logo command typesets a small raised "A" between "L" and "TEX".
 # pymupdf4llm's OCR bracketed that raised letter the same way it brackets
 # superscript digits, e.g. "L[A] TEX" or "L[A] TEXcommands" for "LaTeX".
@@ -151,6 +159,10 @@ _STRUCTURAL_KEYWORDS: frozenset[str] = frozenset({
 # Matches dot-leader patterns in TOC table cells, e.g. " . . . . . . . . 32 "
 # at the end of a cell.  Group 1 = the page number.
 _DOT_LEADER_RE = re.compile(r"\s*\.(?:\s*\.)+\s*(\d+)\s*$")
+
+# Same dot-leader run with no trailing page number in the same cell — used
+# when the page number already sits in the next table cell on its own.
+_DOT_LEADER_NO_NUM_RE = re.compile(r"\s*\.(?:\s*\.)+\s*$")
 
 # ── Front-matter table detection ─────────────────────────────────────────────
 
@@ -324,8 +336,36 @@ def _clean_toc_dot_leaders(md: str) -> str:
                 if j + 1 < len(inner) and not inner[j + 1].strip():
                     inner[j + 1] = f" {page_num} "
                 changed = True
+            elif _DOT_LEADER_NO_NUM_RE.search(cell):
+                # No trailing number in this cell — the page number already
+                # sits in the next cell on its own, just strip the dots.
+                inner[j] = f" {_DOT_LEADER_NO_NUM_RE.sub('', cell).strip()} "
+                changed = True
         if changed:
             line = "|" + "|".join(inner) + "|"
+        result.append(line)
+    return "\n".join(result)
+
+
+def _clean_list_dot_leaders(md: str) -> str:
+    """Strip dot leaders from List of Figures/Tables bullet entries.
+
+    Unlike the actual Table of Contents, a List of Figures/Tables (or its
+    German equivalents, Abbildungs-/Tabellenverzeichnis) renders as plain
+    bullet items rather than table rows, so _clean_toc_dot_leaders (which
+    only looks at table rows) doesn't catch its dot leaders:
+        - 6.1 Comparison of learning curves . . . . . . . 27
+    This strips the dot-leader run and reattaches the page number cleanly:
+        - 6.1 Comparison of learning curves 27
+    """
+    lines = md.split("\n")
+    result = []
+    for line in lines:
+        if line.lstrip().startswith("- "):
+            m = _DOT_LEADER_RE.search(line)
+            if m:
+                page_num = m.group(1)
+                line = _DOT_LEADER_RE.sub("", line).rstrip() + f" {page_num}"
         result.append(line)
     return "\n".join(result)
 
@@ -965,6 +1005,34 @@ def _convert_greek_italic_math(md: str) -> str:
     return "\n".join(result)
 
 
+def _fix_split_code_span_tokens(md: str) -> str:
+    """Remove stray spaces inserted mid-token inside a backtick code span.
+
+    A URL or numeric ID that wraps across a PDF line sometimes picks up a
+    spurious space at the wrap point during extraction:
+        `htt ps://arxiv.org/abs/2511.05502`  →  `https://arxiv.org/abs/2511.05502`
+        `2408.0 6292`                        →  `2408.06292`
+    Only touches spans that already look like a URL or numeric ID, so
+    legitimately spaced inline code (e.g. `response_format` usage examples)
+    is left untouched.
+    """
+    def _maybe_strip(m: re.Match) -> str:
+        content = m.group(1)
+        if " " not in content:
+            return m.group(0)
+        if not (_LOOKS_LIKE_URL_OR_ID_RE.search(content) or _LOOKS_LIKE_NUMERIC_ID_RE.fullmatch(content)):
+            return m.group(0)
+        # An arXiv category tag (e.g. "[cs.CL]") keeps a single space before
+        # it — that's a real separator, not a line-wrap artefact.
+        tag_match = re.search(r"\s*(\[[\w.]+\])\s*$", content)
+        if tag_match:
+            base = re.sub(r"\s+", "", content[:tag_match.start()])
+            return f"`{base} {tag_match.group(1)}`"
+        return "`" + re.sub(r"\s+", "", content) + "`"
+
+    return _CODE_SPAN_RE.sub(_maybe_strip, md)
+
+
 def _fix_ocr_superscripts(md: str) -> str:
     """Fix OCR artefacts where superscript digits were extracted as bracketed refs.
 
@@ -1242,10 +1310,12 @@ def _wrap_monospace_code_blocks(md: str, code_lines: list[str]) -> str:
             # A LaTeX listing only prints a line number for the first physical
             # line of each logical source line — wrapped continuations get
             # none, which looks inconsistent once reflowed into a fence
-            # (numbers on some lines, not others). Strip them from all lines
-            # for a uniform look, since they're gutter decoration, not code.
-            display = [_LISTING_LINE_NUMBER_RE.sub("", l) for l in run]
-            out.append("```\n" + "\n".join(display) + "\n```")
+            # (numbers on some lines, not others). Strip the original numbers
+            # and re-number every line sequentially for a uniform look.
+            stripped = [_LISTING_LINE_NUMBER_RE.sub("", l) for l in run]
+            width = len(str(len(stripped)))
+            numbered = [f"{i + 1:<{width}} {content}" for i, content in enumerate(stripped)]
+            out.append("```\n" + "\n".join(numbered) + "\n```")
             out.append("")
             run.clear()
 
@@ -1305,6 +1375,7 @@ def clean_page(md: str, raw_page_text: str = "", code_lines: list[str] | None = 
     md = _promote_declaration_heading(md)
     md = _strip_running_headers(md)
     md = _clean_toc_dot_leaders(md)
+    md = _clean_list_dot_leaders(md)
     md = _convert_toc_table(md)
     md = _fix_lof_numbers(md, raw_page_text)
     md = _fix_listing_table(md)
@@ -1314,6 +1385,7 @@ def clean_page(md: str, raw_page_text: str = "", code_lines: list[str] | None = 
     md = _unwrap_symbol_italics(md)
     md = _convert_greek_italic_math(md)
     md = _fix_ocr_superscripts(md)
+    md = _fix_split_code_span_tokens(md)
     md = _format_figure_captions(md)
     md = _reorder_captions_after_images(md)
     md = _interleave_batched_figures(md)
@@ -1341,6 +1413,10 @@ _FRONT_MATTER_SECTIONS: frozenset[str] = frozenset({
     "zusammenfassung", "summary",
     "danksagung", "acknowledgements", "acknowledgments",
     "bibliography", "references", "literaturverzeichnis", "literatur",
+    "abkürzungsverzeichnis", "list of abbreviations",
+    "abbildungsverzeichnis", "list of figures",
+    "tabellenverzeichnis", "list of tables",
+    "quellcodeverzeichnis", "list of listings", "listings",
 })
 
 _KAPITEL_RE = re.compile(r"^##\s+((?:Kapitel|Chapter))\s+(\d+)\s*$", re.IGNORECASE)
@@ -1623,6 +1699,9 @@ def _strip_mid_doc_page_numbers(md: str) -> str:
     md = re.sub(r"\n\n\d{1,3} ?\n\n", "\n\n", md)
     # Lone Roman numeral page number (i–xiii range covers all typical front-matter).
     md = re.sub(r"\n\n[ivxIVX]{1,8} ?\n\n", "\n\n", md)
+    # Same artefact directly after a table row, with no blank line before it
+    # (a table's last row and the page footer sit right next to each other).
+    md = re.sub(r"(\|[^\n]*\|)\n\d{1,3} ?\n", r"\1\n\n", md)
     return md
 
 
@@ -1689,6 +1768,78 @@ def _normalise_latex_delimiters(md: str) -> str:
     return md
 
 
+_LISTING_SECTION_HEADING_RE = re.compile(
+    r"^\**\s*(?:List of Figures|Abbildungsverzeichnis|List of Tables|Tabellenverzeichnis|"
+    r"Listings|Quellcodeverzeichnis|List of Abbreviations|Abkürzungsverzeichnis)\s*\**\s*$",
+    re.IGNORECASE,
+)
+
+
+def _merge_wrapped_listing_table_rows(md: str) -> str:
+    """Merge table rows that got split by text wrapping in a List of X page.
+
+    A List of Figures/Tables entry that wraps across multiple lines in the
+    PDF sometimes becomes multiple table rows instead of one, with each
+    continuation row carrying an empty first (and often last) cell:
+        |6.9|Comparison of RBQL and the optimised version, Experi-||
+        |---|---|---|
+        ||ence Replay Q-Learning trained with a hidden layer of 128||
+        ||neurons and Epsilon reduced by 1/3200 over 10000 episodes.|42|
+    This merges each continuation row's middle cell into the previous row,
+    producing one clean row per entry:
+        |6.9|Comparison of RBQL... over 10000 episodes.|42|
+
+    Runs on the whole joined document (not per-page) since the heading and
+    its table can be separated from later continuation rows by a page break.
+    """
+    lines = md.split("\n")
+    result: list[str] = []
+    in_listing_section = False
+    for line in lines:
+        stripped = line.strip()
+        if _LISTING_SECTION_HEADING_RE.match(stripped):
+            in_listing_section = True
+            result.append(line)
+            continue
+        # Only a new heading marks the end of the section — ordinary prose or
+        # bullet entries in between (e.g. non-wrapped list items) are still
+        # part of the same list-of-X page and must not reset the flag.
+        if in_listing_section and stripped.startswith("#"):
+            in_listing_section = False
+
+        if in_listing_section and stripped.startswith("|") and stripped.endswith("|") and not _TABLE_SEPARATOR_RE.match(stripped):
+            inner = [c.strip() for c in stripped.split("|")[1:-1]]
+            # The merge target is the nearest preceding table row, skipping
+            # over the header separator (a continuation row directly under
+            # the separator must merge into the header row two lines back).
+            target_idx = len(result) - 1
+            while target_idx >= 0 and _TABLE_SEPARATOR_RE.match(result[target_idx].strip()):
+                target_idx -= 1
+            target_is_row = (
+                target_idx >= 0
+                and result[target_idx].strip().startswith("|")
+                and result[target_idx].strip().endswith("|")
+            )
+            is_continuation = len(inner) >= 2 and not inner[0] and target_is_row
+            if is_continuation:
+                prev_inner = [c.strip() for c in result[target_idx].strip().split("|")[1:-1]]
+                if len(prev_inner) == len(inner):
+                    if inner[1]:
+                        if prev_inner[1].endswith("-"):
+                            # A hyphen at the wrap point is a hard word break
+                            # (e.g. "Experi-" + "ence"), not a real hyphen —
+                            # drop it so the word rejoins cleanly.
+                            prev_inner[1] = prev_inner[1][:-1] + inner[1]
+                        else:
+                            prev_inner[1] = (prev_inner[1] + " " + inner[1]).strip()
+                    if len(inner) >= 3 and inner[-1]:
+                        prev_inner[-1] = inner[-1]
+                    result[target_idx] = "|" + "|".join(f" {c} " for c in prev_inner) + "|"
+                    continue
+        result.append(line)
+    return "\n".join(result)
+
+
 def postprocess_markdown(md: str) -> str:
     """Final cleanup applied to the fully joined Markdown document."""
     md = md.replace("\r\n", "\n").replace("\r", "\n")
@@ -1704,6 +1855,7 @@ def postprocess_markdown(md: str) -> str:
 
     md = _strip_mid_doc_page_numbers(md)
     md = _strip_mid_doc_running_headers(md)
+    md = _merge_wrapped_listing_table_rows(md)
 
     # Split multiple supervisor/professor entries that got merged onto one line.
     # Pattern: "Prof. ... Mannheim Prof. ..." → two separate lines.
