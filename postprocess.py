@@ -21,13 +21,20 @@ _EMPTY_ITALIC_CAPTION_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Detects an italic figure caption that sits BEFORE an image link so the two
-# can be swapped.  By the time this regex runs, _format_figure_captions has
-# already converted all bold captions to italic, so only the italic form needs
-# to be matched here.
-# Group 1 = full caption line, group 3 = full image link line.
+# Matches a whole caption line wrapped in single-asterisk italics with real
+# descriptive text, e.g.:
+#   *Abbildung 6.1: Vergleich der durchschnittlichen Lernkurven ...*
+# This is how the vision LLM emits figure/table captions (as opposed to
+# pymupdf4llm, which emits the bold form matched by _CAPTION_RE above).
+_ITALIC_CAPTION_RE = re.compile(
+    r"^\*((?:Figure|Fig\.|Abb\.|Abbildung|Table|Tabelle)\s+[\d.]+):?\s*(.*?)\*$",
+    re.IGNORECASE,
+)
+
+# Detects a figure caption that sits BEFORE an image link so the two can be
+# swapped. Group 1 = full caption line, group 3 = full image link line.
 _CAPTION_BEFORE_IMAGE_RE = re.compile(
-    r"^(\*(?:Figure|Fig\.|Abb\.|Abbildung|Table|Tabelle)[^\n]+\*)"
+    r"^(\*\*(?:Figure|Fig\.|Abb\.|Abbildung|Table|Tabelle)[^\n]+\*\*[^\n]*)"
     r"(\s*\n)+"
     r"(!\[[^\]]*\]\([^\)]+\))",
     re.MULTILINE | re.IGNORECASE,
@@ -69,6 +76,28 @@ _GREEK_ITALIC_RE = re.compile(r"_([A-Za-zΑ-ω\d]+)_")
 # distinguishes it from real multi-digit citation references like [12] or [2016].
 _SUPERSCRIPT_DIGITS = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
 _OCR_SUPERSCRIPT_RE = re.compile(r"_([A-Z]{2,})_\[([1-9])\]")
+
+# A negative exponent (e.g. "10^-6") where pymupdf4llm's OCR bracketed the
+# minus sign and the digits separately, e.g. "10 _[−]_[6]" for 10⁻⁶ — same
+# root cause as _OCR_SUPERSCRIPT_RE above, but the italic span wraps the
+# minus sign instead of a mantissa word.
+_OCR_SUPERSCRIPT_NEGATIVE_EXPONENT_RE = re.compile(r"_\[−\]_\[(\d+)\]")
+_SUPERSCRIPT_MINUS = "⁻"
+
+# A vision LLM sometimes writes a power-of-ten exponent as plain tight text
+# with no superscript at all, e.g. "10−7" for 10⁻⁷ (scientific notation is
+# always base 10 and packed with no space, unlike ordinary subtraction).
+_PLAIN_NEGATIVE_EXPONENT_RE = re.compile(r"\b10−(\d+)\b")
+
+# A vision LLM sometimes writes an exponent using an unclosed bold marker
+# instead of a superscript, e.g. "Chi**2" for Chi². This leaves a stray "**"
+# that also breaks bold rendering for any text that follows on the same line.
+_BOLD_EXPONENT_RE = re.compile(r"\b([A-Za-z]+)\*\*(\d+)\b")
+
+# The \LaTeX logo command typesets a small raised "A" between "L" and "TEX".
+# pymupdf4llm's OCR bracketed that raised letter the same way it brackets
+# superscript digits, e.g. "L[A] TEX" or "L[A] TEXcommands" for "LaTeX".
+_LATEX_LOGO_RE = re.compile(r"L\[A\]\s*TEX")
 
 # Matches the figure-ref instruction block that leaks from the LLM prompt into
 # its output — e.g. "The following figures have been extracted from this page
@@ -200,7 +229,7 @@ _BOLD_LISTING_TITLE_RE = re.compile(
 # but usually has sentence punctuation).  Also matches "Chapter N" style headers.
 _RUNNING_HEADER_RE = re.compile(
     r"^(?:(?:\d{1,3}(?:\.\d{1,3}){0,2})\s+[A-ZÄÖÜ][\w\s\-–—äöüÄÖÜß,()]+|"
-    r"(?:Chapter|Kapitel|Section|Abschnitt)\s+\d+\b.*)$"
+    r"(?:Chapter|Kapitel|Section|Abschnitt)\s+\d+\b[^.]*)$"
 )
 
 
@@ -229,6 +258,35 @@ def _reorder_captions_after_images(md: str) -> str:
         *Figure 1.1: What is this Thesis about?*
     """
     return _CAPTION_BEFORE_IMAGE_RE.sub(r"\3\n\1", md)
+
+
+_BATCHED_FIGURES_RE = re.compile(
+    r"((?:!\[[^\]]*\]\([^\)]+\)\s*\n+){2,})"
+    r"((?:\*\*(?:Figure|Fig\.|Abb\.|Abbildung|Table|Tabelle)[^\n]+\*\*[^\n]*\n*){2,})",
+    re.IGNORECASE,
+)
+
+
+def _interleave_batched_figures(md: str) -> str:
+    """Pair up a batch of images with a batch of captions that follows them.
+
+    When a page has multiple figures, vision LLMs sometimes emit all the
+    images first, then all their captions afterward, instead of pairing each
+    image with its own caption directly below it:
+        ![Figure 1](...)
+        ![Figure 2](...)
+        **Figure 4.8:** ...
+        **Figure 4.9:** ...
+    This re-pairs them in order when the image and caption counts match.
+    """
+    def _reorder(m: re.Match) -> str:
+        images = [ln for ln in m.group(1).splitlines() if ln.strip()]
+        captions = [ln for ln in m.group(2).splitlines() if ln.strip()]
+        if len(images) != len(captions):
+            return m.group(0)
+        return "\n\n".join(f"{img}\n{cap}" for img, cap in zip(images, captions)) + "\n"
+
+    return _BATCHED_FIGURES_RE.sub(_reorder, md)
 
 
 def _clean_toc_dot_leaders(md: str) -> str:
@@ -400,26 +458,56 @@ def _convert_toc_table(md: str) -> str:
 
 
 def _convert_abbreviations(md: str) -> str:
-    """Convert an inline bold abbreviation list to a two-column pipe table.
+    """Convert bold abbreviation pairs to a two-column pipe table.
 
     pymupdf4llm renders List of Abbreviations pages with all entries on one
     line:  **AI** artificial intelligence **API** application...
+    The vision LLM instead often splits them one (or a few) pairs per line,
+    with blank lines between:
+        **AHC** Adaptive Heuristic Critic
 
-    Detects ≥3 such pairs and emits a proper Markdown table instead.
+        **DQN** Deep Q-Network **DRL** Deep Reinforcement Learning
+
+    Either way, this collects all pairs across the contiguous block — allowing
+    blank lines between pair-lines — and emits one Markdown table when the
+    block totals ≥3 pairs.
     """
     lines = md.split("\n")
     result: list[str] = []
-    for line in lines:
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
         stripped = line.strip()
-        if stripped.startswith("**") and "**" in stripped[2:]:
-            pairs = _ABBR_INLINE_RE.findall(stripped)
-            if len(pairs) >= 3:
+        pairs = (
+            _ABBR_INLINE_RE.findall(stripped)
+            if stripped.startswith("**") and "**" in stripped[2:]
+            else []
+        )
+        if pairs:
+            block_pairs = list(pairs)
+            j = i + 1
+            while j < n:
+                nxt_stripped = lines[j].strip()
+                if not nxt_stripped:
+                    j += 1
+                    continue
+                if nxt_stripped.startswith("**") and "**" in nxt_stripped[2:]:
+                    nxt_pairs = _ABBR_INLINE_RE.findall(nxt_stripped)
+                    if nxt_pairs:
+                        block_pairs.extend(nxt_pairs)
+                        j += 1
+                        continue
+                break
+            if len(block_pairs) >= 3:
                 result.append("| Abbreviation | Definition |")
                 result.append("|---|---|")
-                for abbr, defn in pairs:
+                for abbr, defn in block_pairs:
                     result.append(f"| {abbr} | {defn.strip()} |")
+                i = j
                 continue
         result.append(line)
+        i += 1
     return "\n".join(result)
 
 
@@ -679,6 +767,38 @@ def _fix_table_list_header(md: str) -> str:
     return "\n".join(result)
 
 
+def _fix_table_row_bold_span(md: str) -> str:
+    """Rebuild a mangled bold table header row, one bold cell per column.
+
+    A table header row is meant to have each cell individually bold:
+        |**ID**|**Requirement**|**Pass Condition**|
+    but the model sometimes scatters the "**" markers irregularly instead —
+    stuck to the outer edges, or left dangling around a cell value that also
+    got mangled into an exponent (e.g. "Chi**2"):
+        |**ID|Requirement|Pass Condition**|
+        |**Variable|MAD|Chi²|**p-value|Classifcation**|
+    Rather than trying to re-pair scattered markers, this identifies header
+    rows by the separator line that follows them and rebuilds the row from
+    scratch: strip every "**" and re-wrap each cell individually.
+    """
+    lines = md.split("\n")
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if (
+            "**" in stripped
+            and stripped.startswith("|") and stripped.endswith("|")
+            and i + 1 < len(lines)
+            and _TABLE_SEPARATOR_RE.match(lines[i + 1].strip())
+        ):
+            cells = stripped[1:-1].split("|")
+            rewrapped = "|".join(
+                f"**{c.replace('**', '').strip()}**" if c.replace("**", "").strip() else c
+                for c in cells
+            )
+            lines[i] = f"|{rewrapped}|"
+    return "\n".join(lines)
+
+
 def _demote_unlabeled_single_word_headings(md: str) -> str:
     """Convert wrongly-promoted bold labels to bold text.
 
@@ -854,21 +974,50 @@ def _fix_ocr_superscripts(md: str) -> str:
         _EMC_[2]  →  EMC²
     Only fires for single-digit brackets (1–9) to avoid touching real multi-digit
     citation references like [12] or [2016].
+
+    Also fixes the same OCR pattern for negative exponents, where the minus
+    sign itself is bracketed instead of a mantissa word:
+        10 _[−]_[6]  →  10⁻⁶
+
+    And the \\LaTeX logo, whose small raised "A" gets bracketed the same way:
+        L[A] TEX  →  LaTeX
+
+    Also fixes two vision-LLM equivalents of the same problem: a power-of-ten
+    exponent written as plain tight text ("10−7" → 10⁻⁷) and an exponent
+    written with an unclosed bold marker instead of a superscript
+    ("Chi**2" → Chi²).
     """
-    return _OCR_SUPERSCRIPT_RE.sub(
+    md = _OCR_SUPERSCRIPT_RE.sub(
         lambda m: m.group(1) + m.group(2).translate(_SUPERSCRIPT_DIGITS),
         md,
     )
+    md = _OCR_SUPERSCRIPT_NEGATIVE_EXPONENT_RE.sub(
+        lambda m: _SUPERSCRIPT_MINUS + m.group(1).translate(_SUPERSCRIPT_DIGITS),
+        md,
+    )
+    md = _LATEX_LOGO_RE.sub("LaTeX", md)
+    md = _PLAIN_NEGATIVE_EXPONENT_RE.sub(
+        lambda m: "10" + _SUPERSCRIPT_MINUS + m.group(1).translate(_SUPERSCRIPT_DIGITS),
+        md,
+    )
+    md = _BOLD_EXPONENT_RE.sub(
+        lambda m: m.group(1) + m.group(2).translate(_SUPERSCRIPT_DIGITS),
+        md,
+    )
+    return md
 
 
 def _format_figure_captions(md: str) -> str:
-    """Convert bold-formatted figure caption lines to italic captions below images.
+    """Normalise figure/table caption lines to a bold-label style below images.
 
-    pymupdf4llm emits figure captions as bold text, e.g.:
+    pymupdf4llm emits captions as bold text:
         **Figure 1.1:** What is this Thesis about?
-
-    This converts them to italic caption lines:
+    The vision LLM instead emits them fully italicised:
         *Figure 1.1: What is this Thesis about?*
+
+    Both are normalised to the same style used for Quellcode captions —
+    bold label, plain text:
+        **Figure 1.1:** What is this Thesis about?
 
     When the caption already follows an image link it stays in place; when it
     is separated from the preceding image by blank lines, those blank lines
@@ -879,19 +1028,19 @@ def _format_figure_captions(md: str) -> str:
     i = 0
     while i < len(lines):
         line = lines[i]
-        # Drop label-only italic captions (no descriptive text), e.g. "*Figure 1:*"
+        # Drop label-only captions (no descriptive text), e.g. "*Figure 1:*"
         if _EMPTY_ITALIC_CAPTION_RE.match(line):
             i += 1
             continue
 
-        cm = _CAPTION_RE.match(line)
+        cm = _CAPTION_RE.match(line) or _ITALIC_CAPTION_RE.match(line)
         if cm:
             label = cm.group(1).rstrip(":")
             text = cm.group(2).strip()
             if not text:
                 i += 1
-                continue  # label-only bold caption — drop it too
-            caption_line = f"*{label}: {text}*"
+                continue  # label-only caption — drop it too
+            caption_line = f"**{label}:** {text}"
             # If the last non-blank line already ended with an image link, keep
             # the caption immediately after it without an extra blank line.
             last_content = next(
@@ -1049,7 +1198,81 @@ def normalize_heading_levels(md: str) -> str:
     return "\n".join(out)
 
 
-def clean_page(md: str, raw_page_text: str = "") -> str:
+_CODE_NORM_RE = re.compile(r"[\s`]+")
+
+# A LaTeX listing's line-number gutter, e.g. "1 class Hypothesis(...)".
+_LISTING_LINE_NUMBER_RE = re.compile(r"^\d+\s+")
+
+
+def _norm_code_text(s: str) -> str:
+    return _CODE_NORM_RE.sub("", s)
+
+
+def _wrap_monospace_code_blocks(md: str, code_lines: list[str]) -> str:
+    """Wrap each run of Markdown lines matching consecutive `code_lines` in a fence.
+
+    pymupdf4llm doesn't recognise a monospace-font run as a code listing —
+    depending on the page it either leaves it as bare unfenced text, or, if
+    it mistook a short line (e.g. "### Topic") for a heading, mangles it into
+    a run of individually backtick-wrapped fragments crammed onto one line.
+    `code_lines` (from `extraction.text.extract_monospace_lines`) gives the
+    ground-truth text pulled directly from the PDF's font data, independent
+    of whatever pymupdf4llm did with it.
+
+    A single page can contain multiple separate listings with prose between
+    them, so matching is a linear scan that consumes `code_lines` in order
+    and only groups *consecutive* matching Markdown lines into one fence —
+    unlike a single first-match/last-match replacement, this never swallows
+    the prose (or other listings) sitting between two separate code blocks.
+    """
+    targets = [(cl, _norm_code_text(cl)) for cl in code_lines if cl.strip()]
+    targets = [(cl, nt) for cl, nt in targets if nt]
+    if not targets:
+        return md
+
+    lines = md.split("\n")
+    norm_lines = [_norm_code_text(l) for l in lines]
+
+    out: list[str] = []
+    run: list[str] = []
+    ti = 0
+
+    def flush_run():
+        if run:
+            # A LaTeX listing only prints a line number for the first physical
+            # line of each logical source line — wrapped continuations get
+            # none, which looks inconsistent once reflowed into a fence
+            # (numbers on some lines, not others). Strip them from all lines
+            # for a uniform look, since they're gutter decoration, not code.
+            display = [_LISTING_LINE_NUMBER_RE.sub("", l) for l in run]
+            out.append("```\n" + "\n".join(display) + "\n```")
+            out.append("")
+            run.clear()
+
+    for i, nl in enumerate(norm_lines):
+        if not nl:
+            # A blank line inside an active run is pymupdf4llm's own paragraph
+            # spacing between code lines, not a break between listings —
+            # swallow it so the run continues past it.
+            if run:
+                continue
+            out.append(lines[i])
+            continue
+
+        matched_here = 0
+        while ti < len(targets) and targets[ti][1] in nl:
+            run.append(targets[ti][0])
+            ti += 1
+            matched_here += 1
+        if matched_here == 0:
+            flush_run()
+            out.append(lines[i])
+    flush_run()
+
+    return "\n".join(out)
+
+
+def clean_page(md: str, raw_page_text: str = "", code_lines: list[str] | None = None) -> str:
     """Clean a single page's Markdown before pages are joined.
 
     Removes PDF visual artifacts (decorative horizontal rules, code-fence
@@ -1059,6 +1282,11 @@ def clean_page(md: str, raw_page_text: str = "") -> str:
     `raw_page_text` is the plain text from fitz for the same page.  When
     provided, bare section-number headings whose title was dropped by
     pymupdf4llm are patched by looking up the number in the fitz text.
+
+    `code_lines` is the page's monospace-font line texts (see
+    `extraction.text.extract_monospace_lines`), used to reconstruct a proper
+    fenced code block for source-code listings pymupdf4llm left unfenced or
+    mangled.
     """
     md = md.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -1081,18 +1309,23 @@ def clean_page(md: str, raw_page_text: str = "") -> str:
     md = _fix_lof_numbers(md, raw_page_text)
     md = _fix_listing_table(md)
     md = _fix_table_list_header(md)
+    md = _fix_table_row_bold_span(md)
     md = _convert_abbreviations(md)
     md = _unwrap_symbol_italics(md)
     md = _convert_greek_italic_math(md)
     md = _fix_ocr_superscripts(md)
     md = _format_figure_captions(md)
     md = _reorder_captions_after_images(md)
+    md = _interleave_batched_figures(md)
     md = _strip_bold_from_headings(md)
     md = _merge_split_headings(md)
     md = _recover_bare_number_headings(md, raw_page_text)
     md = normalize_heading_levels(md)
     md = _demote_outline_chapter_refs(md)
     md = _demote_unlabeled_single_word_headings(md)
+
+    if code_lines:
+        md = _wrap_monospace_code_blocks(md, code_lines)
 
     while "\n\n\n" in md:
         md = md.replace("\n\n\n", "\n\n")
@@ -1107,6 +1340,7 @@ _FRONT_MATTER_SECTIONS: frozenset[str] = frozenset({
     "vorwort", "preface",
     "zusammenfassung", "summary",
     "danksagung", "acknowledgements", "acknowledgments",
+    "bibliography", "references", "literaturverzeichnis", "literatur",
 })
 
 _KAPITEL_RE = re.compile(r"^##\s+((?:Kapitel|Chapter))\s+(\d+)\s*$", re.IGNORECASE)

@@ -47,8 +47,8 @@ def test_clean_page_strips_figure_instruction_preamble():
     assert "Include them as Markdown image links" not in result
     # figure links that appear naturally in the output are kept
     assert "figures/page_015_fig_001.png" in result
-    # Bold figure captions are converted to italic captions
-    assert "*Figure 2.1: content here*" in result
+    # Figure captions are normalised to the bold-label style
+    assert "**Figure 2.1:** content here" in result
 
 
 def test_clean_page_leaves_output_without_instruction_untouched():
@@ -59,26 +59,26 @@ def test_clean_page_leaves_output_without_instruction_untouched():
 def test_format_figure_captions_bold_after_image():
     md = "![Figure 1](figures/page_009_fig_001.png)\n\n**Figure 1.1:** What is this Thesis about?"
     result = _format_figure_captions(md)
-    # blank lines between image and caption removed; caption italicised
-    assert result == "![Figure 1](figures/page_009_fig_001.png)\n*Figure 1.1: What is this Thesis about?*"
+    # blank lines between image and caption removed; caption stays bold-label style
+    assert result == "![Figure 1](figures/page_009_fig_001.png)\n**Figure 1.1:** What is this Thesis about?"
 
 
 def test_format_figure_captions_standalone_bold_caption():
     md = "Some text.\n\n**Figure 2.3:** Description here.\n\nMore text."
     result = _format_figure_captions(md)
-    assert "*Figure 2.3: Description here.*" in result
-    assert "**Figure 2.3:**" not in result
+    assert "**Figure 2.3:** Description here." in result
 
 
-def test_format_figure_captions_already_italic_untouched():
+def test_format_figure_captions_italic_converted_to_bold():
     md = "![img](figures/fig.png)\n*Figure 1.1: caption*"
-    assert _format_figure_captions(md) == md
+    result = _format_figure_captions(md)
+    assert result == "![img](figures/fig.png)\n**Figure 1.1:** caption"
 
 
 def test_format_figure_captions_german_abb():
     md = "![img](figures/fig.png)\n**Abb. 2.1:** Ergebnis der Analyse"
     result = _format_figure_captions(md)
-    assert "*Abb. 2.1: Ergebnis der Analyse*" in result
+    assert "**Abb. 2.1:** Ergebnis der Analyse" in result
 
 
 def test_fix_ocr_superscripts_emc2():
@@ -209,15 +209,15 @@ def test_clean_page_removes_running_header():
     assert "uments which are" in result
 
 
-def test_reorder_captions_italic_before_image():
-    md = "*Figure 1.1: What is this Thesis about?*\n\n![Figure 1](figures/page_009_fig_001.png)"
+def test_reorder_captions_bold_before_image():
+    md = "**Figure 1.1:** What is this Thesis about?\n\n![Figure 1](figures/page_009_fig_001.png)"
     result = _reorder_captions_after_images(md)
     assert result.index("![") < result.index("*")
     assert "Figure 1.1" in result
 
 
 def test_reorder_captions_correct_order_unchanged():
-    md = "![Figure 1](figures/img.png)\n*Figure 1.1: caption*"
+    md = "![Figure 1](figures/img.png)\n**Figure 1.1:** caption"
     assert _reorder_captions_after_images(md) == md
 
 
@@ -229,7 +229,7 @@ def test_clean_page_swaps_bold_caption_before_image():
 
 
 def test_reorder_captions_german_abb_before_image():
-    md = "*Abb. 3.1: Ergebnis*\n\n![Figure 3](figures/fig3.png)"
+    md = "**Abb. 3.1:** Ergebnis\n\n![Figure 3](figures/fig3.png)"
     result = _reorder_captions_after_images(md)
     assert result.index("![") < result.index("*")
 

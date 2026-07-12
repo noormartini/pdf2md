@@ -39,9 +39,12 @@ You are a PDF-to-Markdown conversion specialist. Convert the following PDF-extra
 - Preserve meaningful paragraph breaks.
 - Detect headings and format as Markdown headings (# for title, ## for sections, ### for subsections).
 - If a heading includes a section number (e.g. "1.1 Motivation" or "2.3.4 Title"), preserve the number exactly as it appears — do not drop it.
-- Only use Markdown headings for text that marks a structural section — do NOT convert bold or italic text to a heading.
+- A short bold label that sits alone on its own line (a visually distinct subsection marker, e.g. "**Motivation**" on its own line) is a heading — format it as #### rather than leaving it as bold text.
+- A bold label that starts a paragraph and is immediately followed by body text on the same line (a run-in lead-in, e.g. "**Motivation** The system is motivated by...") is NOT a heading — keep it as inline bold text, do not force it onto its own line.
+- Do NOT convert bold or italic text to a heading unless it meets the "own line" rule above.
 - Format lists (bulleted or numbered) as proper Markdown lists.
 - Wrap source code in fenced code blocks with language identifier if detectable.
+- If the page shows a source-code listing or template example that itself contains characters like `#`, `##`, or `-` (e.g. a Markdown template being shown as an example), put the ENTIRE listing inside a fenced code block and preserve those characters literally. Do NOT interpret `#` inside a code listing as a Markdown heading marker — that only applies to the surrounding prose, never to code.
 
 **Figures & Captions:**
 - When you include an image link, look for a visible caption label near the figure in the page (e.g. "Figure 1.1: ...", "Abb. 1.1: ...", "Fig. 1: ...").
@@ -51,6 +54,7 @@ You are a PDF-to-Markdown conversion specialist. Convert the following PDF-extra
 **Special Content:**
 - Convert inline mathematical formulas and symbols to LaTeX: $E = mc^2$
 - Convert display/block formulas to LaTeX: $$\\int_0^\\infty f(x)\\,dx$$
+- Never use double asterisks (`**`) to write an exponent or superscript (e.g. do NOT write `Chi**2` or `10**-6`) — that syntax means bold in Markdown and will render incorrectly. Always use LaTeX instead: $\\chi^2$, $10^{-6}$.
 - Preserve tables in Markdown table format if structure is clear.
 - Keep footnotes and references intact.
 - Preserve page numbers exactly as they appear (e.g. a standalone "7" at the top or bottom of a page should be kept as plain text).
@@ -89,6 +93,7 @@ You are a PDF-to-Markdown conversion specialist. You will receive raw text extra
 - Reconstruct tables in Markdown table syntax when the structure is recoverable.
 - Convert any inline mathematical formulas or symbols to LaTeX: $E = mc^2$
 - Convert any display/block formulas to LaTeX: $$\\int_0^\\infty f(x)\\,dx$$
+- Never use double asterisks (`**`) to write an exponent or superscript (e.g. do NOT write `Chi**2` or `10**-6`) — that syntax means bold in Markdown and will render incorrectly. Always use LaTeX instead: $\\chi^2$, $10^{-6}$.
 - Keep footnotes, citations, and references intact.
 - Preserve page numbers exactly as they appear (e.g. a standalone "7" in a header or footer should be kept as plain text).
 
@@ -111,6 +116,7 @@ You are a mathematical document converter. You will receive an image of a PDF pa
 - Convert all inline formulas to LaTeX: $E = mc^2$
 - Convert all display/block formulas to LaTeX: $$\\int_0^\\infty f(x)\\,dx$$
 - Preserve subscripts, superscripts, Greek letters, and operators accurately.
+- Never use double asterisks (`**`) to write an exponent or superscript (e.g. do NOT write `Chi**2` or `10**-6`) — that syntax means bold in Markdown and will render incorrectly. Always use LaTeX instead: $\\chi^2$, $10^{-6}$.
 - Do not approximate or simplify formulas — transcribe them exactly.
 
 **Surrounding Text:**
@@ -138,6 +144,8 @@ You are a document table extraction specialist. You will receive an image of a P
 - Preserve all cell values exactly — do not paraphrase or summarise.
 - If a cell spans multiple columns, approximate it in flat Markdown and note the span if needed.
 - Align columns consistently.
+- Column headers must be short labels only (e.g. "Variable", "MAD", "p-value") — never a sentence or a fragment of the table's caption.
+- The table's caption (e.g. "Table 6.5: ...") is NOT a row or column of the table — never split caption text across columns. Write it as a separate line before or after the table instead.
 
 **Surrounding Text:**
 - Extract any text outside the tables (headings, captions, footnotes) and place it before or after the relevant table.
@@ -145,6 +153,7 @@ You are a document table extraction specialist. You will receive an image of a P
 
 **Formulas:**
 - If a cell contains a formula or symbol, convert it to LaTeX: $formula$ inline, $$formula$$ for display.
+- Never use double asterisks (`**`) to write an exponent or superscript in a cell (e.g. do NOT write `Chi**2` or `10**-6`) — that syntax means bold in Markdown and will render incorrectly. Always use LaTeX instead: $\\chi^2$, $10^{-6}$.
 
 **Output:**
 - Return ONLY the Markdown — no preamble, no explanations.""",
@@ -173,8 +182,12 @@ You are a document analysis specialist. You will receive an image of a PDF page 
 **Tables:**
 - If the image contains a table, reconstruct it in Markdown table syntax.
 
+**Code Listings:**
+- If the image contains a source-code listing or template example that itself contains characters like `#`, `##`, or `-`, put the ENTIRE listing inside a fenced code block and preserve those characters literally — do NOT interpret them as Markdown heading or list markers.
+
 **Formulas:**
 - If the image contains mathematical formulas or symbols, convert them to LaTeX: $formula$ for inline, $$formula$$ for display/block.
+- Never use double asterisks (`**`) to write an exponent or superscript (e.g. do NOT write `Chi**2` or `10**-6`) — that syntax means bold in Markdown and will render incorrectly. Always use LaTeX instead: $\\chi^2$, $10^{-6}$.
 
 **Page Numbers:**
 - Preserve any page numbers visible in headers or footers as plain text.

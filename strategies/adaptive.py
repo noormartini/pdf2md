@@ -8,6 +8,7 @@ best strategy is selected based on detected content type.
 """
 
 import base64
+import os
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -50,6 +51,10 @@ class PageAnalysis:
 _IMAGE_THRESHOLD = 0         # Any embedded image triggers vision mode
 _VECTOR_PATH_THRESHOLD = 30  # Short vector paths → likely rendered formulas
 _MIN_TEXT_CHARACTERS = 50    # Pages with less text than this → not "text" type
+
+# Generic Markdown pipe-table separator row, e.g. "|---|---|---|" — used to
+# check whether pymupdf4llm's pre-extracted text actually contains a table.
+_TABLE_SEPARATOR_LINE_RE = re.compile(r"^\|[\s\-:]+(?:\|[\s\-:]+)+\|?\s*$", re.MULTILINE)
 
 
 def _detect_formulas(page: fitz.Page, drawings: list) -> bool:
@@ -123,6 +128,28 @@ def analyze_page(page: fitz.Page) -> PageAnalysis:
     )
 
 
+_IMAGE_REF_RE = re.compile(r'!\[.*?\]\(([^)]+)\)')
+
+
+def _normalize_image_paths(markdown: str, figures_dir: str) -> list[str]:
+    """Extract image paths from Markdown and normalise them to `figures/<name>`.
+
+    pymupdf4llm's own bulk extraction writes absolute paths, unlike the
+    `figures/<name>` links used everywhere else in the pipeline.
+    """
+    cwd_rel = os.path.relpath(figures_dir).replace("\\", "/") + "/"
+    abs_prefix = os.path.abspath(figures_dir).replace("\\", "/") + "/"
+    refs = []
+    for path in _IMAGE_REF_RE.findall(markdown):
+        name = path
+        if name.startswith(cwd_rel):
+            name = name[len(cwd_rel):]
+        elif name.startswith(abs_prefix):
+            name = name[len(abs_prefix):]
+        refs.append(name if name.startswith("figures/") else f"figures/{name}")
+    return refs
+
+
 def render_page_as_base64(page: fitz.Page, dpi: int = 150) -> str:
     """Render a PDF page to a base64-encoded PNG string."""
     matrix = fitz.Matrix(dpi / 72, dpi / 72)
@@ -190,6 +217,10 @@ def adaptive_strategy(
         )
         if pre_extracted_markdown and not _is_toc_page and re.search(r'!\[.*?\]\(', pre_extracted_markdown):
             page_type = PageType.MIXED
+            # Carry over the image(s) pymupdf4llm already found and saved —
+            # otherwise the vision LLM has no way to know they exist and the
+            # image is silently dropped from the output.
+            figure_refs = list(figure_refs or []) + _normalize_image_paths(pre_extracted_markdown, figures_dir)
         else:
             # TEXT pages have no images and no formulas (per analyze_page), so
             # pymupdf4llm's output is the answer — skip the LLM entirely to save
@@ -233,6 +264,25 @@ def adaptive_strategy(
         )
 
     if page_type == PageType.TABLE:
+        # pymupdf4llm's own table detection is reliable for text-layer tables
+        # and — unlike the vision LLM — never drops the surrounding heading
+        # or paragraph text around the table. Prefer it whenever it actually
+        # produced a table; fall back to the vision LLM (e.g. for scanned or
+        # image-based tables the text layer can't see) when it didn't.
+        if pre_extracted_markdown and _TABLE_SEPARATOR_LINE_RE.search(pre_extracted_markdown):
+            return text_call(
+                base_url=base_url,
+                model_name=model_name,
+                pdf_path=pdf_path,
+                page_num=page_num,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                figures_dir=figures_dir,
+                prompt_variant="table",
+                language=language,
+                llm_call=None,
+                pre_extracted_markdown=pre_extracted_markdown,
+            )
         return image_call(
             base_url=base_url,
             model_name=model_name,
