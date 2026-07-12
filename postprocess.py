@@ -45,7 +45,7 @@ _CAPTION_BEFORE_IMAGE_RE = re.compile(
 #   **→**  →  →
 # pymupdf4llm emits these when a symbol span happens to use an italic/bold font.
 # The underscore form is the most common; the ** form also appears occasionally.
-_SYMBOL_ITALIC_RE = re.compile(r"\*{1,2}([^\w\s*_])\*{1,2}|_{1,2}([^\w\s*_])_{1,2}")
+_SYMBOL_ITALIC_RE = re.compile(r"\*{1,2}([^\w\s*_|])\*{1,2}|_{1,2}([^\w\s*_|])_{1,2}")
 
 # Greek letter → LaTeX command mapping.
 # pymupdf4llm renders math variables that use a Greek font as italic Markdown

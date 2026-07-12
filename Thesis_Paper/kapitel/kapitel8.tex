@@ -86,7 +86,7 @@ The two-stage postprocessing pipeline addresses a gap between raw extraction
 output and usable Markdown. Both pymupdf4llm and the vision-language model produce
 predictable artefacts: repeated running headers, collapsed heading levels, dot
 leaders in table-of-contents pages, and incorrectly wrapped code blocks. The
-pipeline removes these through 38 transformation passes verified by 147 unit
+pipeline removes these through 49 transformation passes verified by 182 unit
 tests. Each pass is isolated as a testable function, so the pipeline can be
 extended without breaking existing behaviour. This makes the system's output
 usable without manual correction on the document types it was designed for.
@@ -126,9 +126,10 @@ as the standard for document layout research, which was not feasible within the
 scope of a single bachelor thesis.
 
 All VLM results in this study depend on one model, Qwen2.5-VL-7B, at a single
-temperature setting. A larger model, a more recent model, or one fine-tuned on
-academic documents would produce different output and could alter the strategy
-rankings. The heading structure metric is consistently the weakest across all four
+temperature setting. Section~\ref{sec:threats_to_validity} reports informal testing
+with a larger model, which found that part of this gap is a fixable extraction bug
+rather than a model limit.
+The heading structure metric is consistently the weakest across all four
 strategies, with no strategy exceeding 0.565. This reveals a limitation of the
 evaluation design as well: the metric counts heading occurrences rather than
 verifying level assignments, so a strategy can score well on heading structure
@@ -164,11 +165,12 @@ changes. What remains untested is whether that substitution actually improves
 output quality: a dedicated evaluation comparing pix2tex against the current
 VLM path on formula-heavy pages would show how much \LaTeX{} accuracy improves
 and whether the speed gain justifies the switch.
-All VLM results in this experiment also depend on a single 7B model. A
-larger model or one fine-tuned on academic documents could reduce the paraphrasing
-tendency that causes image-only and hybrid to score poorly on paragraph and code
-block structure. Retesting with a different model would show whether the strategy
-rankings are model-dependent or stable across model families.
+All VLM results in this experiment also depend on a single 7B model.
+Section~\ref{sec:threats_to_validity} shows that switching to a larger model does
+not close the whole gap to text-only: wide tables and source code still come out
+wrong regardless of model size. A controlled comparison across model sizes, run
+after the extraction bugs found in that test are fixed, would isolate how much of
+the remaining gap is model capability rather than the pipeline around it.
 
 The evaluation covers three German bachelor theses. Testing on research papers,
 lecture slides, and scanned documents would reveal whether the page classifier and

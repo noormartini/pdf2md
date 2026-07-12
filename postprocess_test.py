@@ -1,10 +1,12 @@
 from postprocess import (
     clean_page,
     postprocess_markdown,
+    _clean_list_dot_leaders,
     _clean_toc_dot_leaders,
     _clean_picture_text_blocks,
     _convert_abbreviations,
     _convert_greek_italic_math,
+    _convert_list_bullets_to_table_rows,
     _convert_toc_table,
     _demote_code_listing_headings,
     _demote_italic_headings,
@@ -14,10 +16,14 @@ from postprocess import (
     _fix_bold_listing_headings,
     _fix_bold_space_before_colon,
     _fix_listing_table,
+    _fix_split_code_span_tokens,
     _fix_table_list_header,
+    _fix_table_row_bold_span,
     _format_figure_captions,
     _fix_ocr_superscripts,
+    _interleave_batched_figures,
     _merge_kapitel_headings,
+    _merge_wrapped_listing_table_rows,
     _normalise_latex_delimiters,
     _promote_declaration_heading,
     _reorder_captions_after_images,
@@ -29,6 +35,7 @@ from postprocess import (
     _strip_mid_doc_running_headers,
     _strip_running_headers,
     _unwrap_symbol_italics,
+    _wrap_monospace_code_blocks,
 )
 
 
@@ -94,6 +101,30 @@ def test_fix_ocr_superscripts_nasa():
     assert _fix_ocr_superscripts("_NASA_[3]") == "NASA³"
 
 
+def test_fix_ocr_superscripts_negative_exponent():
+    assert _fix_ocr_superscripts("10 _[−]_[6]") == "10 ⁻⁶"
+
+
+def test_fix_ocr_superscripts_negative_exponent_multi_digit():
+    assert _fix_ocr_superscripts("10 _[−]_[15]") == "10 ⁻¹⁵"
+
+
+def test_fix_ocr_superscripts_latex_logo():
+    assert _fix_ocr_superscripts("it generates a full L[A] TEX paper") == "it generates a full LaTeX paper"
+
+
+def test_fix_ocr_superscripts_plain_negative_exponent():
+    assert _fix_ocr_superscripts("2.25×10−1") == "2.25×10⁻¹"
+
+
+def test_fix_ocr_superscripts_bold_exponent():
+    assert _fix_ocr_superscripts("Chi**2") == "Chi²"
+
+
+def test_fix_ocr_superscripts_leaves_normal_bold_unchanged():
+    assert _fix_ocr_superscripts("**bold text**") == "**bold text**"
+
+
 def test_clean_page_fixes_emc2_superscript():
     md = "According to _EMC_[2] 1,7 MB of new data is created every day."
     result = clean_page(md)
@@ -112,6 +143,14 @@ def test_unwrap_symbol_italics_bold_arrow():
 def test_unwrap_symbol_italics_leaves_word_italic():
     assert _unwrap_symbol_italics("_hello_") == "_hello_"
     assert _unwrap_symbol_italics("**bold**") == "**bold**"
+
+
+def test_unwrap_symbol_italics_leaves_table_cell_boundary_untouched():
+    # Regression: "**|**" at the boundary between two individually bold-wrapped
+    # table cells used to be mistaken for a pipe symbol wrapped in emphasis,
+    # collapsing "**ID**|**document**" back into "**ID|document**".
+    md = "|**ID**|**document**|**sentiment**|"
+    assert _unwrap_symbol_italics(md) == md
 
 
 def test_clean_page_unwraps_arrow_sub_bullets():
@@ -958,6 +997,15 @@ def test_strip_mid_doc_page_numbers_leaves_inline_roman():
     assert _strip_mid_doc_page_numbers(md) == md
 
 
+def test_strip_mid_doc_page_numbers_removes_number_directly_after_table_row():
+    # No blank line between the table's last row and the page-footer number —
+    # the plain "\n\n56\n\n" pattern above doesn't match this case.
+    md = "| RBQL | Recursive Backwards Q-Learning |\n56\n\n---\n"
+    result = _strip_mid_doc_page_numbers(md)
+    assert "56" not in result
+    assert "| RBQL | Recursive Backwards Q-Learning |" in result
+
+
 # ── _strip_mid_doc_running_headers ────────────────────────────────────────────
 
 def test_strip_mid_doc_running_headers_removes_kapitel_line():
@@ -1005,6 +1053,36 @@ def test_strip_mid_doc_running_headers_keeps_non_isolated_front_matter():
     # Embedded in a sentence — not a running header.
     md = "See the Inhaltsverzeichnis for details.\n"
     assert _strip_mid_doc_running_headers(md) == md
+
+
+def test_strip_mid_doc_running_headers_keeps_paragraph_starting_with_chapter_number():
+    # Regression: the "Chapter N ..." running-header pattern used to match
+    # greedily with ".*", which swallowed a full paragraph that merely
+    # started with "Chapter 4" followed by a sentence containing a period.
+    md = (
+        "This section explains how the requirements are verified.\n\n"
+        "Chapter 4 defines eleven requirements (FR1-FR8, NFR1-NFR2, C1). "
+        "As discussed in that chapter, the requirements are scoped to "
+        "deterministic system behaviors.\n\n"
+        "Besides the requirements verification, Section 6.3 presents results.\n"
+    )
+    result = _strip_mid_doc_running_headers(md)
+    assert "Chapter 4 defines eleven requirements" in result
+    assert "deterministic system behaviors." in result
+
+
+def test_strip_mid_doc_running_headers_removes_bibliography_header():
+    md = "Some entry.\n\nBibliography\n\nAnother entry.\n"
+    result = _strip_mid_doc_running_headers(md)
+    assert "\n\nBibliography\n\n" not in result
+    assert "Some entry." in result
+    assert "Another entry." in result
+
+
+def test_strip_mid_doc_running_headers_removes_tabellenverzeichnis_header():
+    md = "- 6.9 Entry one 42\n\nTabellenverzeichnis\n\n- 6.10 Entry two 42\n"
+    result = _strip_mid_doc_running_headers(md)
+    assert "\n\nTabellenverzeichnis\n\n" not in result
 
 
 def test_fix_bold_space_before_colon_removes_space():
@@ -1087,3 +1165,212 @@ def test_strip_bibliography_dash_strips_trailing_emdash_variant():
 def test_strip_bibliography_dash_leaves_mid_sentence_dash():
     md = "The system — which is local — runs offline.\n"
     assert _strip_bibliography_dash(md) == md
+
+
+# ── _interleave_batched_figures ────────────────────────────────────────────────
+
+def test_interleave_batched_figures_pairs_images_with_captions():
+    md = (
+        "![Figure 1](figures/page_039_fig_001.png)\n"
+        "![Figure 2](figures/page_039_fig_002.jpeg)\n"
+        "**Figure 4.8:** The activity diagram shows the hypothesis generation pipeline.\n"
+        "**Figure 4.9:** The hypothesis generation screen.\n"
+    )
+    result = _interleave_batched_figures(md)
+    lines = [l for l in result.split("\n") if l.strip()]
+    assert lines[0] == "![Figure 1](figures/page_039_fig_001.png)"
+    assert lines[1] == "**Figure 4.8:** The activity diagram shows the hypothesis generation pipeline."
+    assert lines[2] == "![Figure 2](figures/page_039_fig_002.jpeg)"
+    assert lines[3] == "**Figure 4.9:** The hypothesis generation screen."
+
+
+def test_interleave_batched_figures_leaves_single_pair_untouched():
+    md = "![Figure 1](figures/fig.png)\n**Figure 1.1:** A caption.\n"
+    assert _interleave_batched_figures(md) == md
+
+
+def test_interleave_batched_figures_leaves_mismatched_counts_untouched():
+    md = (
+        "![Figure 1](figures/fig1.png)\n"
+        "![Figure 2](figures/fig2.png)\n"
+        "**Figure 1.1:** First caption.\n"
+        "**Figure 1.2:** Second caption.\n"
+        "**Figure 1.3:** Third caption.\n"
+    )
+    assert _interleave_batched_figures(md) == md
+
+
+# ── _clean_list_dot_leaders ────────────────────────────────────────────────────
+
+def test_clean_list_dot_leaders_strips_dots_and_keeps_page_number():
+    md = "- 6.1 Vergleich der Lernkurven. . . . . . . . 27"
+    assert _clean_list_dot_leaders(md) == "- 6.1 Vergleich der Lernkurven 27"
+
+
+def test_clean_list_dot_leaders_leaves_non_list_line_untouched():
+    md = "This is a normal sentence ending in the number 27."
+    assert _clean_list_dot_leaders(md) == md
+
+
+def test_clean_list_dot_leaders_leaves_bullet_without_dot_leader():
+    md = "- A plain bullet point with no dots"
+    assert _clean_list_dot_leaders(md) == md
+
+
+# ── _fix_table_row_bold_span ───────────────────────────────────────────────────
+
+def test_fix_table_row_bold_span_rewraps_each_cell():
+    md = "|**ID|Requirement|Pass Condition**|\n|---|---|---|\n|FR1|Context|test|"
+    result = _fix_table_row_bold_span(md)
+    assert result.startswith("|**ID**|**Requirement**|**Pass Condition**|")
+
+
+def test_fix_table_row_bold_span_handles_mangled_exponent_row():
+    md = (
+        "|**Variable|MAD|Chi²|**p-value|Classifcation**|\n"
+        "|---|---|---|---|---|\n"
+        "|Population Count|0.0027|10.60|2.25|Excellent|"
+    )
+    result = _fix_table_row_bold_span(md)
+    assert result.startswith("|**Variable**|**MAD**|**Chi²**|**p-value**|**Classifcation**|")
+
+
+def test_fix_table_row_bold_span_ignores_row_without_following_separator():
+    md = "|**ID|Requirement**|\n\nSome text, not a table.\n"
+    assert _fix_table_row_bold_span(md) == md
+
+
+def test_fix_table_row_bold_span_leaves_data_rows_alone():
+    md = "|**ID**|**Requirement**|\n|---|---|\n|FR1|**already bold value**|"
+    result = _fix_table_row_bold_span(md)
+    assert "|FR1|**already bold value**|" in result
+
+
+# ── _fix_split_code_span_tokens ────────────────────────────────────────────────
+
+def test_fix_split_code_span_tokens_removes_space_in_url():
+    md = "url: `htt ps://arxiv.org/abs/2511.05502`"
+    assert _fix_split_code_span_tokens(md) == "url: `https://arxiv.org/abs/2511.05502`"
+
+
+def test_fix_split_code_span_tokens_removes_space_in_numeric_id():
+    md = "arXiv: `2408.0 6292`"
+    assert _fix_split_code_span_tokens(md) == "arXiv: `2408.06292`"
+
+
+def test_fix_split_code_span_tokens_keeps_space_before_category_tag():
+    md = "`1908 . 10084 [cs.CL]`"
+    assert _fix_split_code_span_tokens(md) == "`1908.10084 [cs.CL]`"
+
+
+def test_fix_split_code_span_tokens_leaves_normal_inline_code_untouched():
+    md = "Call `response_format` with the schema."
+    assert _fix_split_code_span_tokens(md) == md
+
+
+# ── _wrap_monospace_code_blocks ────────────────────────────────────────────────
+
+def test_wrap_monospace_code_blocks_wraps_single_listing():
+    code_lines = ["1 def getState(x):", "2 return x"]
+    md = "\n".join(code_lines)
+    result = _wrap_monospace_code_blocks(md, code_lines)
+    assert result == "```\n1 def getState(x):\n2 return x\n```\n"
+
+
+def test_wrap_monospace_code_blocks_renumbers_sequentially():
+    code_lines = ["1 # Paper Specification", "3 ## General Information", "10 ## Section Requirements"]
+    md = "\n".join(code_lines)
+    result = _wrap_monospace_code_blocks(md, code_lines)
+    assert result == "```\n1 # Paper Specification\n2 ## General Information\n3 ## Section Requirements\n```\n"
+
+
+def test_wrap_monospace_code_blocks_keeps_separate_listings_apart():
+    code_lines = ["1 def a():", "2 return 1", "1 def b():", "2 return 2"]
+    md = (
+        "1 def a(): 2 return 1\n\n"
+        "Some prose between the two listings.\n\n"
+        "1 def b(): 2 return 2"
+    )
+    result = _wrap_monospace_code_blocks(md, code_lines)
+    assert result.count("```") == 4
+    assert "Some prose between the two listings." in result
+    before, after = result.split("Some prose between the two listings.")
+    assert "def b" not in before
+    assert "def b" in after
+
+
+def test_wrap_monospace_code_blocks_does_not_bleed_into_identical_line():
+    # Two different listings that happen to share the exact same opening line
+    # must not have the second one's content merged into the first's fence.
+    code_lines = [
+        "1 def updateQ(reward, state):",
+        "2 global er_re",
+        "1 def updateQ(reward, state):",
+        "2 Q[int(state)] += alpha",
+    ]
+    md = (
+        "1 def updateQ(reward, state): 2 global er_re\n\n"
+        "**Quellcode 5.3:** first listing\n\n"
+        "1 def updateQ(reward, state): 2 Q[int(state)] += alpha\n"
+    )
+    result = _wrap_monospace_code_blocks(md, code_lines)
+    assert result.count("```") == 4
+    first_fence = result.split("```")[1]
+    assert "Q[int(state)]" not in first_fence
+
+
+def test_wrap_monospace_code_blocks_no_targets_returns_unchanged():
+    md = "Some plain text with no code."
+    assert _wrap_monospace_code_blocks(md, []) == md
+
+
+# ── _convert_list_bullets_to_table_rows ────────────────────────────────────────
+
+def test_convert_list_bullets_to_table_rows_converts_bullets_in_listing_section():
+    md = (
+        "**Tabellenverzeichnis**\n\n"
+        "- 6.1 Vergleich der Lernkurven 26\n\n"
+        "- 6.2 Weitere Ergebnisse 28\n"
+    )
+    result = _convert_list_bullets_to_table_rows(md)
+    assert "| 6.1 | Vergleich der Lernkurven | 26 |" in result
+    assert "| 6.2 | Weitere Ergebnisse | 28 |" in result
+    assert "- 6.1" not in result
+
+
+def test_convert_list_bullets_to_table_rows_ignores_bullets_outside_listing_section():
+    md = "## Regular Chapter\n\n- 6.1 Not a list-of-tables entry 26\n"
+    assert _convert_list_bullets_to_table_rows(md) == md
+
+
+def test_convert_list_bullets_to_table_rows_stops_at_next_heading():
+    md = (
+        "**Tabellenverzeichnis**\n\n"
+        "- 6.1 Entry 26\n\n"
+        "## Kapitel 7\n\n"
+        "- 6.2 This looks like a bullet but is past the list section 28\n"
+    )
+    result = _convert_list_bullets_to_table_rows(md)
+    assert "| 6.1 | Entry | 26 |" in result
+    assert "- 6.2 This looks like a bullet but is past the list section 28" in result
+
+
+# ── _merge_wrapped_listing_table_rows ──────────────────────────────────────────
+
+def test_merge_wrapped_listing_table_rows_merges_continuation_rows():
+    md = (
+        "Tabellenverzeichnis\n\n"
+        "|6.9|Vergleich von RBQL und der optimierten Version des RBQL und Experi-||\n"
+        "|---|---|---|\n"
+        "||ence Replay Q-Learning beim Trainieren.|42|\n"
+    )
+    result = _merge_wrapped_listing_table_rows(md)
+    assert (
+        "| 6.9 | Vergleich von RBQL und der optimierten Version des RBQL und "
+        "Experience Replay Q-Learning beim Trainieren. | 42 |"
+    ) in result
+
+
+def test_merge_wrapped_listing_table_rows_leaves_normal_table_untouched():
+    md = "Some heading\n\n|A|B|\n|---|---|\n|1|2|\n"
+    assert _merge_wrapped_listing_table_rows(md) == md
