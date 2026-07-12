@@ -190,12 +190,17 @@ The variation reflects the content mix within each document.
 Pages with complex table or figure layouts favour hybrid and image-only.
 Dense text pages favour text-only.
 
-Page 6 is the lowest-scoring page across all strategies, with a best
-similarity of 0.728. Inspection of the reference file shows that this
-page contains a table of contents with dot-leader formatting, which none
-of the strategies reproduce cleanly. This is a known limitation of both
-text extraction (dot leaders appear as fragmented text) and vision
-extraction (the model does not reproduce the exact list format).
+Page 6 of the neural networks thesis shows the widest spread between
+strategies on a single page: hybrid scores 0.728, text-only 0.655,
+image-only 0.519, and adaptive only 0.505. The reference file shows that
+this page continues the table of contents with dot-leader formatting.
+Adaptive scores lowest here for a specific reason, not a shared one.
+It leaves table-of-contents continuation pages empty by design, to avoid
+repeating the full list on every page (Section~\ref{sec:postprocessing_pipeline}).
+That choice costs it points on any continuation page a reference file
+still expects content for. The other three strategies process the page
+normally and score higher, though none of them reproduce the dot-leader
+formatting exactly either.
 
 The strategy rankings are consistent across the three thesis documents.
 Text-only leads on text similarity in all three. Adaptive leads on table

@@ -23,6 +23,12 @@ flowchart TD
 
     N -->|reroute: extracted markdown\ncontains image links?| P([MIXED · 0.75])
 
+    L --> Q{vision response\ntoo short vs.\npre-extracted text?}
+    O --> Q
+    P --> Q
+    Q -->|Yes| R([fallback:\npymupdf4llm text])
+    Q -->|No| S([use vision output])
+
     style D fill:#f8d7da,stroke:#dc3545
     style F fill:#fff3cd,stroke:#f0ad4e
     style H fill:#cce5ff,stroke:#004085
@@ -31,3 +37,5 @@ flowchart TD
     style N fill:#d4edda,stroke:#28a745
     style O fill:#e2d9f3,stroke:#6f42c1
     style P fill:#e2d9f3,stroke:#6f42c1
+    style R fill:#d4edda,stroke:#28a745
+    style S fill:#e2d9f3,stroke:#6f42c1

@@ -118,6 +118,7 @@ the pipeline: a new handler for the \texttt{FORMULA} page type is
 all that is needed.
 
 \section{Threats to Validity}
+\label{sec:threats_to_validity}
 
 Internal validity is limited by the single-annotator ground truth. The
 reference files were written by the thesis author. Different readers may
@@ -138,4 +139,10 @@ The results depend on what thesis documents look like. The three documents in th
 
 Language and script add a second dimension. The language detection module adds a prompt hint that preserves the output language, but the classifier thresholds --- particularly the 50-character minimum for TEXT classification --- were calibrated on German and English content. Right-to-left scripts such as Arabic or Hebrew, or documents mixing CJK characters with Latin text, have not been tested. The character count threshold may behave differently on short-character scripts, misclassifying pages that should route to the vision model. Testing on a two-column scientific paper and a right-to-left script document would be the most informative next step for external validation.
 
-The model dependency is a limitation of this evaluation, not of the system. All VLM results use Qwen2.5-VL-7B. The architecture is model-agnostic: the server URL and model name are parameters, so any OpenAI-compatible vision-language model can be substituted without code changes. A larger or document-specialised model would likely improve all VLM scores, particularly on formula and table pages where the 7B scale may be a limiting factor. The relative rankings between strategies could change with a different model. The text-only strategy has no such dependency: its output is determined by the PDF content and the pymupdf4llm version, both of which are stable across runs.
+The model dependency is a limitation of this evaluation, not of the system. All VLM results use Qwen2.5-VL-7B. The architecture is model-agnostic: the server URL and model name are parameters, so any OpenAI-compatible vision-language model can be substituted without code changes. The text-only strategy has no such dependency. Its output comes from the PDF content and the pymupdf4llm version, both stable across runs.
+
+Informal testing during this thesis's revision tested part of the model-dependency question. The system was run on the same thesis documents with a larger model, Qwen3.5-35B-A3B, served from a rented cloud GPU instead of local hardware. This was not a controlled experiment and produced no new metric scores. But it surfaced a distinction the original hypothesis did not make.
+
+Several failures that looked like model capability gaps turned out to be bugs in the pipeline instead. Figures were sometimes extracted from the wrong region of a page. Code listings were rendered as pictures instead of text. A formula sometimes appeared twice: once correctly converted to \LaTeX{} by the model, and once again as a duplicate raster image the pipeline had carried over by mistake. None of this needed a different model. It needed a fix to the extraction step that ran before the page ever reached the model.
+
+Other failures held up regardless of model size. Wide tables with many columns still collapsed into fewer columns than the source. The model still rewrote source code in its own words instead of copying it exactly. A larger model may close part of the gap the original hypothesis predicted, but not all of it. Some of that gap was never a model problem to begin with.

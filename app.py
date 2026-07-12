@@ -10,7 +10,7 @@ import pymupdf4llm
 from config import Config
 from llm.client import call_llm
 
-from extraction.text import extract_pages_from_pdf
+from extraction.text import extract_pages_from_pdf, extract_monospace_lines
 from extraction.image import extract_page_figures
 from extraction.language import detect_language, language_name
 from postprocess import clean_page, postprocess_markdown
@@ -66,6 +66,32 @@ def _find_toc_page_indices(page_markdowns: list[str]) -> set[int]:
                 ):
                     indices.add(i + 1)
     return indices
+
+
+_FIGURE_CAPTION_RE = re.compile(r"(?:Abbildung|Abb\.|Figure|Fig\.)\s+\d+(?:\.\d+)+", re.IGNORECASE)
+
+
+def _inject_missing_figure(markdown: str, figure_refs: list[str]) -> str:
+    """Insert a figure link before its caption when pymupdf4llm captured the
+    caption text but not the image itself.
+
+    This happens for vector-drawn diagrams (see extraction.image, which falls
+    back to cropping the page's vector-drawing bounding box) — pymupdf4llm's
+    own text extraction has no equivalent, so the caption ends up in the
+    Markdown with no image above it. Decorative images with no caption at
+    all (e.g. a title-page logo) have no anchor line to insert before, so
+    they're placed at the top of the page instead.
+    """
+    missing = [ref for ref in figure_refs if ref not in markdown]
+    if not missing:
+        return markdown
+    lines = markdown.split("\n")
+    for idx, line in enumerate(lines):
+        if _FIGURE_CAPTION_RE.search(line):
+            lines.insert(idx, f"![Figure 1]({missing[0]})\n")
+            return "\n".join(lines)
+    lines.insert(0, f"![Figure 1]({missing[0]})\n")
+    return "\n".join(lines)
 
 
 def _page_label(doc: fitz.Document, index: int) -> str:
@@ -142,6 +168,7 @@ def run(config: Config):
                 raw_text = ""
                 with fitz.open(config.input) as worker_doc:
                     raw_text = worker_doc[i].get_text("text")
+                    code_lines = extract_monospace_lines(worker_doc[i])
                 print(f"Converting page {i+1}/{num_pages} (page {label}) to Markdown...")
                 result = text_strategy(
                     base_url=config.base_url,
@@ -153,7 +180,7 @@ def run(config: Config):
                     figures_dir=figures_dir,
                     pre_extracted_markdown=page_markdown[i] if i < len(page_markdown) else "",
                 )
-                page_md = f"<!-- Page {label} -->\n\n{clean_page(result.markdown, raw_page_text=raw_text)}"
+                page_md = f"<!-- Page {label} -->\n\n{clean_page(result.markdown, raw_page_text=raw_text, code_lines=code_lines)}"
                 return page_md, result.token_usage, result.llm_calls
 
             raw_results = _run_in_pool(page_indices, config.concurrency, _convert)
@@ -256,11 +283,26 @@ def run(config: Config):
                     )
                     print(f"Page {i+1}/{num_pages} (page {label}) → {strategy_label}...")
                     page_image = render_page_as_base64(page)
+                    is_text_page = analysis.page_type == PageType.TEXT
+                    # TEXT pages skip the vision LLM, so a figure caption with
+                    # no matching raster image (a vector-drawn diagram) would
+                    # otherwise be silently dropped — check for that cheaply
+                    # instead of always paying for figure extraction. Also
+                    # rescue vector-drawn decorative images with no caption at
+                    # all (e.g. a title-page logo) when pymupdf4llm's own
+                    # extraction found no image on the page.
+                    page_pre_markdown = page_markdown[i] if i < len(page_markdown) else ""
+                    has_pre_extracted_image = "![" in page_pre_markdown
+                    needs_figure_check = is_text_page and (
+                        bool(_FIGURE_CAPTION_RE.search(raw_text))
+                        or (not has_pre_extracted_image and analysis.vector_path_count >= 10)
+                    )
                     figure_refs = (
                         extract_page_figures(page, worker_doc, i, figures_dir)
-                        if analysis.page_type != PageType.TEXT
+                        if (not is_text_page or needs_figure_check)
                         else None
                     )
+                    code_lines = extract_monospace_lines(page) if is_text_page else None
                 result = adaptive_strategy(
                     base_url=config.base_url,
                     model_name=config.model,
@@ -276,7 +318,10 @@ def run(config: Config):
                     pre_extracted_markdown=page_markdown[i] if i < len(page_markdown) else None,
                     image_call=partial(image_strategy, llm_call=llm_call),
                 )
-                page_md = f"<!-- Page {label} -->\n\n{clean_page(result.markdown, raw_page_text=raw_text)}"
+                result_markdown = result.markdown
+                if is_text_page and figure_refs:
+                    result_markdown = _inject_missing_figure(result_markdown, figure_refs)
+                page_md = f"<!-- Page {label} -->\n\n{clean_page(result_markdown, raw_page_text=raw_text, code_lines=code_lines)}"
                 return page_md, result.token_usage, result.llm_calls
 
             raw_results = _run_in_pool(page_indices, config.concurrency, _convert)

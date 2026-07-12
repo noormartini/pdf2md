@@ -133,6 +133,7 @@ TEXT pages are handled differently: the system calls the text strategy with \tex
 This saves the full round-trip cost on every plain-text page, which is the primary source of efficiency gain for the adaptive strategy on text-heavy documents.
 
 \section{Post-processing Pipeline}
+\label{sec:postprocessing_pipeline}
 
 The raw output from pymupdf4llm and the LLM both contain predictable artefacts that must be removed before the Markdown is usable.
 The pipeline applies a fixed sequence of passes in two stages.
@@ -167,11 +168,51 @@ OCR text blocks that pymupdf4llm extracts from embedded figures are removed: the
 Italic spans containing only Greek letters are converted to inline LaTeX (e.g.\ an italic $\varphi$ becomes \texttt{\$\textbackslash varphi\$}).
 OCR superscript artefacts of the form \texttt{\_EMC\_[2]} are replaced with Unicode superscript characters.
 
+Source-code listings needed a detection path of their own.
+\LaTeX's \texttt{listings} package sets code in a fixed-width font.
+pymupdf4llm does not read that as a signal to build a code block.
+It either leaves the listing as plain text, or, when a numbered line looks like a heading, breaks it into fragments wrapped in scattered backticks.
+
+The pipeline finds monospace lines directly from PyMuPDF's font data.
+A font counts as monospace by name, matching substrings such as Courier or Consolas, or by measurement: if every character on the page has the same width, the font is fixed-width no matter what it is called.
+This second check exists because some PDFs give their code font a generic internal name with no clue in it at all.
+A page's lines are only trusted as code if at least one shows real code syntax, such as a line-number gutter or a closing parenthesis before a colon.
+This rule keeps out bibliography entries and citation URLs, which are sometimes set in the same font as a listing but are not code.
+
+A single page can hold more than one listing with prose between them.
+The reconstruction scans the page line by line and only groups consecutive matching lines into one fence.
+Prose and unrelated listings in between stay untouched.
+This stops two listings from merging into each other or swallowing the caption between them.
+Line numbers are stripped and renumbered in order, since \LaTeX{} only prints a number for a line's first physical row.
+A wrapped continuation gets no number at all, which looks broken once reflowed into one fence.
+
+The same monospace check is reused during figure extraction.
+\LaTeX's \texttt{listings} package draws a shaded box behind a listing.
+That box is a vector-filled shape, not a raster image.
+Earlier, \texttt{extract\_page\_figures} treated any large vector-drawn region as a possible figure.
+This mistook the shaded box for a diagram and saved a screenshot of the code instead of leaving it as text.
+The function now checks whether a candidate region's text is mostly monospace before treating it as a figure, and skips it if so.
+
+A second problem appears when a page holds more than one vector-drawn element, such as two separate code boxes.
+Taking the bounding box of every vector drawing on the page and merging them into one region spans all the prose in between.
+\texttt{extract\_page\_figures} now groups vector drawings by vertical distance and checks each group on its own.
+Unrelated regions on the same page no longer merge into one oversized crop.
+
+A last check filters out pymupdf4llm's own fallback for complex equations.
+When it cannot read a formula as text, it renders that formula as a small image instead, usually under 50 pixels tall for one line of math.
+Carrying that image over to the vision model would duplicate the formula, since the model already converts it to \LaTeX{} correctly from the page image.
+The height check drops the image before that duplication happens.
+
 The second stage repeats some of these on the joined document, where page-spanning artefacts only become visible.
 Duplicate running headers that cross page boundaries are removed a second time.
 Title-page metadata lines and chapter headings split across pages are merged.
 Heading demotion passes run again on the full document.
 LaTeX math delimiters in the \texttt{\textbackslash(...\textbackslash)} and \texttt{\textbackslash[...\textbackslash]} styles are normalised to the \texttt{\$...\$} and \texttt{\$\$...\$\$} forms used throughout the output.
+
+List pages get one more pass at this stage.
+pymupdf4llm sometimes renders the same list of figures or tables as plain bullets on one page and as table rows on the next, since it lays out each page on its own.
+A page-crossing pass rewrites the bullet entries into the same row format, so the whole list reads the same way from start to end.
+A second pass then merges table rows that a wrapped entry split into several pieces, joining them back into one row per entry and reversing any hyphenation that broke mid-word at the wrap point.
 
 Figure~\ref{fig:postprocessing} shows all passes in both stages.
 

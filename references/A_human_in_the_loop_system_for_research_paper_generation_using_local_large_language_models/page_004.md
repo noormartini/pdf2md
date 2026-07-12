@@ -4,7 +4,7 @@
 
 AI-based systems can generate complete research papers, but most reviewed systems are designed around cloud-hosted LLMs. This leads to usage costs, dependency on third parties, and privacy concerns. Previous work shows that human review of intermediate outputs consistently improves the quality of the final result. However, none of the reviewed systems combines fully local inference with a mechanism for human oversight. This thesis introduces a system that fills this gap. It automates the research process, including literature search, experimentation, and paper writing. After each phase, the system pauses so the user can review and improve the output. In a demonstration, the system generated a complete research paper in 43 minutes on consumer hardware, using only local models and without API costs. To test it in isolation, the system ran autonomously. The LLM made errors that the system could detect but not fix on its own. This suggests that human oversight is valuable when using smaller local models for automated research. 
 
-## Abstrakt
+# Abstrakt
 
 ***Ein Human-in-the-Loop System zur Generierung von Forschungsarbeiten mittels lokaler großer Sprachmodelle***
 

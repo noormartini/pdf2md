@@ -11,6 +11,8 @@ flowchart TD
         (level reassignment · split-heading merge · bare-number recovery · demotion)"]
         B4["Special content
         (TOC via doc.get_toc() · list pages · figure captions · Greek → LaTeX · OCR superscripts)"]
+        B5["Source-code listings
+        (monospace font detection · fence rebuilding · line renumbering)"]
     end
 
     B --> C[Join pages with --- separator]
@@ -20,6 +22,8 @@ flowchart TD
         D1["Running header · page-number · duplicate heading removal"]
         D2["Title-page demotion · chapter heading merging · heading demotion"]
         D3["OCR picture-text removal · bibliography cleanup · LaTeX delimiter normalisation"]
+        D4["List-page consistency
+        (bullet-to-table-row conversion · wrapped-row merging)"]
     end
 
     D --> E([Final Markdown Output])
