@@ -10,7 +10,7 @@ document type, which is itself a finding.
 The most striking finding of this study is that text-only extraction outperforms
 all three vision-based strategies on five of seven metrics, despite using no
 language model and processing each page in under 200 milliseconds. This was not
-predicted. Two of the four hypotheses proved wrong on this corpus. The reason, examined in
+predicted. Three of the four hypotheses needed revision on this corpus. The reason, examined in
 Section~7.1, is that thesis documents consist predominantly of machine-typed
 prose, where direct text extraction recovers content with higher fidelity than
 a vision model that paraphrases rather than copies.
@@ -42,8 +42,8 @@ per page and makes 23 LLM calls across 90 pages, compared to 90 calls and
 in total token consumption and a factor of 3.1 improvement in processing speed,
 confirming hypothesis H3. The efficiency gain comes from the page classifier:
 most thesis pages are classified as TEXT and handled by pymupdf4llm without any
-LLM call. The classifier adds a small fixed cost per page but avoids the dominant
-cost, model inference, on the majority of pages. On longer documents the gap
+LLM call. The small fixed classification cost is negligible compared to the
+model inference it avoids on most pages. On longer documents the gap
 widens further, since every additional text page adds savings without adding
 inference cost.
 
@@ -172,7 +172,7 @@ wrong regardless of model size. A controlled comparison across model sizes, run
 after the extraction bugs found in that test are fixed, would isolate how much of
 the remaining gap is model capability rather than the pipeline around it.
 
-The evaluation covers three German bachelor theses. Testing on research papers,
+The evaluation covers three bachelor theses, two in German and one in English. Testing on research papers,
 lecture slides, and scanned documents would reveal whether the page classifier and
 postprocessing pipeline generalise beyond the thesis format. Scanned documents in
 particular would require OCR integration, which the current system does not
