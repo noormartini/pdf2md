@@ -1329,9 +1329,19 @@ def _wrap_monospace_code_blocks(md: str, code_lines: list[str]) -> str:
             out.append(lines[i])
             continue
 
+        # Match targets against this line with a forward-advancing cursor,
+        # not a plain substring search — otherwise two different listings
+        # that happen to share an identical line (e.g. two functions with
+        # the same signature) let a later, unrelated target match inside an
+        # earlier line just because the same text already appears in it.
         matched_here = 0
-        while ti < len(targets) and targets[ti][1] in nl:
+        cursor = 0
+        while ti < len(targets):
+            pos = nl.find(targets[ti][1], cursor)
+            if pos == -1:
+                break
             run.append(targets[ti][0])
+            cursor = pos + len(targets[ti][1])
             ti += 1
             matched_here += 1
         if matched_here == 0:
@@ -1774,6 +1784,61 @@ _LISTING_SECTION_HEADING_RE = re.compile(
     re.IGNORECASE,
 )
 
+_LIST_BULLET_ENTRY_RE = re.compile(r"^-\s+(\d+(?:\.\d+)+)\s+(.+?)\s+(\d+)\s*$")
+
+
+def _convert_list_bullets_to_table_rows(md: str) -> str:
+    """Convert bullet-style List of X entries into table rows for consistency.
+
+    The same List of Figures/Tables/etc. section sometimes renders some
+    entries as bullets ("- 6.1 Description text 26") and others — often
+    after a page break — as table rows ("| 6.9 | Description text | 42 |"),
+    depending on how pymupdf4llm laid out that particular page. Converting
+    the bullets into the same row form makes the whole list read
+    consistently instead of switching format partway through.
+    """
+    lines = md.split("\n")
+    result: list[str] = []
+    in_listing_section = False
+    for line in lines:
+        stripped = line.strip()
+        if _LISTING_SECTION_HEADING_RE.match(stripped):
+            in_listing_section = True
+            result.append(line)
+            continue
+        if in_listing_section and stripped.startswith("#"):
+            in_listing_section = False
+
+        if in_listing_section:
+            m = _LIST_BULLET_ENTRY_RE.match(stripped)
+            if m:
+                num, desc, page = m.groups()
+                result.append(f"| {num} | {desc} | {page} |")
+                continue
+
+        result.append(line)
+
+    # A converted bullet keeps its original blank-line separation, but
+    # consecutive table rows must be adjacent — GFM breaks a table at the
+    # first blank line. Drop blank lines that sit directly between two rows.
+    def _is_row(s: str) -> bool:
+        return s.strip().startswith("|") and s.strip().endswith("|")
+
+    cleaned: list[str] = []
+    i = 0
+    while i < len(result):
+        line = result[i]
+        if (
+            not line.strip()
+            and cleaned and _is_row(cleaned[-1])
+            and i + 1 < len(result) and _is_row(result[i + 1])
+        ):
+            i += 1
+            continue
+        cleaned.append(line)
+        i += 1
+    return "\n".join(cleaned)
+
 
 def _merge_wrapped_listing_table_rows(md: str) -> str:
     """Merge table rows that got split by text wrapping in a List of X page.
@@ -1855,6 +1920,7 @@ def postprocess_markdown(md: str) -> str:
 
     md = _strip_mid_doc_page_numbers(md)
     md = _strip_mid_doc_running_headers(md)
+    md = _convert_list_bullets_to_table_rows(md)
     md = _merge_wrapped_listing_table_rows(md)
 
     # Split multiple supervisor/professor entries that got merged onto one line.

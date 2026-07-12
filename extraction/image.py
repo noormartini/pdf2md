@@ -3,7 +3,7 @@ import os
 
 import fitz
 
-from extraction.text import _MONOSPACE_FONT_MARKERS
+from extraction.text import _MONOSPACE_FONT_MARKERS, _empirically_monospace_fonts
 
 
 def _bbox_is_code_listing(page: fitz.Page, bbox: fitz.Rect, threshold: float = 0.3) -> bool:
@@ -11,8 +11,13 @@ def _bbox_is_code_listing(page: fitz.Page, bbox: fitz.Rect, threshold: float = 0
 
     LaTeX's `listings` package draws a shaded box (a vector-filled rectangle)
     behind source-code listings — that vector content is decorative styling
-    around text, not a diagram, and must not be mistaken for one.
+    around text, not a diagram, and must not be mistaken for one. Some PDFs
+    reference their code font under a generic internal name (e.g. "F91")
+    that carries none of the usual monospace name substrings, so this also
+    checks empirically measured fixed-width fonts on the page, same as
+    extraction.text.extract_monospace_lines.
     """
+    empirical_fonts = _empirically_monospace_fonts(page)
     d = page.get_text("dict", clip=bbox)
     total = 0
     mono = 0
@@ -23,7 +28,7 @@ def _bbox_is_code_listing(page: fitz.Page, bbox: fitz.Rect, threshold: float = 0
             for span in line.get("spans", []):
                 n = len(span["text"])
                 total += n
-                if any(m in span["font"].lower() for m in _MONOSPACE_FONT_MARKERS):
+                if any(m in span["font"].lower() for m in _MONOSPACE_FONT_MARKERS) or span["font"] in empirical_fonts:
                     mono += n
     return total > 0 and (mono / total) >= threshold
 

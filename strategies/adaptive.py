@@ -150,6 +150,30 @@ def _normalize_image_paths(markdown: str, figures_dir: str) -> list[str]:
     return refs
 
 
+def _drop_rendered_formula_images(refs: list[str], figures_dir: str, min_height: float = 50) -> list[str]:
+    """Drop images that are pymupdf4llm's own raster render of a formula.
+
+    When pymupdf4llm can't parse a complex equation as text, it falls back
+    to cropping that region as a small image (e.g. 638x37px for a one-line
+    equation) instead. Carrying that over as a figure_ref would tell the
+    vision model to embed it as-is, duplicating the formula it already
+    converts correctly to LaTeX from reading the page image. A real
+    diagram/logo is much taller than a single equation line, so height is a
+    reliable way to tell the two apart.
+    """
+    kept = []
+    for ref in refs:
+        path = os.path.join(figures_dir, os.path.basename(ref))
+        try:
+            height = fitz.Pixmap(path).height
+        except Exception:
+            kept.append(ref)
+            continue
+        if height >= min_height:
+            kept.append(ref)
+    return kept
+
+
 def render_page_as_base64(page: fitz.Page, dpi: int = 150) -> str:
     """Render a PDF page to a base64-encoded PNG string."""
     matrix = fitz.Matrix(dpi / 72, dpi / 72)
@@ -215,16 +239,7 @@ def adaptive_strategy(
                 re.IGNORECASE | re.MULTILINE,
             )
         )
-        if pre_extracted_markdown and not _is_toc_page and re.search(r'!\[.*?\]\(', pre_extracted_markdown):
-            page_type = PageType.MIXED
-            # Carry over the image(s) pymupdf4llm already found and saved —
-            # otherwise the vision LLM has no way to know they exist and the
-            # image is silently dropped from the output.
-            figure_refs = list(figure_refs or []) + _normalize_image_paths(pre_extracted_markdown, figures_dir)
-        else:
-            # TEXT pages have no images and no formulas (per analyze_page), so
-            # pymupdf4llm's output is the answer — skip the LLM entirely to save
-            # the 3–10 s round-trip per page.
+        def _text_fallback() -> ConversionResult:
             return text_call(
                 base_url=base_url,
                 model_name=model_name,
@@ -238,6 +253,40 @@ def adaptive_strategy(
                 llm_call=None,
                 pre_extracted_markdown=pre_extracted_markdown,
             )
+
+        if pre_extracted_markdown and not _is_toc_page and re.search(r'!\[.*?\]\(', pre_extracted_markdown):
+            # Carry over the image(s) pymupdf4llm already found and saved —
+            # otherwise the vision LLM has no way to know they exist and the
+            # image is silently dropped from the output. Excludes pymupdf4llm's
+            # own rendered-formula fallback images, which would otherwise
+            # duplicate the LaTeX the vision model converts them to.
+            carried_over = _drop_rendered_formula_images(
+                _normalize_image_paths(pre_extracted_markdown, figures_dir), figures_dir
+            )
+            figure_refs = list(figure_refs or []) + carried_over
+            result = image_call(
+                base_url=base_url,
+                model_name=model_name,
+                images=[page_image],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                prompt_variant="default",
+                figure_refs=figure_refs,
+                language=language,
+            )
+            # This page was already well-extracted as text — the vision
+            # detour is only meant to upgrade an embedded formula image to
+            # LaTeX, not replace the whole page. If the model fails outright
+            # (empty/truncated response), falling back to the known-good
+            # pymupdf4llm text is far safer than losing the page's content.
+            if len(result.markdown.strip()) < 0.3 * len(pre_extracted_markdown.strip()):
+                return _text_fallback()
+            return result
+        else:
+            # TEXT pages have no images and no formulas (per analyze_page), so
+            # pymupdf4llm's output is the answer — skip the LLM entirely to save
+            # the 3–10 s round-trip per page.
+            return _text_fallback()
 
     if page_type == PageType.FORMULA:
         return image_call(
@@ -295,7 +344,7 @@ def adaptive_strategy(
         )
 
     # MIXED — image with default prompt (best general coverage)
-    return image_call(
+    result = image_call(
         base_url=base_url,
         model_name=model_name,
         images=[page_image],
@@ -305,3 +354,27 @@ def adaptive_strategy(
         figure_refs=figure_refs,
         language=language,
     )
+    # A vision response that's suspiciously short compared to the page's own
+    # extractable text usually means the model got cut off partway through
+    # (e.g. hit max_tokens) rather than the page genuinely having little
+    # text. Falling back to the known-good text preserves the prose, even
+    # though the figure link isn't re-embedded in this fallback path.
+    if pre_extracted_markdown and len(result.markdown.strip()) < 0.3 * len(pre_extracted_markdown.strip()):
+        fallback = text_call(
+            base_url=base_url,
+            model_name=model_name,
+            pdf_path=pdf_path,
+            page_num=page_num,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            figures_dir=figures_dir,
+            prompt_variant="text",
+            language=language,
+            llm_call=None,
+            pre_extracted_markdown=pre_extracted_markdown,
+        )
+        if figure_refs:
+            refs_md = "\n".join(f"![Figure {i + 1}]({ref})" for i, ref in enumerate(figure_refs))
+            fallback.markdown = fallback.markdown.rstrip() + "\n\n" + refs_md
+        return fallback
+    return result

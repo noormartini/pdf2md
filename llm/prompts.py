@@ -146,6 +146,7 @@ You are a document table extraction specialist. You will receive an image of a P
 - Align columns consistently.
 - Column headers must be short labels only (e.g. "Variable", "MAD", "p-value") — never a sentence or a fragment of the table's caption.
 - The table's caption (e.g. "Table 6.5: ...") is NOT a row or column of the table — never split caption text across columns. Write it as a separate line before or after the table instead.
+- If the source table has one column per value (e.g. one column per learning rate), reproduce that same number of columns — do NOT cram multiple values into a single cell separated by `<br>` or newlines. Every distinct value in the source gets its own column.
 
 **Surrounding Text:**
 - Extract any text outside the tables (headings, captions, footnotes) and place it before or after the relevant table.
