@@ -148,6 +148,15 @@ evaluation design as well: the metric counts heading occurrences rather than
 verifying level assignments, so a strategy can score well on heading structure
 while consistently assigning the wrong depth to every heading.
 
+A related content-fidelity gap sits inside the postprocessing pipeline
+itself. Italic spans containing only Greek letters are converted to inline
+LaTeX math (Section~\ref{sec:postprocessing_pipeline}), but an italic
+single Latin letter, such as a variable written as \textit{s} or
+\textit{F}, is left as plain italic text. Pattern matching alone cannot
+reliably tell a math variable apart from a word in running prose that
+happens to be italicised for emphasis, so this case was left unhandled
+rather than risk corrupting ordinary text.
+
 The system processes only native PDFs with an extractable text layer. Scanned
 documents, where pages exist only as rasterised images, would require an OCR
 stage before classification, which the current implementation does not provide.
