@@ -80,7 +80,7 @@ well ahead of every fixed strategy, including text-only at 0.933 and
 image-only and hybrid at 0.944. Pages classified as TABLE or MIXED are
 routed to the vision model, which reads a table's visual grid directly
 instead of relying on the PDF's text layer, and that shows up as the widest
-gap anywhere in the results table.
+lead any strategy holds on any metric.
 
 Image-only and hybrid both trail on most metrics, but not by as much as an
 uncorrected reading of the raw model output would suggest.
@@ -90,10 +90,24 @@ three strategies, and heading structure (0.685) is its real remaining
 weakness. Hybrid's clearest weak point is also heading structure (0.523),
 the lowest score anywhere in the table.
 
+The paired permutation test from Section~4.3 puts these gaps on firmer
+footing. Against text-only, the only statistically significant difference is
+word overlap ($p = 0.004$), in adaptive's favour. Every other gap between the
+two could be chance at this corpus size. That includes the table structure
+advantage: only eight pages score differently on that metric at all, six of
+them in adaptive's favour, which is too few to reach significance
+($p = 0.29$). Against the vision strategies the differences are broader and
+more reliable. Adaptive is significantly better than image-only on text
+similarity ($p = 0.007$) and heading structure ($p = 0.024$), and
+significantly better than hybrid on text similarity, heading structure, code
+blocks, and word overlap (all $p < 0.05$). No metric shows a significant
+difference in favour of any fixed strategy over adaptive.
+
 These results partially answer RQ1 and RQ2. Adaptive does not beat
 text-only outright, but it comes within noise of every metric text-only
 leads and pulls well ahead on table structure and word overlap, the two
-metrics most sensitive to visual layout rather than plain prose. Section~\ref{sec:efficiency}
+metrics where routing visually complex pages to the vision model pays off
+most. Section~\ref{sec:efficiency}
 shows adaptive reaches this at a fraction of the cost of the two other
 vision-based strategies.
 
@@ -167,17 +181,27 @@ Hybrid     & 90 & 4{,}163 & 374{,}661 \\
 The per-call token cost is similar for all three VLM strategies, ranging
 from 3{,}669 to 4{,}163 tokens per call. The difference is in how many
 calls are made. Image-only and hybrid call the LLM on every one of the
-90 pages. Adaptive calls it on only 23 pages --- the pages the classifier
-identified as IMAGE, FORMULA, TABLE, or MIXED. The other 67 pages are
-TEXT pages that go through pymupdf4llm with no LLM call at all.
+90 pages. Adaptive calls it on only 23: the 11 pages the classifier
+identified as TABLE and the 12 it identified as MIXED. This corpus
+contains no pages that classify as IMAGE or FORMULA. The other 67 pages,
+63 plain-text pages and 4 empty ones, produce no LLM call at all.
 This reduces total token consumption by 75\% compared to image-only and
 77\% compared to hybrid. Hybrid consumes the most tokens of any strategy
 because it sends both the rendered page image and the extracted text in
 every request, which increases the input length on every call.
 
+One detail separates these measurements from the deployed pipeline.
+The evaluation harness routes purely by page type, so every TABLE page
+took the vision path here. The text-layer table shortcut and the TEXT-page
+reroute from Sections~5.3 and~5.4 both depend on the deployed pipeline's
+bulk pre-extraction step, which the harness does not replicate. In deployed
+use the call count for the same documents can therefore differ slightly in
+either direction: the shortcut removes calls for cleanly extracted tables,
+while the reroute adds calls for text pages with embedded formula images.
+
 These results confirm hypothesis H3: the adaptive system is significantly
 cheaper than image-only or hybrid in both processing time and token usage,
-while matching or beating them on most metrics. The efficiency gain grows
+while beating both on every quality metric. The efficiency gain grows
 with document length --- a 300-page document would consume roughly
 $300 \times 3{,}745 \approx 1.12$\,million tokens with image-only but only
 around $281{,}000$ with adaptive, assuming a similar content distribution.
@@ -190,27 +214,31 @@ The per-page breakdown shows that no single strategy wins every page.
 Across the 90 evaluated pages, image-only produces the highest text
 similarity on 19 pages, hybrid on 16, text-only on 11, and adaptive on 6.
 On the remaining 38 pages, two or more strategies scored equally.
-The variation reflects the content mix within each document.
-Pages with complex table or figure layouts favour hybrid and image-only.
-Dense text pages favour text-only or adaptive.
+Raw win counts are misleading here, though. Image-only and hybrid collect
+almost all of their wins on plain prose pages, where every strategy scores
+high and the winner is decided by a median margin of just 0.002. Adaptive's
+six wins are different in kind: five fall on TABLE pages, with a median
+winning margin of 0.17. Where the vision-based strategies win, the win is
+cosmetic. Where adaptive wins, the other strategies have genuinely failed
+the page.
 
 HITL page 9 shows the widest spread between strategies on a single page:
 adaptive scores 0.968, text-only 0.664, while image-only and hybrid collapse
 to 0.047 and 0.032. The reference file is a List of Tables, a short
-front-matter list set as a pipe table. PyMuPDF's table finder classifies
-this page as TABLE, and since pymupdf4llm already extracts a correct pipe
-table from it, adaptive takes the text-only path described in
-Section~\ref{sec:postprocessing_pipeline} instead of paying for a vision
-call it does not need. Image-only and hybrid have no such option: both
-render the page and ask the vision model to reconstruct the same list from
-a picture of it, and the model reproduces almost none of it correctly.
+front-matter list set as a pipe table. All three vision-based strategies
+sent this page to the same model as the same page image; the only difference
+is the prompt. The classifier labelled the page TABLE, so adaptive used the
+specialised table prompt, which instructs the model to rebuild pipe tables
+cell by cell (Section~5.4). Image-only and hybrid used the general-purpose
+prompt and reproduced almost none of the list correctly. On this page, one
+content-specific prompt on one correctly classified page outweighs every
+other difference between the strategies.
 
 An earlier version of this evaluation attributed adaptive's low score on
 table-of-contents continuation pages to its design choice of leaving them
 empty by default; correcting the evaluation to properly credit the
 postprocessing pipeline showed this cost was smaller than originally
-measured. HITL page 9 shows the opposite side of the same design: routing a
-reliable page away from the vision model is a clear win here, not a cost.
+measured.
 
 The strategy rankings are close across all three documents. Adaptive leads
 or matches text-only on table structure in every document: 1.000 versus
@@ -224,7 +252,8 @@ versus 0.830). None of these gaps exceed half a percentage point. This
 answers RQ5 more cleanly than the corpus-level averages alone: adaptive's
 table structure advantage holds in every document, and the remaining
 per-document variation in text similarity is small enough to read as noise
-rather than a real reversal. A document with more formula or image pages
+rather than a real reversal, a reading the significance tests in
+Section~6.2 support. A document with more formula or image pages
 would widen the gap between adaptive and text-only because the classifier
 would route more pages to the vision model.
 
@@ -252,12 +281,14 @@ from appearance rather than read it directly from the text.
 
 Table structure is the metric where the strategies diverge most clearly.
 Adaptive scores 0.978, ahead of every fixed strategy: text-only at 0.933,
-and image-only and hybrid both at 0.944. On pages where text extraction
-produces malformed or missing table markup, the vision model restores it,
-and the classifier sends exactly those pages there while leaving simpler
-tables in the faster text path (Section~\ref{sec:postprocessing_pipeline}).
-This is the metric where per-page routing provides a clear benefit beyond
-what either fixed strategy reaches alone.
+and image-only and hybrid both at 0.944. The gap to image-only and hybrid
+is not about routing, since all three send table pages to the same model.
+It is the prompt difference the HITL page~9 case in Section~6.4 showed in
+isolation, now visible at corpus level. This is the metric where per-page
+routing, and the content-specific prompt that comes with it, provides the
+largest observed benefit beyond what either fixed strategy reaches alone,
+though as Section~6.2 notes, the corpus holds too few table pages for that
+gap to reach statistical significance.
 
 Word overlap scores are close across all four strategies, ranging from
 0.804 (text-only) to 0.854 (adaptive). This means all strategies recover

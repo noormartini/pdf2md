@@ -301,21 +301,30 @@ def run_combinations(
     new_results: list[EvaluationResult] = []
     num_pages = len(pages)
 
-    doc = fitz.open(pdf_path)
-    limit = config.max_pages if config.max_pages else len(doc)
-    limit = min(limit, len(doc), num_pages)
-    page_labels = [_page_label(doc, i) for i in range(limit)]
-    raw_page_texts = [doc[i].get_text("text") for i in range(limit)]
-    code_lines_all = [extract_monospace_lines(doc[i]) for i in range(limit)]
-
+    # Page labels, raw text, and monospace lines feed clean_page() the same
+    # inputs app.py gives it. When the PDF can't be opened (tests inject the
+    # page text directly and pass a placeholder path), fall back to defaults —
+    # clean_page still runs, just without the font-derived extras.
     page_analyses = None
     adaptive_images = None
-    if "adaptive" in config.strategies:
-        print("Pre-analysing pages for adaptive strategy...")
-        page_analyses = [analyze_page(doc[i]) for i in range(limit)]
-        adaptive_images = [render_page_as_base64(doc[i]) for i in range(limit)]
-        print(f"  Page types: {[a.page_type.value for a in page_analyses]}\n")
-    doc.close()
+    try:
+        doc = fitz.open(pdf_path)
+    except Exception:
+        page_labels = [str(i + 1) for i in range(num_pages)]
+        raw_page_texts = [""] * num_pages
+        code_lines_all = [None] * num_pages
+    else:
+        limit = config.max_pages if config.max_pages else len(doc)
+        limit = min(limit, len(doc), num_pages)
+        page_labels = [_page_label(doc, i) for i in range(limit)]
+        raw_page_texts = [doc[i].get_text("text") for i in range(limit)]
+        code_lines_all = [extract_monospace_lines(doc[i]) for i in range(limit)]
+        if "adaptive" in config.strategies:
+            print("Pre-analysing pages for adaptive strategy...")
+            page_analyses = [analyze_page(doc[i]) for i in range(limit)]
+            adaptive_images = [render_page_as_base64(doc[i]) for i in range(limit)]
+            print(f"  Page types: {[a.page_type.value for a in page_analyses]}\n")
+        doc.close()
 
     total_combinations = (
         len(config.strategies)

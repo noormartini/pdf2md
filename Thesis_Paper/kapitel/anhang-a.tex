@@ -10,7 +10,8 @@ orchestration), \texttt{strategies/} (the four extraction strategies and the
 page classifier), \texttt{extraction/} (figure extraction, monospace-font
 detection, and language detection), \texttt{llm/} (prompt definitions and API
 client), \texttt{postprocess.py} (the two-stage post-processing pipeline), and
-\texttt{evaluation/} (metrics, strategy comparison, and report generation).
+\texttt{evaluation/} (metrics, strategy comparison, significance tests, and
+report generation).
 
 \section{Complete Results Tables}
 
@@ -114,7 +115,7 @@ PDF-extracted text into clean, well-structured Markdown.
 - Return ONLY the final Markdown - no preamble, no explanations.
 \end{lstlisting}
 
-\medskip\noindent\textbf{Variant: \textit{text} --- plain-text pages (adaptive TEXT path)}
+\medskip\noindent\textbf{Variant: \textit{text} --- optional LLM cleanup of the text path (unused in the default configuration)}
 
 \begin{lstlisting}[basicstyle=\footnotesize\ttfamily,breaklines=true,breakatwhitespace=true,columns=fullflexible,frame=single]
 You are a PDF-to-Markdown conversion specialist. You will receive raw text

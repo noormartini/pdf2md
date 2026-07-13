@@ -14,9 +14,13 @@ image-only and hybrid outright on all seven metrics, and is close enough to
 text-only to call four of the seven a win: list structure, table structure,
 word overlap, and an effective tie on text similarity (0.894 versus 0.893).
 Text-only still leads narrowly on heading structure, code blocks, and
-paragraph structure. Hypothesis H1 is now largely confirmed: adaptive is not
-the outright winner on every single metric, but it wins where it matters
-most for structural fidelity and never meaningfully falls behind on the rest.
+paragraph structure. The significance tests in Section~6.2 sharpen this
+picture: the only statistically reliable difference between adaptive and
+text-only is word overlap, in adaptive's favour, while the table advantage
+rests on too few pages to rule out chance. Hypothesis H1 is therefore
+confirmed against image-only and hybrid, and neutralised against text-only.
+On a corpus this prose-heavy, adaptive cannot demonstrate superiority over
+direct extraction, but it never falls significantly behind it either.
 
 Hypothesis H2 predicted that text-only would fail on image-heavy or
 formula-rich content, while image-only and hybrid would handle diverse
@@ -46,8 +50,9 @@ hybrid, all measured on the same rented GPU (Section~4.4). The speedup comes
 directly from the classifier: most thesis pages are classified as TEXT and
 handled by pymupdf4llm without any LLM call. The classifier adds a small
 fixed cost per page but avoids the dominant cost, model inference, on the
-majority of pages. The adaptive strategy is roughly 4.5 times cheaper than
-either image-only or hybrid while matching or beating both on every metric.
+majority of pages. Combined with the quality results, this makes the two
+always-vision baselines strictly worse choices on this corpus: they cost
+about 4.5 times more and win nothing in exchange.
 
 \section{Comparison with Related Work}
 
@@ -71,9 +76,12 @@ local model.
 Subramani et al.\ \autocite{subramani2020} surveyed document layout
 analysis methods and identified four recurring challenges: formula
 recognition, table extraction, figure captioning, and reading-order
-recovery. The results in Chapter~6 confirm that formulas and reading
-order are the hardest tasks for the text extraction path, while table
-extraction is where the adaptive routing adds the most value.
+recovery. This evaluation can only speak to part of that list, since the
+corpus contains no formula-dominated pages and the metrics do not measure
+reading order directly. For the part it does test, the results agree:
+table extraction is where the adaptive routing adds the most value, and
+heading hierarchy, a challenge Subramani et al.\ do not name, proved the
+hardest structural task for every strategy in Chapter~6.
 OmniDocBench \autocite{omnidocbench2025} recently showed that multi-modal
 models outperform text-only parsers on layout-rich documents. This is
 consistent with the table structure result here (adaptive 0.978 versus
@@ -133,7 +141,7 @@ levels would score well on text similarity but fail in practice. The heading
 structure metric partially addresses this, but it counts headings rather than
 verifying their level assignments.
 
-External validity is the main open question. The corpus covers three bachelor theses --- one in German, two in English --- totalling 90 pages. Three documents is a very small sample. The rankings are close and consistent across all three (Section~\ref{sec:rq5_consistency}): adaptive leads or matches text-only on table structure in every document, and the remaining gap in text similarity is small enough on each one to read as noise rather than a real difference. Even so, a sample of three cannot establish generalisability across document types.
+External validity is the main open question. The corpus covers three bachelor theses --- one in German, two in English --- totalling 90 pages. Three documents is a very small sample. The rankings are close and consistent across all three (Section~\ref{sec:rq5_consistency}): adaptive leads or matches text-only on table structure in every document, and the remaining gap in text similarity is not statistically significant (Section~6.2). Even so, a sample of three cannot establish generalisability across document types.
 
 The results depend on what thesis documents look like. The three documents in this study follow a standard single-column layout with numbered headings, code listings, and occasional tables. That structure favours text-only extraction: the text layer is clean and PyMuPDF reproduces it accurately. Multi-column scientific papers, documents with dense formula environments, or reports with irregular table structures would break this advantage. On such documents, the vision strategies would likely close the gap or overtake text-only on more metrics.
 
@@ -145,4 +153,4 @@ An initial, informal test during this thesis's revision ran the system on the sa
 
 These pipeline fixes address real output-quality problems that the seven-metric framework does not fully capture. A page where code renders as a screenshot instead of a fenced block may still register a similar code block score to one where it renders correctly, since the metric counts fence markers rather than assessing whether the page layout itself is sound.
 
-After fixing those bugs, the model comparison was repeated formally: both models were run through the corrected pipeline and scored with the same postprocessing-aware evaluation used everywhere else in this chapter. The two models are close on most metrics. The larger model shows a genuine, specific improvement in heading structure --- 0.224 higher for hybrid and 0.141 higher for image-only --- while table structure declines slightly across all three vision-based strategies, by 0.011 to 0.034, and code block score and text similarity are effectively flat. This is a more specific finding than "a bigger model helps": it helps with the one structural element that depends most on the model inferring visual hierarchy from the page image, and does not help, or slightly hurts, on a different structural element that the classifier already routes carefully regardless of model size. This remains an informal comparison outside the main experimental design, since it reuses the same three documents rather than an independent test set, but the pattern is specific enough to be worth a controlled follow-up rather than a general claim that bigger models perform better.
+After fixing those bugs, the model comparison was repeated formally: both models were run through the corrected pipeline and scored with the same postprocessing-aware evaluation used everywhere else in this chapter. The two models are close on most metrics. The larger model shows a genuine, specific improvement in heading structure --- 0.224 higher for hybrid and 0.141 higher for image-only --- while table structure declines slightly across all three vision-based strategies, by 0.011 to 0.034, and code block score and text similarity are effectively flat. This is a more specific finding than "a bigger model helps": it helps with the one structural element that depends most on the model inferring visual hierarchy from the page image, and does not help, or slightly hurts, on a different structural element that the specialised table prompt already handles well regardless of model size. This remains an informal comparison outside the main experimental design, since it reuses the same three documents rather than an independent test set, but the pattern is specific enough to be worth a controlled follow-up rather than a general claim that bigger models perform better.

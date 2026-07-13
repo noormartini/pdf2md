@@ -169,8 +169,9 @@ def test_run_combinations_skips_pages_with_no_reference(tmp_path: Path):
     cfg = _cfg(str(tmp_path), max_pages=2)
     record: list = []
     results = run_combinations(["t1", "t2"], ["i1", "i2"], cfg, pdf_path="unused", runner=_make_fake_runner(record))
-    # Page 2 reference missing → skipped before runner is called
-    assert len(record) == 1
+    # Every page is converted (postprocess_markdown needs the full joined
+    # document), but pages without a reference are skipped at scoring time.
+    assert len(record) == 2
     assert len(results) == 1
     assert results[0].page_number == 1
 

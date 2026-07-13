@@ -1,8 +1,8 @@
 \chapter{Conclusion}
 
 Per-page strategy selection beats both other vision-based strategies outright
-on every metric, produces a clear improvement on table structure over every
-fixed strategy, and reduces token consumption by 75 per cent compared to
+on every metric, holds the largest observed advantage on table structure of
+any strategy, and reduces token consumption by 75 per cent compared to
 image-only processing. Whether it beats the simplest baseline, direct text
 extraction, depends on which metric matters most, and the two are close
 enough that either could be the right default depending on the use case.
@@ -23,14 +23,16 @@ any fixed strategy. Adaptive beats image-only and hybrid outright on every
 metric, and is close enough to text-only to call it a win on four of the
 seven: list structure, table structure, word overlap, and an effective tie
 on text similarity. Its clearest advantage is table structure, where
-adaptive scores 0.978 against text-only's 0.933. This advantage comes
-directly from the classifier routing table pages to the vision model, which
-reads the visual grid structure rather than relying on the PDF text layer,
-while still using the reliable text path for tables pymupdf4llm already
-extracts correctly (Section~\ref{sec:postprocessing_pipeline}). Hypothesis
-H1 is now largely confirmed: adaptive does not sweep every single metric,
-but it wins where it matters most for structural fidelity and never
-meaningfully falls behind on the rest.
+adaptive scores 0.978 against text-only's 0.933. This advantage comes from
+pairing each table page with the specialised table prompt rather than the
+general-purpose one, a mechanism Section~\ref{sec:rq5_consistency}
+demonstrates on a single page. The advantage holds in every document
+but rests on the corpus's few table pages, so it stays below statistical
+significance (Section~6.2). Hypothesis H1 splits accordingly: confirmed
+against both vision baselines, where adaptive is significantly better on
+the broad-based metrics and never significantly worse on any, and
+neutralised against text-only, where the only reliable difference, word
+overlap, favours adaptive.
 
 RQ2 asked how the three fixed strategies rank against each other. Text-only
 leads on heading structure (0.808), code blocks (1.000), and paragraph
@@ -73,9 +75,10 @@ than a real difference (Section~\ref{sec:rq5_consistency}).
 The primary contribution of this thesis is a per-page content classifier that
 assigns each PDF page to one of six types: TEXT, IMAGE, FORMULA, TABLE, MIXED,
 or EMPTY. The classifier uses four structural signals derived from PyMuPDF:
-embedded image count, vector path density, mathematical Unicode character
-presence, and table detection. No machine learning is required. Classification is
-deterministic, runs in under a millisecond per page, and assigns a confidence
+embedded image count, vector path count, text-layer character count, and
+table detection. No machine learning is required. Classification is
+deterministic, costs around 60 milliseconds per page, most of it spent in
+PyMuPDF's table detection, and assigns a confidence
 score that reflects how reliably the content type was identified. Ingemarsson and
 Persson \autocite{ingemarsson2024} measured that rule-based tools score zero
 percent on image-only pages; this classifier is what allows the system to identify
@@ -111,8 +114,10 @@ structured document. For accessibility, Darvishy \autocite{darvishy2018} noted
 that no existing tool can describe mathematical formulas or scientific graphs from
 PDFs; routing formula and image pages to a vision-language model addresses this
 within the same pipeline. The key finding is that matching the extraction approach
-to the content of each page produces better results than any fixed strategy, and
-does so at a fraction of the computational cost.
+to the content of each page beats every fixed vision strategy on every metric
+at a quarter of their cost, and turns the choice against the text-only
+baseline into a genuine trade-off: a small speed premium buys the best table
+structure of any strategy without giving up ground anywhere else.
 
 \section{Limitations of the Study}
 

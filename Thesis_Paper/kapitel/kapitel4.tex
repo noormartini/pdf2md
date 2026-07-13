@@ -140,6 +140,15 @@ enough to require cell-level scoring, and producing cell-level annotations
 by hand for a multi-document corpus carries a high annotation cost.
 Table detection score covers the relevant case for this evaluation.
 
+Score differences between strategies are tested for statistical significance
+with a paired sign-flip permutation test. Every page is converted by all four
+strategies, so per-page scores form matched pairs, and the test asks how often
+a mean difference at least as large as the observed one would arise if each
+page's difference were equally likely to carry either sign. The test is
+two-sided, uses 100{,}000 resamples, and treats $p < 0.05$ as significant.
+It makes no assumption about how the scores are distributed, which matters
+for metrics where most pages tie and only a handful differ.
+
 \section{Experimental Design}
 
 The experiment applies each of the four strategies to every document in
