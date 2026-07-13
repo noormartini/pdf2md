@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -14,9 +15,38 @@ from strategies.image_only import image_strategy
 from strategies.hybrid import hybrid_strategy
 from strategies.adaptive import analyze_page, adaptive_strategy, render_page_as_base64, PageType
 from strategies.result import ConversionResult
-from extraction.text import extract_pages_from_pdf
+from extraction.text import extract_pages_from_pdf, extract_monospace_lines
 from extraction.image import extract_pages_from_pdf as extract_images_from_pdf
 from evaluation.metrics import evaluate_conversion, EvaluationResult, aggregate_results
+from postprocess import clean_page, postprocess_markdown
+
+
+_PAGE_MARKER_RE = re.compile(r"<!--\s*Page\s+(.+?)\s*-->")
+
+
+def _page_label(doc: fitz.Document, index: int) -> str:
+    """Return the printed page label (e.g. 'v', '3') for a 0-based page index.
+
+    Mirrors app.py's `_page_label` exactly so postprocess_markdown sees the
+    same page-comment format the real pipeline produces.
+    """
+    label = doc[index].get_label()
+    return label if label else str(index + 1)
+
+
+def _split_postprocessed_pages(joined: str, expected_count: int) -> list[str]:
+    """Split a postprocess_markdown'd document back into per-page bodies.
+
+    Splits on the `<!-- Page X -->` markers `clean_page` output was joined
+    with, discarding the marker itself so the returned strings are directly
+    comparable to what the old (pre-fix) evaluation scored.
+    """
+    parts = _PAGE_MARKER_RE.split(joined)
+    # re.split with a capturing group yields [pre, label1, body1, label2, body2, ...]
+    bodies = [parts[i] for i in range(2, len(parts), 2)]
+    if len(bodies) != expected_count:
+        print(f"  ⚠ Page split mismatch: expected {expected_count}, got {len(bodies)}")
+    return bodies
 
 
 @dataclass
@@ -248,11 +278,20 @@ def run_combinations(
     done_keys: set[tuple] = None,
     output_path: str = "",
 ) -> list[EvaluationResult]:
-    """Loop over every (strategy, model, prompt, temperature, page) combination.
+    """Loop over every (strategy, model, prompt, temperature) combination.
 
-    Skips combinations already present in `done_keys` and saves incrementally
-    to `output_path` after each completed page so the run can be resumed if
-    interrupted.
+    For each combination, every page is converted first, then run through
+    the same two-stage postprocessing the real pipeline (app.py) applies —
+    `clean_page()` per page, then `postprocess_markdown()` once on the whole
+    joined document — before being split back apart and scored. This mirrors
+    what a real user of the tool actually receives, rather than scoring the
+    raw pre-postprocessing strategy output.
+
+    Skips a combination entirely if all of its pages are already present in
+    `done_keys`; otherwise the whole combination is redone (postprocessing
+    needs every page together, so partial per-page resume isn't possible
+    within a combination). Saves incrementally to `output_path` after each
+    completed combination.
     """
     if all_results is None:
         all_results = []
@@ -262,22 +301,36 @@ def run_combinations(
     new_results: list[EvaluationResult] = []
     num_pages = len(pages)
 
+    # Page labels, raw text, and monospace lines feed clean_page() the same
+    # inputs app.py gives it. When the PDF can't be opened (tests inject the
+    # page text directly and pass a placeholder path), fall back to defaults —
+    # clean_page still runs, just without the font-derived extras.
     page_analyses = None
-    if "adaptive" in config.strategies:
-        print("Pre-analysing pages for adaptive strategy...")
+    adaptive_images = None
+    try:
         doc = fitz.open(pdf_path)
+    except Exception:
+        page_labels = [str(i + 1) for i in range(num_pages)]
+        raw_page_texts = [""] * num_pages
+        code_lines_all = [None] * num_pages
+    else:
         limit = config.max_pages if config.max_pages else len(doc)
-        page_analyses = [analyze_page(doc[i]) for i in range(min(limit, len(doc)))]
-        adaptive_images = [render_page_as_base64(doc[i]) for i in range(min(limit, len(doc)))]
+        limit = min(limit, len(doc), num_pages)
+        page_labels = [_page_label(doc, i) for i in range(limit)]
+        raw_page_texts = [doc[i].get_text("text") for i in range(limit)]
+        code_lines_all = [extract_monospace_lines(doc[i]) for i in range(limit)]
+        if "adaptive" in config.strategies:
+            print("Pre-analysing pages for adaptive strategy...")
+            page_analyses = [analyze_page(doc[i]) for i in range(limit)]
+            adaptive_images = [render_page_as_base64(doc[i]) for i in range(limit)]
+            print(f"  Page types: {[a.page_type.value for a in page_analyses]}\n")
         doc.close()
-        print(f"  Page types: {[a.page_type.value for a in page_analyses]}\n")
 
     total_combinations = (
         len(config.strategies)
         * len(config.models)
         * len(config.prompt_variants)
         * len(config.temperatures)
-        * num_pages
     )
     current = 0
 
@@ -285,26 +338,22 @@ def run_combinations(
         for model in config.models:
             for prompt_variant in config.prompt_variants:
                 for temperature in config.temperatures:
-                    for page_idx in range(num_pages):
-                        current += 1
-                        page_num = page_idx + 1
-                        key = _done_key(pdf_path, page_num, strategy, model,
-                                        prompt_variant, temperature)
-
-                        if key in done_keys:
-                            print(f"[{current}/{total_combinations}] "
-                                  f"Page {page_num} | {strategy} | skipped (already done)")
-                            continue
-
+                    current += 1
+                    combo_keys = [
+                        _done_key(pdf_path, i + 1, strategy, model, prompt_variant, temperature)
+                        for i in range(num_pages)
+                    ]
+                    if all(k in done_keys for k in combo_keys):
                         print(f"[{current}/{total_combinations}] "
-                              f"Page {page_num} | {strategy} | {model} | "
-                              f"prompt={prompt_variant} | temp={temperature}")
+                              f"{strategy} | {model} | skipped (already done)")
+                        continue
 
-                        reference = load_reference(config.reference_dir, page_num, pdf_path)
-                        if reference is None:
-                            print(f"  ⚠ No reference found for page {page_num}, skipping")
-                            continue
+                    print(f"[{current}/{total_combinations}] "
+                          f"{strategy} | {model} | prompt={prompt_variant} | temp={temperature}")
 
+                    # Stage 0: convert every page, raw (matches the old per-page loop).
+                    raw_results: list[tuple] = []  # (markdown, timing_ms, token_usage, llm_calls, error)
+                    for page_idx in range(num_pages):
                         page_text = pages[page_idx]
 
                         if strategy == "adaptive" and page_analyses is not None:
@@ -327,20 +376,58 @@ def run_combinations(
                             prompt_variant=prompt_variant,
                             page_type=page_type,
                         )
-
+                        markdown = result.markdown if result else ""
                         timing_ms = result.timing_ms if result else 0.0
                         token_usage = result.token_usage if result else None
                         llm_calls = result.llm_calls if result else 0
-                        markdown = result.markdown if result else ""
-
                         if error:
-                            print(f"  ✗ Error: {error}")
-                        else:
-                            print(f"  ✓ Completed in {timing_ms:.0f}ms")
+                            print(f"  ✗ Page {page_idx + 1}: {error}")
+                        raw_results.append((markdown, timing_ms, token_usage, llm_calls, error))
+
+                    # Stage 1: clean_page() per page — same args app.py passes per strategy.
+                    cleaned_pages: list[str] = []
+                    for page_idx, (markdown, *_rest) in enumerate(raw_results):
+                        label = page_labels[page_idx] if page_idx < len(page_labels) else str(page_idx + 1)
+                        if strategy == "text":
+                            raw_text = raw_page_texts[page_idx] if page_idx < len(raw_page_texts) else ""
+                            code_lines = code_lines_all[page_idx] if page_idx < len(code_lines_all) else None
+                            cleaned = clean_page(markdown, raw_page_text=raw_text, code_lines=code_lines)
+                        elif strategy == "adaptive":
+                            raw_text = raw_page_texts[page_idx] if page_idx < len(raw_page_texts) else ""
+                            is_text_page = (
+                                page_analyses is not None
+                                and page_idx < len(page_analyses)
+                                and page_analyses[page_idx].page_type == PageType.TEXT
+                            )
+                            code_lines = code_lines_all[page_idx] if is_text_page and page_idx < len(code_lines_all) else None
+                            cleaned = clean_page(markdown, raw_page_text=raw_text, code_lines=code_lines)
+                        else:  # image, hybrid
+                            cleaned = clean_page(markdown)
+                        cleaned_pages.append(f"<!-- Page {label} -->\n\n{cleaned}")
+
+                    # Stage 2: join + postprocess_markdown() once, then split back apart.
+                    joined = "\n\n---\n\n".join(cleaned_pages)
+                    joined = postprocess_markdown(joined)
+                    final_pages = _split_postprocessed_pages(joined, num_pages)
+
+                    # Score each page against its reference using the final, postprocessed text.
+                    for page_idx in range(num_pages):
+                        page_num = page_idx + 1
+                        key = combo_keys[page_idx]
+                        if key in done_keys:
+                            continue
+
+                        reference = load_reference(config.reference_dir, page_num, pdf_path)
+                        if reference is None:
+                            print(f"  ⚠ No reference found for page {page_num}, skipping")
+                            continue
+
+                        _, timing_ms, token_usage, llm_calls, error = raw_results[page_idx]
+                        final_markdown = final_pages[page_idx] if page_idx < len(final_pages) else ""
 
                         eval_result = evaluate_conversion(
                             reference=reference,
-                            candidate=markdown,
+                            candidate=final_markdown,
                             page_number=page_num,
                             strategy=strategy,
                             model=model,
@@ -356,8 +443,10 @@ def run_combinations(
                         new_results.append(eval_result)
                         all_results.append(eval_result)
                         done_keys.add(key)
-                        if output_path:
-                            save_results(all_results, output_path)
+
+                    print(f"  ✓ Combination done ({num_pages} pages)")
+                    if output_path:
+                        save_results(all_results, output_path)
 
     return new_results
 

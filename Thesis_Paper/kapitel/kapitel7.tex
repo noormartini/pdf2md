@@ -1,53 +1,58 @@
 \chapter{Discussion}
 
-The experimental results answer all five research questions, but three of the
-four hypotheses required revision. The sections below examine why the results
-took the shape they did and what they mean for practical use of the system.
+The experimental results answer all five research questions, and change the
+picture for two of the four hypotheses. The sections below examine why the
+results took the shape they did and what they mean for practical use of the
+system.
 
 \section{Interpretation of Results}
 
-The most unexpected finding is that text-only extraction outperforms
-all three vision-based strategies on five of seven metrics.
-Hypothesis H1 predicted that the adaptive system would outperform every
-fixed strategy. Hypothesis H4 predicted that hybrid would be a strong
-baseline. Neither held for this corpus.
+The clearest change from the corrected results is how well adaptive holds
+up. Hypothesis H1 predicted that the adaptive system would outperform every
+fixed strategy on documents with diverse content. Adaptive beats both
+image-only and hybrid outright on all seven metrics, and is close enough to
+text-only to call four of the seven a win: list structure, table structure,
+word overlap, and an effective tie on text similarity (0.894 versus 0.893).
+Text-only still leads narrowly on heading structure, code blocks, and
+paragraph structure. The significance tests in Section~6.2 sharpen this
+picture: the only statistically reliable difference between adaptive and
+text-only is word overlap, in adaptive's favour, while the table advantage
+rests on too few pages to rule out chance. Hypothesis H1 is therefore
+confirmed against image-only and hybrid, and neutralised against text-only.
+On a corpus this prose-heavy, adaptive cannot demonstrate superiority over
+direct extraction, but it never falls significantly behind it either.
 
-The explanation lies in the document type. Thesis documents consist
-largely of continuous prose. PyMuPDF extracts machine-typed text with
-near-perfect character accuracy. A vision-language model does not
-transcribe verbatim: it paraphrases, reorders, and sometimes drops
-sentences when given a page image. On text-dominant content, exact
-transcription beats model-generated output every time.
+Hypothesis H2 predicted that text-only would fail on image-heavy or
+formula-rich content, while image-only and hybrid would handle diverse
+content well at a higher computational cost. The strongest evidence for the
+failure half of this prediction, in an earlier version of this evaluation,
+was image-only's near-total collapse on code blocks (0.250). With
+postprocessing correctly credited, that score is 0.972, close to every other
+strategy. The underlying bug was real --- code sometimes rendered as a
+screenshot instead of a fenced block --- but it was a pipeline defect, not
+evidence that vision models cannot transcribe code. What survives from H2 is
+the cost half of the prediction: image-only and hybrid are still far more
+expensive per page than text-only or adaptive, without a matching gain in
+accuracy on this text-dominant corpus.
 
-Hypothesis H2 is partially confirmed. Text-only does fail on formula
-and table content, as predicted. The code block score of 0.889 for
-text-only is high because the thesis documents contain structured code
-listings that pymupdf4llm extracts reliably. Image-only collapses on
-the same metric (0.250), which confirms that the VLM does not reproduce
-code blocks exactly. The model reads the code, understands it, and
-writes its own version, which differs from the reference character by
-character. This is not a failure of vision capability; it is a
-paraphrasing tendency that makes VLMs unsuitable for verbatim
-transcription tasks.
+Hybrid performs worse than every other strategy on heading structure (0.523)
+and worse than text-only and adaptive on text similarity, which hypothesis
+H4 did not anticipate. Providing both the page image and the extracted text
+does not help. The model receives conflicting signals (the image shows one
+layout, the text extraction shows another) and appears to weight the image,
+which produces the lowest heading score of any strategy. More input is not
+always better. Hypothesis H4 is rejected: hybrid loses to adaptive on every
+one of the seven metrics.
 
-Hybrid performs worse than image-only on text similarity and heading
-structure, which hypothesis H4 did not anticipate. Providing both the
-page image and the extracted text does not help. The model receives
-conflicting signals (the image shows one layout, the text extraction
-shows another) and appears to weight the image, which introduces the
-same paraphrasing issues as image-only while also producing a lower
-heading count (0.348 versus 0.429). More input is not always better.
-Hypothesis H4 is rejected.
-
-Hypothesis H3 is confirmed. The adaptive system processes a page in
-20{,}790\,ms on average, compared to 64{,}696\,ms for image-only and
-68{,}009\,ms for hybrid. The speedup comes directly from the
-classifier: most thesis pages are classified as TEXT and handled by
-pymupdf4llm without any LLM call. The classifier adds a small fixed
-cost per page but avoids the dominant cost, model inference, on the
-majority of pages. The adaptive strategy is 3.1 times cheaper than
-image-only while matching or exceeding it on every metric except list
-structure and word overlap.
+Hypothesis H3 is confirmed. The adaptive system processes a page in 705\,ms
+on average, compared to 3{,}250\,ms for image-only and 3{,}170\,ms for
+hybrid, all measured on the same rented GPU (Section~4.4). The speedup comes
+directly from the classifier: most thesis pages are classified as TEXT and
+handled by pymupdf4llm without any LLM call. The classifier adds a small
+fixed cost per page but avoids the dominant cost, model inference, on the
+majority of pages. Combined with the quality results, this makes the two
+always-vision baselines strictly worse choices on this corpus: they cost
+about 4.5 times more and win nothing in exchange.
 
 \section{Comparison with Related Work}
 
@@ -71,23 +76,28 @@ local model.
 Subramani et al.\ \autocite{subramani2020} surveyed document layout
 analysis methods and identified four recurring challenges: formula
 recognition, table extraction, figure captioning, and reading-order
-recovery. The results in Chapter~6 confirm that formulas and reading
-order are the hardest tasks for the text extraction path, while table
-extraction is where the adaptive routing adds the most value.
+recovery. This evaluation can only speak to part of that list, since the
+corpus contains no formula-dominated pages and the metrics do not measure
+reading order directly. For the part it does test, the results agree:
+table extraction is where the adaptive routing adds the most value, and
+heading hierarchy, a challenge Subramani et al.\ do not name, proved the
+hardest structural task for every strategy in Chapter~6.
 OmniDocBench \autocite{omnidocbench2025} recently showed that multi-modal
 models outperform text-only parsers on layout-rich documents. This is
-consistent with the table structure result here (adaptive 0.956 versus
-text-only 0.922), but the advantage disappears on text-dominant pages.
+consistent with the table structure result here (adaptive 0.978 versus
+text-only 0.933), but the advantage narrows on text-dominant pages.
 
 \section{Practical Implications}
 \label{sec:practical_implications}
 
-For thesis documents specifically, the text strategy is the best choice
-when speed matters and the document has no complex tables or formulas.
-It is 105 times faster than adaptive and scores higher on most metrics.
-For documents with unknown content distribution, the adaptive strategy
-is the safest choice: it matches text-only on text pages, improves on
-table pages, and avoids the code block collapse that image-only produces.
+For thesis documents specifically, the text strategy is still attractive
+when speed matters most: it is 4.6 times faster than adaptive, and the two
+are close enough on most metrics that the choice comes down to how much the
+extra table-structure accuracy is worth for a given use case. For documents
+with unknown content distribution, the adaptive strategy is the safer
+choice. It beats every vision-based fixed strategy outright, comes within
+noise of text-only on the metrics text-only leads, and improves
+substantially on table pages.
 
 The page classifier is the key component. Its accuracy directly
 determines how much of the efficiency gain is captured. A page
@@ -97,17 +107,15 @@ classifier in this system uses character count, embedded image count,
 vector path density, and PyMuPDF's table detector, which works well for
 thesis layouts but may need adjustment for other document types.
 
-The classifier routes every page with a detected table to the vision LLM.
-This is a conservative choice.
-For complex tables (merged cells, irregular column spans, or figures embedded
-in cells) the VLM produces more accurate output than pymupdf4llm alone, because
-it reads the visual structure rather than the extracted character stream.
-For the simpler tables common in academic theses, however, pymupdf4llm extracts
-rows and columns directly and would produce equally correct Markdown at no
-inference cost.
-A refined classifier could add a complexity check and keep simple tables in the
-text path, reducing token usage and inference time without sacrificing quality
-on the majority of pages.
+A page with a detected table does not automatically go to the vision LLM.
+The system first checks whether pymupdf4llm's own extraction already produced a valid Markdown pipe table from the text layer.
+If it did, the page is treated like plain text: no image is rendered and no inference cost is paid, since pymupdf4llm reads the character stream directly and reproduces simple rows and columns correctly at no cost.
+Only when that extraction fails --- typically a scanned page or a table embedded as an image --- does the page fall back to the vision LLM, which reads the visual grid structure instead of the extracted characters.
+This matters for complex tables specifically: merged cells, irregular column spans, or figures embedded in cells are exactly the cases pymupdf4llm's text-layer extraction struggles with, so the vision fallback is reserved for the pages that actually need it.
+
+The current check is presence-based rather than quality-based: it asks whether pymupdf4llm produced \emph{some} pipe table, not whether that table is \emph{correct}.
+A table with merged cells can still cause pymupdf4llm to emit a technically valid but wrong pipe table --- for example, flattening a merged header into the wrong number of columns --- and the current check would accept that output without ever reaching the vision path.
+A refined version of this check would inspect the extracted table's structure (column count consistency across rows, for instance) rather than just its presence, catching these silent mis-extractions before they reach the final Markdown.
 
 Formula pages currently use the general-purpose Qwen2.5-VL-7B model.
 A dedicated formula recognition tool such as pix2tex could replace
@@ -133,16 +141,16 @@ levels would score well on text similarity but fail in practice. The heading
 structure metric partially addresses this, but it counts headings rather than
 verifying their level assignments.
 
-External validity is the main open question. The corpus covers three bachelor theses --- two in German, one in English --- totalling 90 pages. Three documents is a very small sample. The rankings are consistent across all three, but consistency across three documents does not establish generalisability across document types.
+External validity is the main open question. The corpus covers three bachelor theses --- one in German, two in English --- totalling 90 pages. Three documents is a very small sample. The rankings are close and consistent across all three (Section~\ref{sec:rq5_consistency}): adaptive leads or matches text-only on table structure in every document, and the remaining gap in text similarity is not statistically significant (Section~6.2). Even so, a sample of three cannot establish generalisability across document types.
 
 The results depend on what thesis documents look like. The three documents in this study follow a standard single-column layout with numbered headings, code listings, and occasional tables. That structure favours text-only extraction: the text layer is clean and PyMuPDF reproduces it accurately. Multi-column scientific papers, documents with dense formula environments, or reports with irregular table structures would break this advantage. On such documents, the vision strategies would likely close the gap or overtake text-only on more metrics.
 
 Language and script add a second dimension. The language detection module adds a prompt hint that preserves the output language, but the classifier thresholds --- particularly the 50-character minimum for TEXT classification --- were calibrated on German and English content. Right-to-left scripts such as Arabic or Hebrew, or documents mixing CJK characters with Latin text, have not been tested. The character count threshold may behave differently on short-character scripts, misclassifying pages that should route to the vision model. Testing on a two-column scientific paper and a right-to-left script document would be the most informative next step for external validation.
 
-The model dependency is a limitation of this evaluation, not of the system. All VLM results use Qwen2.5-VL-7B. The architecture is model-agnostic: the server URL and model name are parameters, so any OpenAI-compatible vision-language model can be substituted without code changes. The text-only strategy has no such dependency. Its output comes from the PDF content and the pymupdf4llm version, both stable across runs.
+The model dependency is a limitation of this evaluation, not of the system. All formal VLM results use Qwen2.5-VL-7B. The architecture is model-agnostic: the server URL and model name are parameters, so any OpenAI-compatible vision-language model can be substituted without code changes. The text-only strategy has no such dependency. Its output comes from the PDF content and the pymupdf4llm version, both stable across runs.
 
-Informal testing during this thesis's revision tested part of the model-dependency question. The system was run on the same thesis documents with a larger model, Qwen3.5-35B-A3B, served from a rented cloud GPU instead of local hardware. This was not a controlled experiment and produced no new metric scores. But it surfaced a distinction the original hypothesis did not make.
+An initial, informal test during this thesis's revision ran the system on the same three documents with a much larger model, Qwen3.6-35B-A3B. A 35B-parameter model does not fit in the GPU memory or storage available on local hardware, so this test used a rented cloud GPU instead. That first pass, run before several pipeline bugs were fixed, surfaced a useful distinction the original hypothesis did not make: several failures that looked like model capability gaps turned out to be bugs in the pipeline instead. Figures were sometimes extracted from the wrong region of a page. Code listings were rendered as pictures instead of text. A formula sometimes appeared twice: once correctly converted to \LaTeX{} by the model, and once again as a duplicate raster image the pipeline had carried over by mistake. None of this needed a different model. It needed a fix to the extraction step that ran before the page ever reached the model.
 
-Several failures that looked like model capability gaps turned out to be bugs in the pipeline instead. Figures were sometimes extracted from the wrong region of a page. Code listings were rendered as pictures instead of text. A formula sometimes appeared twice: once correctly converted to \LaTeX{} by the model, and once again as a duplicate raster image the pipeline had carried over by mistake. None of this needed a different model. It needed a fix to the extraction step that ran before the page ever reached the model.
+These pipeline fixes address real output-quality problems that the seven-metric framework does not fully capture. A page where code renders as a screenshot instead of a fenced block may still register a similar code block score to one where it renders correctly, since the metric counts fence markers rather than assessing whether the page layout itself is sound.
 
-Other failures held up regardless of model size. Wide tables with many columns still collapsed into fewer columns than the source. The model still rewrote source code in its own words instead of copying it exactly. A larger model may close part of the gap the original hypothesis predicted, but not all of it. Some of that gap was never a model problem to begin with.
+After fixing those bugs, the model comparison was repeated formally: both models were run through the corrected pipeline and scored with the same postprocessing-aware evaluation used everywhere else in this chapter. The two models are close on most metrics. The larger model shows a genuine, specific improvement in heading structure --- 0.224 higher for hybrid and 0.141 higher for image-only --- while table structure declines slightly across all three vision-based strategies, by 0.011 to 0.034, and code block score and text similarity are effectively flat. This is a more specific finding than "a bigger model helps": it helps with the one structural element that depends most on the model inferring visual hierarchy from the page image, and does not help, or slightly hurts, on a different structural element that the specialised table prompt already handles well regardless of model size. This remains an informal comparison outside the main experimental design, since it reuses the same three documents rather than an independent test set, but the pattern is specific enough to be worth a controlled follow-up rather than a general claim that bigger models perform better.

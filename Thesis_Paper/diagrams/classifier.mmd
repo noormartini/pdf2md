@@ -13,6 +13,9 @@ flowchart TD
 
     G -->|No| I{table\ndetected?}
     I -->|Yes| J([TABLE · 0.85])
+    J --> T{pymupdf4llm\nproduced valid\npipe table?}
+    T -->|Yes| U([text path:\nno LLM call])
+    T -->|No| V([vision:\ntable prompt])
 
     I -->|No| K{has images\nOR formulas?}
     K -->|Yes| L([MIXED · 0.75])
@@ -33,6 +36,8 @@ flowchart TD
     style F fill:#fff3cd,stroke:#f0ad4e
     style H fill:#cce5ff,stroke:#004085
     style J fill:#d1ecf1,stroke:#0c5460
+    style U fill:#d4edda,stroke:#28a745
+    style V fill:#d1ecf1,stroke:#0c5460
     style L fill:#e2d9f3,stroke:#6f42c1
     style N fill:#d4edda,stroke:#28a745
     style O fill:#e2d9f3,stroke:#6f42c1

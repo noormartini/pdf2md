@@ -17,6 +17,12 @@ import fitz
 
 from typing import Callable
 
+from config import (
+    ADAPTIVE_IMAGE_THRESHOLD,
+    ADAPTIVE_MIN_TEXT_CHARACTERS,
+    ADAPTIVE_RENDER_DPI,
+    ADAPTIVE_VECTOR_PATH_THRESHOLD,
+)
 from strategies.text_only import text_strategy as _text_strategy
 from strategies.image_only import image_strategy as _image_strategy
 from strategies.result import ConversionResult
@@ -48,9 +54,9 @@ class PageAnalysis:
 # ---------------------------------------------------------------------------
 # Classification thresholds
 # ---------------------------------------------------------------------------
-_IMAGE_THRESHOLD = 0         # Any embedded image triggers vision mode
-_VECTOR_PATH_THRESHOLD = 30  # Short vector paths → likely rendered formulas
-_MIN_TEXT_CHARACTERS = 50    # Pages with less text than this → not "text" type
+_IMAGE_THRESHOLD = ADAPTIVE_IMAGE_THRESHOLD
+_VECTOR_PATH_THRESHOLD = ADAPTIVE_VECTOR_PATH_THRESHOLD
+_MIN_TEXT_CHARACTERS = ADAPTIVE_MIN_TEXT_CHARACTERS
 
 # Generic Markdown pipe-table separator row, e.g. "|---|---|---|" — used to
 # check whether pymupdf4llm's pre-extracted text actually contains a table.
@@ -174,7 +180,7 @@ def _drop_rendered_formula_images(refs: list[str], figures_dir: str, min_height:
     return kept
 
 
-def render_page_as_base64(page: fitz.Page, dpi: int = 150) -> str:
+def render_page_as_base64(page: fitz.Page, dpi: int = ADAPTIVE_RENDER_DPI) -> str:
     """Render a PDF page to a base64-encoded PNG string."""
     matrix = fitz.Matrix(dpi / 72, dpi / 72)
     pixmap = page.get_pixmap(matrix=matrix)

@@ -10,7 +10,10 @@ flowchart TD
 
     subgraph E[Per-Page Processing]
         F{Page Classifier} -->|TEXT| G[Pre-extracted\nMarkdown]
-        F -->|IMAGE · FORMULA\nTABLE · MIXED| H[Render Page\n150 DPI PNG]
+        F -->|IMAGE · FORMULA\nMIXED| H[Render Page\n150 DPI PNG]
+        F -->|TABLE| T{pymupdf4llm\ntable OK?}
+        T -->|Yes| G
+        T -->|No| H
         F -->|EMPTY| I[Placeholder]
         H --> J[LM Studio\nLLM Inference]
     end
