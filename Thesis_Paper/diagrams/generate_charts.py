@@ -31,10 +31,10 @@ metrics = ["Text\nsimilarity", "Heading\nstructure", "List\nstructure",
            "Word\noverlap"]
 
 data = {
-    "Text-only":  [0.860, 0.565, 0.859, 0.922, 0.889, 0.726, 0.761],
-    "Adaptive":   [0.838, 0.542, 0.868, 0.956, 0.752, 0.636, 0.794],
-    "Image-only": [0.827, 0.429, 0.914, 0.944, 0.250, 0.156, 0.811],
-    "Hybrid":     [0.818, 0.348, 0.891, 0.944, 0.736, 0.597, 0.795],
+    "Text-only":  [0.893, 0.808, 0.904, 0.933, 1.000, 0.815, 0.804],
+    "Adaptive":   [0.894, 0.803, 0.919, 0.978, 0.994, 0.808, 0.854],
+    "Image-only": [0.839, 0.685, 0.911, 0.944, 0.972, 0.782, 0.838],
+    "Hybrid":     [0.813, 0.523, 0.875, 0.944, 0.946, 0.774, 0.835],
 }
 
 n_metrics = len(metrics)
@@ -66,8 +66,8 @@ plt.close(fig)
 print("Saved performance.png")
 
 # ── Chart 2: processing time – vertical bars ─────────────────────────────────
-times_ms = [197.3, 20790.1, 64696.3, 68009.5]
-multipliers = ["1×", "105×", "328×", "345×"]
+times_ms = [153.7, 704.5, 3250.2, 3170.2]
+multipliers = ["1×", "4.6×", "21.2×", "20.6×"]
 colors_v = [COLORS[s] for s in STRATEGIES]
 
 # two-line x-tick labels: strategy name + multiplier

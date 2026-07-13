@@ -294,9 +294,10 @@ unnecessary LLM calls on plain-text pages.
 This thesis works only with PDF as the input format. The system is tested
 on bachelor thesis documents in German and English. The system
 architecture is compatible with any LLM backend that supports a vision
-Application Programming Interface (API),
-but all experiments are conducted locally using LM Studio, so there is no
-cloud dependency and results are fully reproducible.
+Application Programming Interface (API). All experiments use LM Studio as
+a self-hosted runtime rather than a third-party cloud AI service, which
+keeps results reproducible regardless of which machine LM Studio runs on;
+Section~4.4 describes the specific hardware used for each experiment.
 
 The system detects the document language from the first page using the
 \texttt{langdetect} library and adjusts LLM prompts to prevent the model

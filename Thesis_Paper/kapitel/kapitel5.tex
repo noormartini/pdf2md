@@ -74,8 +74,13 @@ Figure~\ref{fig:classifier} shows the full decision tree.
 
 The PDF processing module has two sub-pipelines: one that extracts the text layer and one that renders pages as images.
 Which pipeline runs depends on the page type assigned by the classifier.
-TEXT pages go through text extraction only. IMAGE, FORMULA, TABLE, and MIXED pages go through image rendering. EMPTY pages skip both.
+TEXT pages go through text extraction only. IMAGE, FORMULA, and MIXED pages go through image rendering. EMPTY pages skip both.
 The hybrid strategy uses both pipelines on the same page.
+
+TABLE pages are a special case: the system checks whether pymupdf4llm's own text-layer extraction already produced a valid Markdown pipe table (detected by scanning for a \texttt{|---|---|} separator line) before deciding which pipeline to use.
+If it did, the page is treated like a TEXT page: no image is rendered and no LLM call is made, since pymupdf4llm's table detector reads the native text layer directly and never paraphrases a cell value or drops the heading above the table.
+Only when pymupdf4llm's extraction did not yield a usable table --- typically a scanned page or a table embedded as an image --- does the page fall back to image rendering with the vision model.
+This keeps the system's total LLM cost down without sacrificing the pages that genuinely need the vision path.
 
 Text extraction is handled by pymupdf4llm \autocite{pymupdf4llm}.
 The system calls \texttt{pymupdf4llm.to\_markdown()} once for the whole document with \texttt{page\_chunks=True}, which returns one result per page as a list.
@@ -240,12 +245,12 @@ The \texttt{requests} library handles all HTTP communication with LM Studio.
 No training or fine-tuning is required. The system runs entirely with pre-trained models loaded through LM Studio \autocite{lmstudio}.
 
 A single model is used across all LLM-dependent strategies, as described in
-Section~4.4: Qwen2.5-VL~7B, a vision-language model served through LM Studio's
-local HTTP server, which exposes an OpenAI-compatible
-\texttt{/v1/chat/completions} endpoint. The text strategy and the adaptive TEXT
-path do not invoke the LLM at all. The server URL and model name are passed as
-parameters to every strategy function, so switching to a different model or
-server requires no code changes.
+Section~4.4: Qwen2.5-VL~7B, a vision-language model served through LM Studio,
+which exposes an OpenAI-compatible \texttt{/v1/chat/completions} endpoint. The
+text strategy and the adaptive TEXT path do not invoke the LLM at all. The
+server URL and model name are passed as parameters to every strategy
+function, so switching to a different model, or to a server running on a
+remote machine instead of the same host, requires no code changes.
 
 Reproducibility is ensured through three design choices. All experiments run at
 temperature 0.0, which makes LLM output deterministic for the same input.

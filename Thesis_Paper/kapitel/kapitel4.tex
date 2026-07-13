@@ -77,8 +77,8 @@ Documents were drawn from real sources rather than synthetic benchmarks.
 Meuschke et al.\ \autocite{meuschke2023} found that tool performance varies
 significantly by document structure, which is why the corpus was built to
 include theses with different content mixes and layouts. The documents are
-primarily in German, with a subset in English, reflecting the intended usage
-context. Each selected document contains at least one structurally challenging
+primarily in English, with one document in German, reflecting the intended
+usage context. Each selected document contains at least one structurally challenging
 page: a formula-heavy section, a multi-column spread, or a table with complex
 cell structure. The final corpus consists of three thesis documents totalling 90 evaluated
 pages, 30 per document. All three belong to a single document category:
@@ -150,11 +150,20 @@ whether differences in score come from the strategy or from sampling
 noise.
 
 One vision-language model is used across all VLM strategies:
-Qwen2.5-VL~7B, running locally through LM Studio. The text strategy
-does not use a model at all. It calls PyMuPDF directly through the
-pymupdf4llm library, which converts the PDF text layer to Markdown
-without invoking any LLM. All four strategies therefore run under
-identical hardware and model conditions, which keeps the comparison fair.
+Qwen2.5-VL~7B, served through LM Studio on a rented cloud GPU rather than
+local hardware. The model runs locally just as well, but a full 360-page
+run on local hardware takes hours; the same run completes in minutes on
+the rented GPU, which is why it was used here. The text strategy does not
+use a model at all. It calls
+PyMuPDF directly through the pymupdf4llm library, which converts the PDF
+text layer to Markdown without invoking any LLM. The three vision-based
+strategies therefore run under identical hardware and model conditions,
+which keeps that part of the comparison fair. Text-only's processing time
+instead reflects local disk and CPU speed, since it never reaches the GPU
+at all. Each strategy's output is scored after the full postprocessing
+pipeline described in Section~\ref{sec:postprocessing_pipeline}, so the
+metrics in Chapter~6 measure what the deployed system actually returns to
+a user, not an earlier, unpolished stage of it.
 
 Text-only extraction at temperature 0.0 is the baseline. It is the
 simplest possible extraction method: raw text from PyMuPDF with no
