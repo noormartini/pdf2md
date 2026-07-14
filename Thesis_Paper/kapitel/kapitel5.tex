@@ -185,9 +185,34 @@ The pipeline reads the PDF bookmark outline directly via \texttt{doc.get\_toc()}
 The first TOC page receives this list; continuation pages are left empty.
 This bypasses pymupdf4llm entirely for TOC pages, avoiding the noisy pipe-table output it produces for these pages.
 Front-matter list pages (List of Figures, List of Tables, and Listings) are classified as TEXT and processed by pymupdf4llm, then a dedicated pass converts the pipe-table structure into clean Markdown and removes dot leaders.
-Bold-formatted figure caption lines are converted to italic and placed directly below their image link; captions that appear before their image are swapped.
+Figure caption lines are normalised to a single style: bold label, plain caption text.
+pymupdf4llm emits captions as bold lines, and the vision model sometimes emits them fully italicised; both forms become the same bold-label style used for source-code captions.
+Captions that appear before their image are swapped, blank lines between an image and its caption are removed, and label-only captions with no descriptive text are dropped.
+Figure~\ref{fig:caption_reorder} shows the swap on a corpus page: the vision model placed the caption above the figure link, and the pass moves it directly below the image.
+The link target is the file that \texttt{extract\_page\_figures} saved to disk (Section~5.3), so this is also what a preserved figure looks like in the final Markdown.
 Italic spans containing only Greek letters are converted to inline LaTeX (e.g.\ an italic $\varphi$ becomes \texttt{\$\textbackslash varphi\$}).
 OCR superscript artefacts of the form \texttt{\_EMC\_[2]} are replaced with Unicode superscript characters.
+
+\begin{figure}[ht]
+\medskip\noindent\textbf{Raw vision-model output}
+\begin{lstlisting}[language={},nolol,identifierstyle=\color{black},basicstyle=\footnotesize\ttfamily\color{black},upquote=true,breakatwhitespace=true]
+**Figure 1.1:** What is this Thesis about?
+
+![Figure 1](figures/page_009_fig_001.png)
+\end{lstlisting}
+
+\medskip\noindent\textbf{After caption reordering}
+\begin{lstlisting}[language={},nolol,identifierstyle=\color{black},basicstyle=\footnotesize\ttfamily\color{black},upquote=true,breakatwhitespace=true]
+![Figure 1](figures/page_009_fig_001.png)
+**Figure 1.1:** What is this Thesis about?
+\end{lstlisting}
+\caption{Caption reordering on a corpus page (sentiment analysis thesis,
+page 9, classified as MIXED). The vision model emits the caption above the
+figure link. The pass swaps the two lines and removes the blank line, so
+the caption sits directly below its image. The link path is where
+\texttt{extract\_page\_figures} saved the embedded figure.}
+\label{fig:caption_reorder}
+\end{figure}
 
 Source-code listings needed a detection path of their own.
 \LaTeX's \texttt{listings} package sets code in a fixed-width font.
