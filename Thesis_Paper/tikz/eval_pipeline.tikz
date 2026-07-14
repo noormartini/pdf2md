@@ -1,0 +1,39 @@
+% Evaluation pipeline — mirrors evaluation/{metrics,compare,significance}.py
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    >={Latex[length=1.8mm]},
+    box/.style={draw=black!70, line width=0.5pt, rounded corners=2pt, align=center, inner sep=4pt},
+    startstop/.style={box, fill=black!12, rounded corners=5pt, font=\sffamily\footnotesize\bfseries},
+    proc/.style={box, fill=white, font=\sffamily\footnotesize},
+    lbl/.style={font=\sffamily\scriptsize\itshape, inner sep=2pt}
+]
+\node[startstop, text width=44mm] (corpus) at (5.5,0) {PDF corpus\\3 documents \(\cdot\) 90 pages};
+
+\node[proc, text width=24mm] (s1) at (1.0,-1.7)  {text-only};
+\node[proc, text width=24mm] (s2) at (4.0,-1.7)  {image-only};
+\node[proc, text width=24mm] (s3) at (7.0,-1.7)  {hybrid};
+\node[proc, text width=24mm] (s4) at (10.0,-1.7) {adaptive};
+
+\node[startstop, text width=46mm] (outp) at (2.7,-3.5) {360 Markdown outputs\\4 strategies \(\times\) 90 pages};
+\node[startstop, text width=48mm, fill=black!5] (gt) at (8.6,-3.5) {ground truth\\90 hand-written page references};
+
+\node[proc, text width=116mm] (score) at (5.5,-5.5) {metric scoring -- 7 metrics per page\\[1pt]
+    {\scriptsize text similarity \(\cdot\) heading structure \(\cdot\) list structure \(\cdot\) table structure\\
+     code blocks \(\cdot\) paragraph structure \(\cdot\) word overlap}};
+
+\node[proc, text width=42mm] (mean) at (2.7,-7.5) {mean score per\\metric and strategy};
+\node[proc, text width=52mm] (sig) at (8.6,-7.5) {paired sign-flip permutation test\\100\,000 resamples \(\cdot\) \(p<0.05\)};
+
+\draw[->] (corpus) -- (s1);
+\draw[->] (corpus) -- (s2);
+\draw[->] (corpus) -- (s3);
+\draw[->] (corpus) -- (s4);
+\draw[->] (s1) -- (outp);
+\draw[->] (s2) -- (outp);
+\draw[->] (s3) -- (outp);
+\draw[->] (s4) -- (outp);
+\draw[->] (outp) -- (score);
+\draw[->] (gt) -- (score);
+\draw[->] (score) -- (mean);
+\draw[->] (score) -- (sig);
+\end{tikzpicture}

@@ -91,7 +91,9 @@ weakness. Hybrid's clearest weak point is also heading structure (0.523),
 the lowest score anywhere in the table.
 
 The paired permutation test from Section~4.3 puts these gaps on firmer
-footing. Against text-only, the only statistically significant difference is
+footing. Table~\ref{tab:significance} lists the mean per-page difference and
+the p-value for all 21 comparisons: adaptive against each fixed strategy on
+each of the seven metrics. Against text-only, the only statistically significant difference is
 word overlap ($p = 0.004$), in adaptive's favour. Every other gap between the
 two could be chance at this corpus size. That includes the table structure
 advantage: only eight pages score differently on that metric at all, six of
@@ -102,6 +104,31 @@ similarity ($p = 0.007$) and heading structure ($p = 0.024$), and
 significantly better than hybrid on text similarity, heading structure, code
 blocks, and word overlap (all $p < 0.05$). No metric shows a significant
 difference in favour of any fixed strategy over adaptive.
+
+\begin{table}[ht]
+\centering
+\caption{Paired sign-flip permutation tests: adaptive versus each fixed
+strategy over 90 pages. $\Delta$ is the mean per-page score difference
+(adaptive minus baseline); positive values favour adaptive. Bold marks
+$p < 0.05$.}
+\label{tab:significance}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{2}{c}{\textbf{vs.\ text-only}} & \multicolumn{2}{c}{\textbf{vs.\ image-only}} & \multicolumn{2}{c}{\textbf{vs.\ hybrid}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+\textbf{Metric} & $\Delta$ & $p$ & $\Delta$ & $p$ & $\Delta$ & $p$ \\
+\midrule
+Text similarity     & $+0.001$ & 0.894 & $+0.056$ & \textbf{0.007} & $+0.082$ & $\mathbf{<0.001}$ \\
+Heading structure   & $-0.006$ & 1.000 & $+0.118$ & \textbf{0.024} & $+0.280$ & $\mathbf{<0.001}$ \\
+List structure      & $+0.016$ & 0.622 & $+0.008$ & 0.750 & $+0.045$ & 0.172 \\
+Table structure     & $+0.044$ & 0.289 & $+0.033$ & 0.249 & $+0.033$ & 0.249 \\
+Code blocks         & $-0.006$ & 1.000 & $+0.022$ & 0.498 & $+0.048$ & \textbf{0.031} \\
+Paragraph structure & $-0.007$ & 0.455 & $+0.026$ & 0.231 & $+0.034$ & 0.212 \\
+Word overlap        & $+0.049$ & \textbf{0.004} & $+0.016$ & 0.205 & $+0.018$ & \textbf{0.047} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 These results partially answer RQ1 and RQ2. Adaptive does not beat
 text-only outright, but it comes within noise of every metric text-only
@@ -234,22 +261,88 @@ prompt and reproduced almost none of the list correctly. On this page, one
 content-specific prompt on one correctly classified page outweighs every
 other difference between the strategies.
 
+Figure~\ref{fig:page9_prompts} shows this contrast on the page itself.
+The evaluation run stored only the scores, so the page was reconverted with
+the same model, prompts, and settings. The re-run reproduces the same
+failure mode. The general-purpose prompt returns the rows as plain text
+with stray pipe characters and no table syntax at all, so its table
+structure score is 0.0. The table prompt rebuilds the pipe table cell by
+cell and scores 1.0.
+
+\begin{figure}[ht]
+\medskip\noindent\textbf{Ground-truth reference}
+\begin{lstlisting}[language={},nolol,identifierstyle=\color{black},basicstyle=\footnotesize\ttfamily\color{black}]
+# List of Tables
+
+| Table | Description | Page |
+|---|---|---|
+| 3.1 | Comparison of automated research systems | 9 |
+| 4.1 | System requirements | 11 |
+| 6.1 | Requirement pass conditions | 47 |
+...
+\end{lstlisting}
+
+\medskip\noindent\textbf{Table prompt} (adaptive; page classified TABLE) --- table structure 1.0
+\begin{lstlisting}[language={},nolol,identifierstyle=\color{black},basicstyle=\footnotesize\ttfamily\color{black}]
+# List of Tables
+
+| Table No | Title | Page |
+|---|---|---|
+| 3.1 | Comparison of automated research systems | 9 |
+| 4.1 | System requirements | 11 |
+| 6.1 | Requirement pass conditions | 47 |
+...
+\end{lstlisting}
+
+\medskip\noindent\textbf{General-purpose prompt} (image-only and hybrid) --- table structure 0.0
+\begin{lstlisting}[language={},nolol,identifierstyle=\color{black},basicstyle=\footnotesize\ttfamily\color{black}]
+# List of Tables
+
+3.1 Comparison of automated research systems | 9
+4.1 System requirements | 11
+6.1 Requirement pass conditions | 47
+...
+\end{lstlisting}
+\caption{The same page under two prompts: HITL thesis, page 9 (List of
+Tables), converted twice by the same vision model from the same page image.
+Only the system prompt differs. Each output is shown after post-processing,
+truncated to the first three rows.}
+\label{fig:page9_prompts}
+\end{figure}
+
 An earlier version of this evaluation attributed adaptive's low score on
 table-of-contents continuation pages to its design choice of leaving them
 empty by default; correcting the evaluation to properly credit the
 postprocessing pipeline showed this cost was smaller than originally
 measured.
 
-The strategy rankings are close across all three documents. Adaptive leads
-or matches text-only on table structure in every document: 1.000 versus
-0.933 on the neural networks thesis, an exact tie at 0.933 on the HITL
-thesis, and 1.000 versus 0.933 again on the sentiment analysis thesis. Text
-similarity is close enough between the two that no consistent winner
-emerges: adaptive is very slightly ahead on the neural networks thesis
-(0.933 versus 0.928) and the HITL thesis (0.920 versus 0.919), while
-text-only is very slightly ahead on the sentiment analysis thesis (0.833
-versus 0.830). None of these gaps exceed half a percentage point. This
-answers RQ5 more cleanly than the corpus-level averages alone: adaptive's
+The strategy rankings are close across all three documents.
+Table~\ref{tab:per_document} breaks the two closest strategies down by
+document. Adaptive leads or matches text-only on table structure in every
+document. Text similarity is close enough that no consistent winner
+emerges: adaptive is very slightly ahead on two documents, text-only on
+the third, and none of these gaps exceed half a percentage point.
+
+\begin{table}[ht]
+\centering
+\caption{Adaptive versus text-only per document: mean table structure and
+text similarity scores (30 pages per document)}
+\label{tab:per_document}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lcccc}
+\toprule
+ & \multicolumn{2}{c}{\textbf{Table structure}} & \multicolumn{2}{c}{\textbf{Text similarity}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+\textbf{Document} & Adaptive & Text-only & Adaptive & Text-only \\
+\midrule
+Neural networks thesis    & 1.000 & 0.933 & 0.933 & 0.928 \\
+HITL thesis               & 0.933 & 0.933 & 0.920 & 0.919 \\
+Sentiment analysis thesis & 1.000 & 0.933 & 0.830 & 0.833 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+This answers RQ5 more cleanly than the corpus-level averages alone: adaptive's
 table structure advantage holds in every document, and the remaining
 per-document variation in text similarity is small enough to read as noise
 rather than a real reversal, a reading the significance tests in

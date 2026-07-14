@@ -19,10 +19,9 @@ the postprocessing pipeline properly, a distinction explained in
 Sections~4.4 and 7.1.
 
 RQ1 asked whether per-page strategy selection achieves higher accuracy than
-any fixed strategy. Adaptive beats image-only and hybrid outright on every
-metric, and is close enough to text-only to call it a win on four of the
-seven: list structure, table structure, word overlap, and an effective tie
-on text similarity. Its clearest advantage is table structure, where
+any fixed strategy. Against the two vision baselines the answer is a clear
+yes; against text-only the outcome is the split described above.
+The adaptive strategy's clearest advantage is table structure, where
 adaptive scores 0.978 against text-only's 0.933. This advantage comes from
 pairing each table page with the specialised table prompt rather than the
 general-purpose one, a mechanism Section~\ref{sec:rq5_consistency}
@@ -40,28 +39,27 @@ structure (0.815), all by narrow margins. Image-only and hybrid both trail
 text-only on most metrics without collapsing on any of them: image-only's
 code block score is 0.972 and its paragraph structure score is 0.782, both
 close to text-only's own scores. Hybrid's clearest weakness is heading
-structure (0.523), the lowest score anywhere in the results, which is the
-failure mode hypothesis H4 did not anticipate: combining both signals
-produces a worse result than using either one alone. Hypothesis H4 is
-rejected: hybrid loses to adaptive on every one of the seven metrics.
+structure (0.523), the lowest score anywhere in the results: combining both
+signals produces a worse result than using either one alone. This is the
+failure mode that led to the rejection of hypothesis H4 in Section~7.1.
 
 RQ3 asked about computational cost. The adaptive strategy averages 705\,ms
 per page and makes 23 LLM calls across 90 pages, compared to 90 calls and
 3{,}250\,ms per page for image-only, all measured on the same rented GPU
 (Section~4.4). This corresponds to a 75 per cent reduction in total token
 consumption and roughly a 4.5-fold improvement in processing speed over
-image-only or hybrid, confirming hypothesis H3. The efficiency gain comes
-from the page classifier: most thesis pages are classified as TEXT and
-handled by pymupdf4llm without any LLM call. The small fixed classification
+image-only or hybrid, confirming hypothesis H3. The gain comes from
+skipping inference: the classifier marks most thesis pages as TEXT, and
+those pages never reach the model. The small fixed classification
 cost is negligible compared to the model inference it avoids on most pages.
 On longer documents the gap widens further, since every additional text
 page adds savings without adding inference cost.
 
 RQ4 asked how Markdown quality can be measured beyond BLEU and ROUGE. The
 seven-metric framework shows why per-element scoring is necessary even when
-no strategy collapses outright: hybrid's heading structure score (0.523)
-sits nearly 0.3 below its own text similarity score (0.813), a gap a single
-aggregate score would average away entirely. Flat sequence metrics reward
+no strategy collapses outright: hybrid recovers vocabulary far better than
+heading hierarchy (0.813 against 0.523), and one aggregate number would
+hide that gap. Flat sequence metrics reward
 recovered vocabulary without detecting a structural weakness isolated to
 one part of the document. RQ5 asked whether strategy rankings hold
 consistently across documents. They do, more cleanly than the corpus-level
@@ -99,7 +97,7 @@ The two-stage postprocessing pipeline addresses a gap between raw extraction
 output and usable Markdown. Both pymupdf4llm and the vision-language model produce
 predictable artefacts: repeated running headers, collapsed heading levels, dot
 leaders in table-of-contents pages, and incorrectly wrapped code blocks. The
-pipeline removes these through 49 transformation passes verified by 182 unit
+pipeline removes these through 39 transformation passes verified by 182 unit
 tests. Each pass is isolated as a testable function, so the pipeline can be
 extended without breaking existing behaviour. This makes the system's output
 usable without manual correction on the document types it was designed for.
@@ -121,21 +119,19 @@ structure of any strategy without giving up ground anywhere else.
 
 \section{Limitations of the Study}
 
-The evaluation covers three thesis documents and 90 pages. This is sufficient to
-answer the five research questions within the defined scope, but it is not enough
-to generalize the findings to other document types. Research papers, technical
-reports, legal documents, and financial statements have different structural
-patterns than academic theses. The content distribution of this corpus is
-predominantly prose with relatively few formula or table pages, which is what
-makes text-only extraction so competitive here. A corpus weighted toward visual
-content would produce different relative rankings between strategies.
+The evaluation covers three thesis documents and 90 pages, enough to answer
+the five research questions within the defined scope but not to generalise
+beyond it, for the external validity reasons given in
+Section~\ref{sec:threats_to_validity}. The content distribution of this
+corpus is predominantly prose with relatively few formula or table pages,
+which is what makes text-only extraction so competitive here. A corpus
+weighted toward visual content would produce different relative rankings
+between strategies.
 
-The ground truth was produced by a single annotator. Different annotators may
-interpret the same page differently, particularly for heading level assignments,
-list formatting, and the handling of table captions. The seven metrics measure
-similarity to this specific reference, not absolute conversion quality. This
-limits the strength of claims about which strategy produces objectively better
-Markdown: the results describe agreement with one annotator's judgement.
+The ground truth reflects a single annotator's judgement, the internal
+validity limit described in Section~\ref{sec:threats_to_validity}. The seven
+metrics therefore measure agreement with one reference interpretation, not
+absolute conversion quality.
 Pfitzmann et al.\ \autocite{pfitzmann2022} established multi-annotator annotation
 as the standard for document layout research, which was not feasible within the
 scope of a single bachelor thesis.
@@ -148,10 +144,9 @@ structure or code block score. This suggests the remaining gap to text-only
 is not mainly a matter of model size.
 Heading structure remains the weakest metric relative to each strategy's own
 other scores, though the gap is now concentrated in hybrid (0.523) rather
-than spread evenly across all four strategies. This reveals a limitation of the
-evaluation design as well: the metric counts heading occurrences rather than
-verifying level assignments, so a strategy can score well on heading structure
-while consistently assigning the wrong depth to every heading.
+than spread evenly across all four strategies. Part of the true
+heading-depth error also stays invisible to the evaluation, for the
+construct validity reason given in Section~\ref{sec:threats_to_validity}.
 
 A related content-fidelity gap sits inside the postprocessing pipeline
 itself. Italic spans containing only Greek letters are converted to inline
@@ -174,10 +169,9 @@ practical applicability.
 
 \section{Future Work}
 
-Heading level detection remains the weakest metric, concentrated mostly in
-hybrid (0.523) and, to a lesser extent, image-only (0.685). The current
-approach infers heading levels from font-size ratios for the text path and
-from visual appearance for the vision path.
+Heading level detection is the clearest single improvement target. The
+current approach infers heading levels from font-size ratios for the text
+path and from visual appearance for the vision path.
 Neither method reliably assigns the correct depth when the document uses
 inconsistent font sizes or non-standard heading styles. A dedicated heading
 classifier trained on labelled thesis documents would likely improve this score

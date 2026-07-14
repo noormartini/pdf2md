@@ -46,6 +46,33 @@ reading order \autocite{gao2011}. Formulas are a particular problem: PDF stores
 them as sequences of individual characters at specific coordinates, so
 superscripts, subscripts, and multi-line expressions have no semantic markup
 and are often merged with body text by extractors \autocite{blecher2023}.
+Figure~\ref{fig:extraction_example} shows two of these effects on a real
+page from the corpus used in Chapter~4: the chapter heading arrives as two
+plain text lines with nothing marking them as a heading, and words are cut
+in half wherever the print layout hyphenated them at a line end.
+
+\begin{figure}[ht]
+\medskip\noindent\textbf{Raw sequential extraction (PyMuPDF)}
+\begin{lstlisting}[language={},nolol,identifierstyle=\color{black},basicstyle=\footnotesize\ttfamily\color{black}]
+Chapter 1
+Introduction
+Systems that automate the scientific research process, including searching literature, gen-
+erating hypotheses, running experiments and writing manuscripts, are no longer just con-
+cepts. Systems like data-to-paper [1], The AI Scientist [2] or Agent Laboratory [3] have
+...
+\end{lstlisting}
+
+\medskip\noindent\textbf{The structure the reader perceives (ground-truth Markdown)}
+\begin{lstlisting}[language={},nolol,identifierstyle=\color{black},basicstyle=\footnotesize\ttfamily\color{black}]
+# Chapter 1: Introduction
+Systems that automate the scientific research process, including searching literature, generating hypotheses, running experiments and writing manuscripts, are no longer just concepts. ...
+\end{lstlisting}
+\caption{Sequential text extraction versus intended structure, shown on the
+first body page of one evaluation document. The raw extraction keeps the
+visual line breaks, including mid-word hyphenation, and carries no heading
+markup.}
+\label{fig:extraction_example}
+\end{figure}
 
 Images embedded in a PDF carry no context linking them to the surrounding text,
 so their relationship to a caption or paragraph is lost during extraction
@@ -178,9 +205,7 @@ character sequences and their coordinates without any visual processing.
 Libraries like PyMuPDF and pdfplumber work this way. They are fast,
 deterministic, and reliable on native PDFs with simple layouts, but they cannot
 process scanned or image-based pages at all and they discard all visual
-structure \autocite{meuschke2023}. Ingemarsson and Persson
-\autocite{ingemarsson2024} measured this directly: rule-based tools achieve 0\%
-accuracy on image-only documents, and no amount of configuration changes that.
+structure \autocite{meuschke2023}.
 
 Deep learning approaches use trained neural network models to recognize text,
 layout regions, and graphical elements from page images. Tesseract is a

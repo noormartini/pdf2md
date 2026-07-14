@@ -7,8 +7,8 @@ complete evaluation pipeline.
 
 \begin{figure}[ht]
     \centering
-    \includegraphics[width=\textwidth,height=0.45\textheight,keepaspectratio]{eval_pipeline.png}
-    \caption{Evaluation pipeline: corpus, strategies, ground truth, metrics, and final scores}
+    \input{tikz/eval_pipeline.tikz}
+    \caption{Evaluation pipeline: corpus, strategies, ground truth, metrics, mean scores, and the paired permutation test}
     \label{fig:eval_pipeline}
 \end{figure}
 
@@ -118,8 +118,9 @@ word-level omissions such as missing paragraphs.
 
 Three metrics target document structure. Heading structure score compares
 the candidate and reference heading counts at each level from H1 to H6,
-skipping levels that are absent in both. List structure score checks that
-bullet and numbered lists appear at the correct nesting level. Paragraph
+skipping levels that are absent in both. List structure score compares the
+number of list items, bulleted and numbered combined, between candidate
+and reference. Paragraph
 count score compares paragraph counts with a 20 per cent tolerance: a
 candidate within that range of the reference scores 1.0, with a linear
 penalty beyond it. A document can have high text similarity and still fail

@@ -1,0 +1,38 @@
+% Two-stage post-processing — mirrors clean_page() and postprocess_markdown() in postprocess.py
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    >={Latex[length=1.8mm]},
+    box/.style={draw=black!70, line width=0.5pt, rounded corners=2pt, align=center, inner sep=4pt},
+    startstop/.style={box, fill=black!12, rounded corners=5pt, font=\sffamily\footnotesize\bfseries},
+    pass/.style={box, fill=white, font=\sffamily\footnotesize, text width=48mm},
+    stagetitle/.style={align=center, font=\sffamily\footnotesize},
+    stageframe/.style={draw=black!50, dashed, thin, rounded corners=3pt, inner sep=3mm}
+]
+% --- Stage 1: clean_page, per page (left column) ---
+\node[stagetitle] (t1) at (0,0) {\textbf{Stage 1 \(\cdot\) per page}\\\texttt{clean\_page}};
+\node[pass, below=3.5mm of t1] (b1) {structural noise\\{\scriptsize running headers \(\cdot\) decorative\\rules under headings}};
+\node[pass, below=3.5mm of b1] (b2) {LLM artefacts\\{\scriptsize \texttt{```markdown} fences \(\cdot\)\\echoed prompt text}};
+\node[pass, below=3.5mm of b2] (b3) {heading quality\\{\scriptsize level normalisation \(\cdot\) split-heading\\merge \(\cdot\) bare-number recovery \(\cdot\)\\demotions}};
+\node[pass, below=3.5mm of b3] (b4) {special content\\{\scriptsize TOC tables \& dot leaders \(\cdot\)\\list-of-figures pages \(\cdot\) figure captions\\Greek \(\rightarrow\) LaTeX \(\cdot\) OCR superscripts}};
+\node[pass, below=3.5mm of b4] (b5) {source-code listings\\{\scriptsize fences rebuilt from monospace\\lines \(\cdot\) renumbering}};
+\node[stageframe, fit=(t1)(b1)(b2)(b3)(b4)(b5)] (S1) {};
+
+% --- Stage 2: postprocess_markdown, full document (right column) ---
+\node[stagetitle] (t2) at (8.8,0) {\textbf{Stage 2 \(\cdot\) full document}\\\texttt{postprocess\_markdown}};
+\node[pass, below=3.5mm of t2] (d1) {cross-page duplicates\\{\scriptsize running headers \(\cdot\) page numbers \(\cdot\)\\repeated headings}};
+\node[pass, below=3.5mm of d1] (d2) {heading demotions \& merges\\{\scriptsize title page \(\cdot\) italic \& listing\\headings \(\cdot\) chapter merge}};
+\node[pass, below=3.5mm of d2] (d3) {content cleanup\\{\scriptsize OCR picture text \(\cdot\) bibliography\\entries \(\cdot\) LaTeX delimiter\\normalisation}};
+\node[pass, below=3.5mm of d3] (d4) {list-page consistency\\{\scriptsize bullets \(\rightarrow\) table rows \(\cdot\)\\wrapped-row merge}};
+\node[stageframe, fit=(t2)(d1)(d2)(d3)(d4)] (S2) {};
+
+% --- endpoints and join ---
+\node[startstop, above=4mm of S1] (raw) {raw page Markdown};
+\node[box, fill=black!5, font=\sffamily\footnotesize, text width=22mm, align=center] (join) at (4.4,-4.4) {join all pages\\with \texttt{-{}-{}-}\\separator};
+\node[startstop, below=4mm of S2] (final) {final Markdown document};
+
+% --- flow ---
+\draw[->] (raw) -- (S1);
+\draw[->] (S1.east|-join) -- (join.west);
+\draw[->] (join.east) -- (S2.west|-join);
+\draw[->] (S2) -- (final);
+\end{tikzpicture}

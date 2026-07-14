@@ -1,0 +1,43 @@
+% Phase 1: classification cascade — mirrors analyze_page() in strategies/adaptive.py
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    node distance=4.5mm and 9mm,
+    >={Latex[length=1.8mm]},
+    box/.style={draw=black!70, line width=0.5pt, rounded corners=2pt, align=center, inner sep=5pt},
+    signal/.style={box, fill=black!8, text width=78mm},
+    cond/.style={box, fill=white, font=\ttfamily\footnotesize, align=left, text width=78mm},
+    outcome/.style={box, fill=black!12, font=\sffamily\footnotesize\bfseries, text width=27mm, rounded corners=5pt},
+    lbl/.style={font=\sffamily\scriptsize\itshape, inner sep=2pt}
+]
+\node[signal] (sig) {extract signals per page:\\[2pt]
+    {\ttfamily\footnotesize image\_count \(\cdot\) vector\_path\_count\\[1pt] text\_length \(\cdot\) table\_count}};
+
+\node[cond, below=of sig] (c1) {text\_length < 10 and not has\_images\\and vector\_path\_count < 5};
+\node[cond, below=of c1]  (c2) {has\_formulas and text\_length < 50};
+\node[cond, below=of c2]  (c3) {has\_images and image\_count > 3};
+\node[cond, below=of c3]  (c4) {table\_count > 0};
+\node[cond, below=of c4]  (c5) {has\_images or has\_formulas};
+\node[cond, below=of c5]  (c6) {text\_length >= 50};
+
+\node[outcome, right=of c1] (o1) {EMPTY \(\cdot\) 0.90};
+\node[outcome, right=of c2] (o2) {FORMULA \(\cdot\) 0.85};
+\node[outcome, right=of c3] (o3) {IMAGE \(\cdot\) 0.90};
+\node[outcome, right=of c4] (o4) {TABLE \(\cdot\) 0.85};
+\node[outcome, right=of c5] (o5) {MIXED \(\cdot\) 0.75};
+\node[outcome, right=of c6] (o6) {TEXT \(\cdot\) 0.95};
+\node[outcome, below=of c6] (o7) {MIXED \(\cdot\) 0.50};
+
+\draw[->] (sig) -- (c1);
+\draw[->] (c1) -- node[lbl, above] {yes} (o1);
+\draw[->] (c2) -- node[lbl, above] {yes} (o2);
+\draw[->] (c3) -- node[lbl, above] {yes} (o3);
+\draw[->] (c4) -- node[lbl, above] {yes} (o4);
+\draw[->] (c5) -- node[lbl, above] {yes} (o5);
+\draw[->] (c6) -- node[lbl, above] {yes} (o6);
+\draw[->] (c1) -- node[lbl, right] {no} (c2);
+\draw[->] (c2) -- node[lbl, right] {no} (c3);
+\draw[->] (c3) -- node[lbl, right] {no} (c4);
+\draw[->] (c4) -- node[lbl, right] {no} (c5);
+\draw[->] (c5) -- node[lbl, right] {no} (c6);
+\draw[->] (c6) -- node[lbl, right] {no} (o7);
+\end{tikzpicture}
