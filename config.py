@@ -44,7 +44,7 @@ class Config:
     model: str
     max_pages: int
     strategy: str = "text"
-    temperature: float = 0.2
+    temperature: float = 0.0
     max_tokens: int = 4096
     llm_timeout: int = DEFAULT_LLM_TIMEOUT
     concurrency: int = DEFAULT_CONCURRENCY

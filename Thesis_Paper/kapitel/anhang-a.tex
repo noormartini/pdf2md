@@ -1,8 +1,9 @@
-\chapter{Appendix}
+\chapter{Supplementary Material}
 
-The appendix collects supporting material referenced in the main chapters.
+This appendix collects supporting material referenced in the main chapters.
 
 \section{Implementation Code Snippets}
+\label{sec:code_snippets}
 
 The full implementation is available in the project repository. The source is
 organised into six parts: \texttt{app.py} (entry point and pipeline
@@ -11,7 +12,202 @@ page classifier), \texttt{extraction/} (figure extraction, monospace-font
 detection, and language detection), \texttt{llm/} (prompt definitions and API
 client), \texttt{postprocess.py} (the two-stage post-processing pipeline), and
 \texttt{evaluation/} (metrics, strategy comparison, significance tests, and
-report generation).
+report generation). This section reproduces three central fragments verbatim.
+
+\subsection{Page Classification Rules}
+
+Listing~\ref{lst:classifier} shows \texttt{analyze\_page} from
+\texttt{strategies/adaptive.py}. It collects four signals per page (embedded
+images, vector drawings, detected tables, and text length) and maps them to
+one of the six page types through a fixed rule cascade. Formula detection is
+delegated to a helper that checks for many short vector paths, Unicode math
+symbols, and LaTeX-style markup in the extracted text.
+
+\begin{lstlisting}[language=Python, literate={—}{{---}}1 {–}{{--}}1, caption={Page classification rules (\texttt{strategies/adaptive.py})}, label={lst:classifier}]
+def analyze_page(page: fitz.Page) -> PageAnalysis:
+    """
+    Analyse a PDF page and return its classified type with confidence.
+
+    Args:
+        page: A PyMuPDF Page object.
+
+    Returns:
+        PageAnalysis with type, supporting metrics, and confidence score.
+    """
+    image_count = len(page.get_images(full=False))
+    has_images = image_count > _IMAGE_THRESHOLD
+
+    drawings = page.get_drawings()
+    vector_path_count = len(drawings)
+
+    has_formulas = _detect_formulas(page, drawings)
+    text_length = len(page.get_text("text").strip())
+
+    finder = page.find_tables()
+    table_count = len(finder.tables)
+    has_tables = table_count > 0
+
+    if text_length < 10 and not has_images and vector_path_count < 5:
+        page_type, confidence = PageType.EMPTY, 0.9
+    elif has_formulas and text_length < _MIN_TEXT_CHARACTERS:
+        page_type, confidence = PageType.FORMULA, 0.85
+    elif has_images and image_count > 3:
+        page_type, confidence = PageType.IMAGE, 0.9
+    elif has_tables:
+        page_type, confidence = PageType.TABLE, 0.85
+    elif has_images or has_formulas:
+        page_type, confidence = PageType.MIXED, 0.75
+    elif text_length >= _MIN_TEXT_CHARACTERS:
+        page_type, confidence = PageType.TEXT, 0.95
+    else:
+        page_type, confidence = PageType.MIXED, 0.5
+
+    return PageAnalysis(
+        page_type=page_type,
+        has_images=has_images,
+        has_formulas=has_formulas,
+        has_tables=has_tables,
+        image_count=image_count,
+        table_count=table_count,
+        text_length=text_length,
+        vector_path_count=vector_path_count,
+        confidence=confidence,
+    )
+\end{lstlisting}
+
+\subsection{Post-processing Pass Sequence}
+
+Listing~\ref{lst:clean_page} shows \texttt{clean\_page} from
+\texttt{postprocess.py}, the first stage of the post-processing pipeline. It
+runs once per page, before the pages are joined. The function body documents
+the exact order in which the repair passes are applied.
+
+\begin{lstlisting}[language=Python, literate={—}{{---}}1 {–}{{--}}1, caption={Per-page post-processing pass sequence (\texttt{postprocess.py})}, label={lst:clean_page}]
+def clean_page(md: str, raw_page_text: str = "", code_lines: list[str] | None = None) -> str:
+    """Clean a single page's Markdown before pages are joined.
+
+    Removes PDF visual artifacts (decorative horizontal rules, code-fence
+    wrappers) and normalises heading levels.  Called per-page so that the
+    page-break separators added afterwards are not affected.
+
+    `raw_page_text` is the plain text from fitz for the same page.  When
+    provided, bare section-number headings whose title was dropped by
+    pymupdf4llm are patched by looking up the number in the fitz text.
+
+    `code_lines` is the page's monospace-font line texts (see
+    `extraction.text.extract_monospace_lines`), used to reconstruct a proper
+    fenced code block for source-code listings pymupdf4llm left unfenced or
+    mangled.
+    """
+    md = md.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Strip figure-ref instruction text that some models copy verbatim from the prompt.
+    md = _FIGURE_INSTRUCTION_RE.sub("", md)
+
+    # LLMs sometimes wrap their entire response in ```markdown ... ```.
+    md = re.sub(r"```markdown\n(.*?)```", lambda m: m.group(1), md, flags=re.DOTALL)
+
+    # Remove horizontal rules that appear immediately after a heading — these are
+    # PDF decorative underlines extracted as artifacts, not intentional separators.
+    md = re.sub(r"(^#{1,6} .+\n)\n*([ \t]*(-{3,}|\*{3,}|_{3,})[ \t]*\n)", r"\1\n", md, flags=re.MULTILINE)
+
+    md = _fix_bold_space_before_colon(md)
+    md = _fix_bold_listing_headings(md)
+    md = _promote_declaration_heading(md)
+    md = _strip_running_headers(md)
+    md = _clean_toc_dot_leaders(md)
+    md = _clean_list_dot_leaders(md)
+    md = _convert_toc_table(md)
+    md = _fix_lof_numbers(md, raw_page_text)
+    md = _fix_listing_table(md)
+    md = _fix_table_list_header(md)
+    md = _fix_table_row_bold_span(md)
+    md = _convert_abbreviations(md)
+    md = _unwrap_symbol_italics(md)
+    md = _convert_greek_italic_math(md)
+    md = _fix_ocr_superscripts(md)
+    md = _fix_split_code_span_tokens(md)
+    md = _format_figure_captions(md)
+    md = _reorder_captions_after_images(md)
+    md = _interleave_batched_figures(md)
+    md = _strip_bold_from_headings(md)
+    md = _merge_split_headings(md)
+    md = _recover_bare_number_headings(md, raw_page_text)
+    md = normalize_heading_levels(md)
+    md = _demote_outline_chapter_refs(md)
+    md = _demote_unlabeled_single_word_headings(md)
+
+    if code_lines:
+        md = _wrap_monospace_code_blocks(md, code_lines)
+
+    while "\n\n\n" in md:
+        md = md.replace("\n\n\n", "\n\n")
+
+    return md.strip()
+\end{lstlisting}
+
+\subsection{Evaluation Metric Examples}
+
+Listing~\ref{lst:metrics} shows two of the seven metrics from
+\texttt{evaluation/metrics.py}: the character-level text similarity and the
+heading structure score. The remaining structural metrics (lists, tables,
+code blocks, paragraphs, and word overlap) follow the same
+count-and-compare pattern.
+
+\begin{lstlisting}[language=Python, literate={—}{{---}}1 {–}{{--}}1, caption={Text similarity and heading structure metrics (\texttt{evaluation/metrics.py})}, label={lst:metrics}]
+def text_similarity(reference: str, candidate: str) -> float:
+    """
+    Calculate text similarity using difflib SequenceMatcher.
+    Returns a score between 0.0 (completely different) and 1.0 (identical).
+    """
+    # Normalize whitespace for fair comparison
+    ref_normalized = " ".join(reference.split())
+    cand_normalized = " ".join(candidate.split())
+
+    return difflib.SequenceMatcher(
+        None, ref_normalized, cand_normalized
+    ).ratio()
+
+
+def count_headings(text: str) -> dict[str, int]:
+    """Count headings by level in markdown text."""
+    counts = {"h1": 0, "h2": 0, "h3": 0, "h4": 0, "h5": 0, "h6": 0}
+
+    for line in text.split("\n"):
+        stripped = line.lstrip()
+        if stripped.startswith("#"):
+            level = len(stripped) - len(stripped.lstrip("#"))
+            if 1 <= level <= 6:
+                counts[f"h{level}"] += 1
+
+    return counts
+
+
+def heading_structure_score(reference: str, candidate: str) -> float:
+    """
+    Compare heading structure between reference and candidate.
+    Returns similarity score based on heading counts per level.
+
+    Only levels used by either side contribute to the score, so a page that
+    only has H1+H2 is not artificially inflated by perfect H3-H6 matches.
+    """
+    ref_counts = count_headings(reference)
+    cand_counts = count_headings(candidate)
+
+    similarities = []
+    for level in ref_counts.keys():
+        ref_val = ref_counts[level]
+        cand_val = cand_counts[level]
+
+        if ref_val == 0 and cand_val == 0:
+            continue
+        if ref_val == 0 or cand_val == 0:
+            similarities.append(0.0)
+        else:
+            similarities.append(min(ref_val / cand_val, cand_val / ref_val))
+
+    return sum(similarities) / len(similarities) if similarities else 1.0
+\end{lstlisting}
 
 \section{Complete Results Tables}
 
@@ -39,12 +235,11 @@ Hybrid     & 3{,}170        & 0.813          & 0.523          & 0.875          &
 
 \section{Sample Documents and Outputs}
 
-The three thesis documents used as the evaluation corpus, their ground truth
-reference files, and the raw per-page Markdown outputs are available in the
-project repository. The corpus configuration is in
-\texttt{experiments/sample.json}, reference files are in the corresponding
-\texttt{references/} subdirectory, and all per-page conversion results are
-stored in \texttt{output/results.json}.
+The three thesis documents used as the evaluation corpus and their ground
+truth reference files are available in the project repository. The corpus
+configuration is in \texttt{experiments/sample.json}, reference files are in
+the corresponding \texttt{references/} subdirectory, and the per-page metric
+scores for every strategy are stored in \texttt{output/results.json}.
 
 \section{Prompt Templates}
 \label{sec:prompt_templates}
@@ -54,7 +249,10 @@ below. Each variant defines a system prompt only. The user message is a single
 placeholder \texttt{\{text\}}, which the calling strategy replaces with the
 extracted page text or a base64-encoded image before sending the API request.
 For non-English documents, the \texttt{with\_language\_hint} function appends
-a language-preservation note to the system prompt at runtime.
+a language-preservation note to the system prompt at runtime. For
+typesetting, Unicode arrows in the original prompt text are transcribed
+as \texttt{->} and some backticks around inline code tokens are omitted;
+the wording is otherwise verbatim.
 
 \medskip\noindent\textbf{Variant: \textit{default} --- general-purpose}
 

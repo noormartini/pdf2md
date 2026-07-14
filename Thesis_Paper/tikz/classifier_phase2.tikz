@@ -1,0 +1,45 @@
+% Phase 2: routing checks — mirrors adaptive_strategy() in strategies/adaptive.py
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    >={Latex[length=1.8mm]},
+    box/.style={draw=black!70, line width=0.5pt, rounded corners=2pt, align=center, inner sep=4pt},
+    head/.style={box, fill=black!12, font=\sffamily\footnotesize\bfseries, rounded corners=5pt},
+    cond/.style={box, fill=white, text width=38mm, minimum height=14mm, font=\sffamily\footnotesize},
+    outcome/.style={box, fill=black!5, text width=21mm, font=\sffamily\footnotesize, anchor=north},
+    direct/.style={align=center, font=\sffamily\footnotesize},
+    lbl/.style={font=\sffamily\scriptsize\itshape, inner sep=2pt}
+]
+% --- column 1: TABLE ---
+\node[head] (h1) at (0,0) {TABLE \(\cdot\) 0.85};
+\node[cond] (q1) at (0,-2.1) {text layer already gives a valid pipe table?};
+\node[outcome] (a1) at (-1.25,-3.7) {text path:\\no LLM call};
+\node[outcome] (b1) at (1.25,-3.7) {vision LLM,\\table prompt};
+\draw[->] (h1) -- (q1);
+\draw[->] (q1.south) -- node[lbl, left=1pt] {yes} (a1.north);
+\draw[->] (q1.south) -- node[lbl, right=1pt] {no} (b1.north);
+
+% --- column 2: TEXT ---
+\node[head] (h2) at (5.5,0) {TEXT \(\cdot\) 0.95};
+\node[cond] (q2) at (5.5,-2.1) {extracted Markdown contains image links?\\{\scriptsize(TOC pages exempt)}};
+\node[outcome] (a2) at (4.25,-3.7) {reroute:\\MIXED \(\cdot\) 0.75};
+\node[outcome] (b2) at (6.75,-3.7) {text path:\\no LLM call};
+\draw[->] (h2) -- (q2);
+\draw[->] (q2.south) -- node[lbl, left=1pt] {yes} (a2.north);
+\draw[->] (q2.south) -- node[lbl, right=1pt] {no} (b2.north);
+
+% --- column 3: MIXED ---
+\node[head] (h3) at (11,0) {MIXED \(\cdot\) any score};
+\node[cond] (q3) at (11,-2.1) {vision response shorter than 30\,\% of extracted text?};
+\node[outcome] (a3) at (9.75,-3.7) {fallback:\\pymupdf4llm text};
+\node[outcome] (b3) at (12.25,-3.7) {keep vision output};
+\draw[->] (h3) -- (q3);
+\draw[->] (q3.south) -- node[lbl, left=1pt] {yes} (a3.north);
+\draw[->] (q3.south) -- node[lbl, right=1pt] {no} (b3.north);
+
+% --- direct routes (no check) ---
+\draw[black!50, dashed, thin] (-2.4,-5.4) -- (13.4,-5.4);
+\node[direct, font=\sffamily\footnotesize\itshape, anchor=north] at (5.5,-5.65) {direct routes, no check:};
+\node[direct, anchor=north] at (0,-6.35)   {EMPTY \(\rightarrow\) skipped};
+\node[direct, anchor=north] at (5.5,-6.35) {FORMULA \(\rightarrow\) vision LLM,\\formula prompt};
+\node[direct, anchor=north] at (11,-6.35)  {IMAGE \(\rightarrow\) vision LLM,\\diagram prompt};
+\end{tikzpicture}

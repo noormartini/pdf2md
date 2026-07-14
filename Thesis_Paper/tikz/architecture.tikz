@@ -1,0 +1,56 @@
+% System architecture — mirrors run() in app.py (adaptive pipeline)
+\begin{tikzpicture}[
+    font=\sffamily\small,
+    >={Latex[length=1.8mm]},
+    box/.style={draw=black!70, line width=0.5pt, rounded corners=2pt, align=center, inner sep=4pt},
+    startstop/.style={box, fill=black!12, rounded corners=5pt, font=\sffamily\footnotesize\bfseries},
+    proc/.style={box, fill=white, font=\sffamily\footnotesize},
+    cond/.style={box, fill=black!5, font=\sffamily\footnotesize},
+    note/.style={font=\sffamily\scriptsize, text=black!60},
+    lbl/.style={font=\sffamily\scriptsize\itshape, inner sep=2pt}
+]
+\node[startstop] (pdf) at (5.5,0) {PDF file};
+
+\node[proc, text width=42mm] (lang) at (2.4,-1.55) {language detection\\{\scriptsize\ttfamily langdetect}{\scriptsize, first page}};
+\node[proc, text width=50mm] (bulk) at (8.6,-1.55) {bulk text extraction\\{\scriptsize\ttfamily pymupdf4llm}{\scriptsize, once per document}};
+
+\node[proc, text width=62mm] (pool) at (5.5,-3.15) {thread pool -- 4 workers by default\\{\scriptsize results collected in page order}};
+
+% --- per-page processing frame ---
+\draw[black!50, dashed, thin, rounded corners=3pt] (-0.9,-4.1) rectangle (12.4,-9.55);
+\node[note, anchor=north west] at (-0.9,-4.12) {per page, in parallel};
+
+\node[cond, text width=44mm] (toc) at (5.5,-5.0) {TOC page with PDF bookmarks?};
+\node[proc, text width=34mm] (tocout) at (1.1,-6.55) {TOC built from\\\texttt{doc.get\_toc()} -- no LLM};
+\node[proc, text width=44mm] (clf) at (5.5,-6.55) {page classifier + routing\\{\scriptsize Figures~\ref{fig:classifier} and~\ref{fig:routing}}};
+
+\node[proc, text width=30mm] (tp) at (1.6,-8.55) {text path:\\pre-extracted Markdown};
+\node[proc, text width=40mm] (vp) at (5.5,-8.55) {vision path: 150\,DPI PNG\\\(\rightarrow\) LM Studio LLM};
+\node[proc, text width=26mm] (pl) at (9.9,-8.55) {EMPTY:\\placeholder};
+
+\draw[->] (pdf) -- (lang);
+\draw[->] (pdf) -- (bulk);
+\draw[->] (lang) -- (pool);
+\draw[->] (bulk) -- (pool);
+\draw[->] (pool) -- (toc);
+\draw[->] (toc) -- node[lbl, above] {yes} (tocout);
+\draw[->] (toc) -- node[lbl, right] {no} (clf);
+\draw[->] (clf) -- (tp);
+\draw[->] (clf) -- (vp);
+\draw[->] (clf) -- (pl);
+
+% --- document assembly ---
+\node[proc, text width=46mm] (clean) at (5.5,-10.55) {\texttt{clean\_page} -- per-page cleanup};
+\node[proc, text width=52mm] (join) at (5.5,-11.9) {join pages with \texttt{-{}-{}-} separator};
+\node[proc, text width=58mm] (post) at (5.5,-13.25) {\texttt{postprocess\_markdown} -- document-wide cleanup};
+\node[startstop] (out) at (5.5,-14.7) {Markdown output};
+
+\draw[->] (tp) -- (clean);
+\draw[->] (vp) -- (clean);
+\draw[->] (pl) -- (clean);
+\draw[->] (clean) -- (join);
+% TOC pages bypass clean_page and go straight into the join
+\draw[->] (tocout.south) .. controls (-1.6,-10.9) and (-0.5,-11.9) .. (join.west);
+\draw[->] (join) -- (post);
+\draw[->] (post) -- (out);
+\end{tikzpicture}

@@ -159,10 +159,9 @@ Scientific knowledge is a clear example. Blecher et al.\ \autocite{blecher2023}
 note that PDFs make up 2.4\% of Common Crawl and are the second most
 common data format on the internet after HTML. Most of that content is
 not directly machine-readable. For AI systems that need to reason over large
-document collections, this is a serious bottleneck. Khan et al.\ \autocite{khan2024}
-tested this directly: a RAG system built on poorly extracted PDF text produced
-low-quality answers even when the correct information was present in the
-documents. The extraction step, not the language model, was the limiting factor.
+document collections, this is a serious bottleneck. In the RAG experiments of
+Khan et al.\ \autocite{khan2024}, the extraction step, not the language model,
+was the limiting factor.
 
 The problem is not limited to academic papers. Ding et al.\ \autocite{ding2026}
 identify finance, healthcare and legal domains as sectors where visually rich
@@ -179,11 +178,10 @@ use cases this thesis targets. It is human-readable without a renderer,
 compatible with Git for version control, easy to parse programmatically, and
 well-supported by LLM and RAG tooling.
 
-The choice matters for downstream tasks. Fragmented or unstructured text
-produces poor embeddings, which causes retrieval to fail even when the relevant
-content is in the document. Markdown preserves hierarchy through headings, lists
-and tables, which means the document's structure is visible to the embedding
-model and to any downstream reader. A plain paragraph dump does not provide that.
+The choice matters for downstream tasks. Markdown preserves hierarchy through
+headings, lists and tables, which means the document's structure is visible to
+the embedding model and to any downstream reader. A plain paragraph dump does
+not provide that.
 
 Markdown also has a practical advantage over XML and HTML for this setting.
 Both of those formats require a parser to read, and neither is easy to inspect
@@ -206,11 +204,9 @@ to every page uniformly. The adaptive approach routes each page to the
 strategy that fits its detected content type, which is the key difference
 none of the other three provide.
 
-Meuschke et al.\ \autocite{meuschke2023} evaluated mainstream PDF parsing tools
-across multiple document types and found that no single tool performed
-consistently well across all of them. Rule-based text extractors performed best
-on simple single-column documents but failed on scientific and patent documents.
-This finding directly motivates the adaptive approach: if the best tool for one
+Meuschke et al.'s finding that no single tool performs consistently well
+across document types \autocite{meuschke2023} directly motivates the
+adaptive approach: if the best tool for one
 document type is the wrong tool for another, a system that applies one strategy
 uniformly will always underperform on at least some content.
 
@@ -297,7 +293,7 @@ architecture is compatible with any LLM backend that supports a vision
 Application Programming Interface (API). All experiments use LM Studio as
 a self-hosted runtime rather than a third-party cloud AI service, which
 keeps results reproducible regardless of which machine LM Studio runs on;
-Section~4.4 describes the specific hardware used for each experiment.
+Section~4.4 describes the hardware setup used for the experiments.
 
 The system detects the document language from the first page using the
 \texttt{langdetect} library and adjusts LLM prompts to prevent the model

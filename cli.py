@@ -42,7 +42,7 @@ def parse_args():
         "-t",
         "--temperature",
         type=float,
-        default=0.2,
+        default=0.0,
         help="LLM creativity (0.0 = deterministic, 1.0 = creative)",
     )
     parser.add_argument(
